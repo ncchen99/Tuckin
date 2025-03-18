@@ -143,7 +143,7 @@ class CustomCheckbox extends StatelessWidget {
         child:
             value
                 ? Padding(
-                  padding: const EdgeInsets.all(4.0),
+                  padding: const EdgeInsets.all(2.0),
                   child: Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFFB33D1C),
@@ -175,11 +175,15 @@ class PrivacyPolicyDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const StrokeTextWidget(
-              text: '隱私條款',
-              fontSize: 24,
-              textAlign: TextAlign.center,
-              padding: EdgeInsets.only(bottom: 4), // 調整文字位置
+            Container(
+              width: double.infinity,
+              alignment: Alignment.center,
+              child: const StrokeTextWidget(
+                text: '隱私條款',
+                fontSize: 24,
+                textAlign: TextAlign.center,
+                padding: EdgeInsets.only(bottom: 4), // 調整文字位置
+              ),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -480,44 +484,27 @@ class _LoginPageState extends State<LoginPage> {
                                 GestureDetector(
                                   onTap: _showPrivacyPolicy,
                                   child: SizedBox(
-                                    width: 140,
+                                    width: 130,
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
                                         // 隱私條款文字
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: const [
-                                            // 「我同意」
-                                            Flexible(
-                                              child: StrokeTextWidget(
-                                                text: '我同意',
-                                                fontSize: 16,
-                                                textColor: Color(0xFFD1D1D1),
-                                                textAlign: TextAlign.left,
-                                              ),
-                                            ),
-                                            SizedBox(width: 2),
-                                            // 隱私條款文字
-                                            Flexible(
-                                              child: StrokeTextWidget(
-                                                text: '隱私條款',
-                                                fontSize: 16,
-                                                textColor: Color(0xFFD1D1D1),
-                                                textAlign: TextAlign.left,
-                                              ),
-                                            ),
-                                          ],
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 3,
+                                          ), // 添加頂部padding使文字垂直對齊
+                                          child: StrokeTextWidget(
+                                            text: '我同意 隱私條款',
+                                            fontSize: 16,
+                                            textColor: Color(0xFFD1D1D1),
+                                            textAlign: TextAlign.left,
+                                          ),
                                         ),
                                         // 底線僅放在隱私條款下方，精確定位
                                         Padding(
                                           padding: const EdgeInsets.only(
-                                            left: 52,
+                                            left: 53, // 調整位置，讓底線只在「隱私條款」下方
                                           ),
                                           child: Container(
                                             width: 64,
