@@ -13,6 +13,8 @@ class StrokeTextWidget extends StatelessWidget {
   final Color strokeColor;
   final TextAlign textAlign;
   final EdgeInsets padding;
+  final TextOverflow overflow;
+  final int? maxLines;
 
   const StrokeTextWidget({
     Key? key,
@@ -22,6 +24,8 @@ class StrokeTextWidget extends StatelessWidget {
     this.strokeColor = const Color(0xFF23456B),
     this.textAlign = TextAlign.left,
     this.padding = EdgeInsets.zero,
+    this.overflow = TextOverflow.visible,
+    this.maxLines,
   }) : super(key: key);
 
   @override
@@ -36,10 +40,12 @@ class StrokeTextWidget extends StatelessWidget {
           fontFamily: 'OtsutomeFont',
           fontWeight: FontWeight.bold,
           height: 1.4, // 進一步增加行高，使文字下移
+          overflow: overflow,
         ),
         strokeColor: strokeColor,
         strokeWidth: 3,
         textAlign: textAlign,
+        maxLines: maxLines,
       ),
     );
   }
@@ -186,17 +192,22 @@ class PrivacyPolicyDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              '非常感謝您使用TUCKIN應用程式。我們十分重視您的隱私保護與個人資料安全。\n\n'
-              '• 我們僅收集必要的資訊以提供服務\n'
-              '• 您的個人資料不會被出售或分享給第三方\n'
-              '• 我們採用現代加密技術保護您的資料\n'
-              '• 您有權限查閱、更正或刪除您的個人資料\n\n'
-              '使用本應用即表示您同意我們的隱私政策條款。',
-              style: TextStyle(
-                fontSize: 16,
-                fontFamily: 'OtsutomeFont',
-                height: 1.4, // 進一步增加行高
+            // 使用 Flexible + SingleChildScrollView 處理長文字
+            Flexible(
+              child: SingleChildScrollView(
+                child: const Text(
+                  '非常感謝您使用TUCKIN應用程式。我們十分重視您的隱私保護與個人資料安全。\n\n'
+                  '• 我們僅收集必要的資訊以提供服務\n'
+                  '• 您的個人資料不會被出售或分享給第三方\n'
+                  '• 我們採用現代加密技術保護您的資料\n'
+                  '• 您有權限查閱、更正或刪除您的個人資料\n\n'
+                  '使用本應用即表示您同意我們的隱私政策條款。',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontFamily: 'OtsutomeFont',
+                    height: 1.4, // 進一步增加行高
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -484,7 +495,9 @@ class _LoginPageState extends State<LoginPage> {
                                 GestureDetector(
                                   onTap: _showPrivacyPolicy,
                                   child: SizedBox(
-                                    width: 130,
+                                    width:
+                                        MediaQuery.of(context).size.width *
+                                        0.35,
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
@@ -499,6 +512,8 @@ class _LoginPageState extends State<LoginPage> {
                                             fontSize: 16,
                                             textColor: Color(0xFFD1D1D1),
                                             textAlign: TextAlign.left,
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
                                           ),
                                         ),
                                         // 底線僅放在隱私條款下方，精確定位
