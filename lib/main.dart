@@ -328,7 +328,7 @@ class _ImageButtonState extends State<ImageButton> {
                     letterSpacing: 1.0,
                     height: 1.4, // 進一步增加行高
                   ),
-                  strokeColor: Colors.black,
+                  strokeColor: const Color(0xFF23456B), // 修改為深藍色
                   strokeWidth: 4,
                   textAlign: TextAlign.center,
                 ),
@@ -443,11 +443,29 @@ class _LoginPageState extends State<LoginPage> {
                     // TUCKIN 標誌 - 調整間距
                     Padding(
                       padding: const EdgeInsets.only(bottom: 20, top: 40),
-                      child: Image.asset(
-                        'assets/images/icon/tuckin_t_brand.png',
-                        width: 200,
-                        height: 100,
-                        fit: BoxFit.contain,
+                      child: Stack(
+                        children: [
+                          // 底部陰影圖片
+                          Positioned(
+                            left: 0,
+                            top: 3,
+                            child: Image.asset(
+                              'assets/images/icon/tuckin_t_brand.png',
+                              width: 200,
+                              height: 100,
+                              fit: BoxFit.contain,
+                              color: Colors.black.withOpacity(0.4),
+                              colorBlendMode: BlendMode.srcIn,
+                            ),
+                          ),
+                          // 圖片主圖層
+                          Image.asset(
+                            'assets/images/icon/tuckin_t_brand.png',
+                            width: 200,
+                            height: 100,
+                            fit: BoxFit.contain,
+                          ),
+                        ],
                       ),
                     ),
 
