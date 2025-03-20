@@ -1,5 +1,5 @@
 name: tuckin
-description: "A new Flutter project."
+description: "每一頓飯，都是一個故事的開端；每一次相聚，都是友誼的起點！"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -35,6 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   stroke_text: ^1.0.0
+  video_player: ^2.9.3
 
 dev_dependencies:
   flutter_test:
@@ -63,7 +64,11 @@ flutter:
     - assets/images/ui/button/
     - assets/images/background/
     - assets/images/icon/
+    - assets/images/avatar/no_bg/
+    - assets/images/dish/
     - assets/fonts/
+    - assets/video/
+
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
