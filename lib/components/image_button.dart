@@ -106,9 +106,8 @@ class _ImageButtonState extends State<ImageButton> {
                     height: 1.2, // 減小行高以改善垂直對齊
                     fontSize:
                         isSmallButton
-                            ? widget.textStyle.fontSize?.sp ?? 20.sp
-                            : widget.textStyle.fontSize?.sp ??
-                                24.sp, // 根據按鈕大小調整字體
+                            ? widget.textStyle.fontSize ?? 18
+                            : widget.textStyle.fontSize ?? 20, // 根據按鈕大小調整字體
                   ),
                   strokeColor: const Color(0xFF23456B), // 深藍色邊框
                   strokeWidth: (isSmallButton ? 3.r : 4.r), // 自適應邊框寬度

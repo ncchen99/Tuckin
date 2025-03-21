@@ -65,7 +65,7 @@ class PrivacyPolicyDialog extends StatelessWidget {
               width: 130.w, // 使用自適應寬度
               height: 65.h, // 使用自適應高度
               textStyle: TextStyle(
-                fontSize: 20.sp, // 使用自適應字體大小
+                fontSize: 20, // 使用自適應字體大小
                 color: const Color(0xFFD1D1D1),
                 fontFamily: 'OtsutomeFont',
                 fontWeight: FontWeight.bold,
