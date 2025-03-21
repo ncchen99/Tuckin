@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'extensions.dart';
 
 /// 響應式佈局組件
 /// 根據不同設備類型顯示不同內容

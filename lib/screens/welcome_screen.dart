@@ -79,7 +79,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   final int _virtualFigureCount = 50; // 增加到50個虛擬人物
 
   // 添加人物佈局相關變數，使其能在不同方法間共享
-  List<int> _rowGrids = [15, 10, 7, 5, 4]; // 由上到下的格子數
+  final List<int> _rowGrids = [15, 10, 7, 5, 4]; // 由上到下的格子數
   List<double> _rowStartY = [];
   List<double> _rowHeights = [];
 
