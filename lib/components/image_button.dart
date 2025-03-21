@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:stroke_text/stroke_text.dart';
+import '../utils/index.dart'; // 導入自適應佈局工具
 
 // 圖片按鈕元件
 class ImageButton extends StatefulWidget {
@@ -34,11 +35,15 @@ class _ImageButtonState extends State<ImageButton> {
 
   @override
   Widget build(BuildContext context) {
-    // 根據按鈕尺寸計算適當的陰影偏移量
-    final bool isSmallButton = widget.width <= 130; // 判斷是否為小號按鈕
-    final double shadowOffset = isSmallButton ? 3 : 5; // 小按鈕用小陰影
-    final double textTopOffset = isSmallButton ? 6 : 9; // 小按鈕文字偏移量較小
-    final double textNormalOffset = isSmallButton ? 2 : 3; // 常規狀態下的文字偏移量
+    // 根據按鈕尺寸計算適當的陰影偏移量和比例
+    final bool isSmallButton = widget.imagePath.contains('_m');
+
+    // 將尺寸適配為自適應尺寸
+    final adaptiveShadowOffset = (isSmallButton ? 3.h : 4.h); // 減小小號按鈕的陰影偏移
+    final adaptiveTextTopOffset =
+        (isSmallButton ? 5.h : 9.h); // 同步調整小號按鈕的文字頂部偏移
+    final adaptiveTextNormalOffset = (isSmallButton ? 1.5.h : 3.h); // 調整常規文字偏移
+    final adaptiveBottomSpace = (isSmallButton ? 5.h : 10.h); // 調整底部空間
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
@@ -49,18 +54,18 @@ class _ImageButtonState extends State<ImageButton> {
       onTapCancel: () => setState(() => _isPressed = false),
       child: SizedBox(
         width: widget.width,
-        height: widget.height + (isSmallButton ? 6 : 10), // 小按鈕下方空間較小
+        height: widget.height + adaptiveBottomSpace, // 使用自適應底部空間
         child: Stack(
           children: [
             // 底部陰影圖片 - 使用相同的圖片但僅向下偏移
             if (!_isPressed)
               Positioned(
                 left: 0,
-                top: shadowOffset,
+                top: adaptiveShadowOffset,
                 child: Container(
                   width: widget.width,
                   height: widget.height,
-                  decoration: BoxDecoration(color: Colors.transparent),
+                  decoration: const BoxDecoration(color: Colors.transparent),
                   child: Image.asset(
                     widget.imagePath,
                     width: widget.width,
@@ -74,7 +79,7 @@ class _ImageButtonState extends State<ImageButton> {
 
             // 按鈕主圖層
             Positioned(
-              top: _isPressed ? shadowOffset + 1 : 0,
+              top: _isPressed ? adaptiveShadowOffset + 1.h : 0,
               child: Container(
                 decoration: const BoxDecoration(color: Colors.transparent),
                 child: Image.asset(
@@ -89,19 +94,24 @@ class _ImageButtonState extends State<ImageButton> {
             // 按鈕文字 - 使用 StrokeText 組件
             Positioned(
               top:
-                  _isPressed ? textTopOffset : textNormalOffset, // 根據按鈕大小調整文字位置
+                  _isPressed ? adaptiveTextTopOffset : adaptiveTextNormalOffset,
               left: 0,
               right: 0,
-              bottom: isSmallButton ? 6 : 10, // 調整文字位置，避免被底部切斷
+              bottom: adaptiveBottomSpace, // 使用自適應底部空間
               child: Center(
                 child: StrokeText(
                   text: widget.text,
                   textStyle: widget.textStyle.copyWith(
-                    letterSpacing: 1.0,
-                    height: 1.4, // 進一步增加行高
+                    letterSpacing: 1.0.w, // 自適應字母間距
+                    height: 1.2, // 減小行高以改善垂直對齊
+                    fontSize:
+                        isSmallButton
+                            ? widget.textStyle.fontSize?.sp ?? 20.sp
+                            : widget.textStyle.fontSize?.sp ??
+                                24.sp, // 根據按鈕大小調整字體
                   ),
-                  strokeColor: const Color(0xFF23456B), // 修改為深藍色
-                  strokeWidth: isSmallButton ? 3 : 4, // 小按鈕文字邊框較細
+                  strokeColor: const Color(0xFF23456B), // 深藍色邊框
+                  strokeWidth: (isSmallButton ? 3.r : 4.r), // 自適應邊框寬度
                   textAlign: TextAlign.center,
                 ),
               ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:stroke_text/stroke_text.dart';
+import '../utils/index.dart'; // 導入自適應佈局工具
 
 // 自定義文字元件（帶邊框）
 class StrokeTextWidget extends StatelessWidget {
@@ -26,12 +27,15 @@ class StrokeTextWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 使用自適應尺寸，但保留原始字體大小作為基準
+    final adaptiveFontSize = fontSize.sp;
+
     return Padding(
       padding: padding,
       child: StrokeText(
         text: text,
         textStyle: TextStyle(
-          fontSize: fontSize,
+          fontSize: adaptiveFontSize, // 使用自適應字體大小
           color: textColor,
           fontFamily: 'OtsutomeFont',
           fontWeight: FontWeight.bold,
@@ -39,7 +43,7 @@ class StrokeTextWidget extends StatelessWidget {
           overflow: overflow,
         ),
         strokeColor: strokeColor,
-        strokeWidth: 3,
+        strokeWidth: fontSize > 20 ? 4.r : 3.r, // 根據字體大小調整邊框寬度並使用自適應值
         textAlign: textAlign,
         maxLines: maxLines,
       ),

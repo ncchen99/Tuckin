@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../components/components.dart';
+import '../utils/index.dart'; // 導入自適應佈局工具
 import 'login_page.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:math' as math;
@@ -51,9 +52,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // 新的介紹文字
   final List<String> _introTexts = [
-    '每一頓飯，都是一個故事的開端；每一次相聚，都是友誼的起點！',
-    '智能配對，連結志同道合的夥伴，擁抱與共鳴的瞬間！',
-    '一起出發尋找美食，\n創造難忘回憶！',
+    '每一頓飯，都是一個故事的開端；\n每一次相聚，都是友誼的起點！',
+    '智能配對，連結志同道合的夥伴\n擁抱與共鳴的瞬間！',
+    '一起出發尋找美食\n創造難忘回憶！',
   ];
 
   // 黏土人物路徑
@@ -357,8 +358,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+    // 使用擴展方法替代 MediaQuery
+    final screenWidth = context.screenWidth;
+    final screenHeight = context.screenHeight;
 
     // 計算方形容器的大小（使用較小的值以確保正方形）
     final squareSize = math.min(screenWidth, screenHeight * 0.6);
@@ -378,7 +380,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               AspectRatio(
                 aspectRatio: 1.0, // 強制1:1的比例
                 child: Padding(
-                  padding: const EdgeInsets.all(25.0),
+                  padding: EdgeInsets.all(25.r), // 使用自適應圓角
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       // 使用LayoutBuilder獲取實際可用空間
@@ -410,41 +412,48 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               // 底部說明區域
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 30),
+                  padding: EdgeInsets.symmetric(horizontal: 30.w), // 使用自適應寬度
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       // 說明文字
-                      Text(
-                        _introTexts[_currentPage],
-                        style: const TextStyle(
-                          fontSize: 18,
-                          color: Color(0xFF23456B),
-                          fontFamily: 'OtsutomeFont',
-                          fontWeight: FontWeight.bold,
-                          height: 1.4,
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            _introTexts[_currentPage],
+                            style: TextStyle(
+                              fontSize: 18.sp, // 使用自適應字體大小
+                              color: const Color(0xFF23456B),
+                              fontFamily: 'OtsutomeFont',
+                              fontWeight: FontWeight.bold,
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                        textAlign: TextAlign.center,
                       ),
 
                       // 下一步按鈕
-                      ImageButton(
-                        imagePath: 'assets/images/ui/button/red_m.png',
-                        text: _currentPage < _totalPages - 1 ? '下一步' : '開始使用',
-                        width: 160, // 增加按鈕寬度
-                        height: 70, // 增加按鈕高度
-                        textStyle: const TextStyle(
-                          fontSize: 18, // 稍微縮小文字大小
-                          color: Color(0xFFD1D1D1),
-                          fontFamily: 'OtsutomeFont',
-                          fontWeight: FontWeight.bold,
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 40.h), // 統一底部間距
+                        child: ImageButton(
+                          imagePath: 'assets/images/ui/button/red_m.png',
+                          text: _currentPage < _totalPages - 1 ? '下一步' : '開始使用',
+                          width: 160.w, // 使用自適應寬度
+                          height: 75.h, // 使用自適應高度
+                          textStyle: TextStyle(
+                            fontSize: 18.sp, // 使用自適應字體大小
+                            color: const Color(0xFFD1D1D1),
+                            fontFamily: 'OtsutomeFont',
+                            fontWeight: FontWeight.bold,
+                          ),
+                          onPressed: _goToNextPage,
                         ),
-                        onPressed: _goToNextPage,
                       ),
 
                       // 分頁指示器
-                      SizedBox(
-                        height: 20,
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 20.h), // 與登入頁面統一底部間距
                         child: ProgressDotsIndicator(
                           totalSteps: _totalPages,
                           currentStep: _currentPage + 1,
@@ -467,10 +476,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(25),
+        borderRadius: BorderRadius.circular(25.r), // 使用自適應圓角
       ),
-      clipBehavior: Clip.hardEdge,
+      clipBehavior: Clip.antiAlias, // 使用抗鋸齒裁剪方式
       child:
           _isVideoInitialized
               ? FittedBox(
@@ -488,30 +496,35 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // 第二頁：人物動畫
   Widget _buildFiguresAnimation(double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        image: const DecorationImage(
-          image: AssetImage('assets/images/background/bg3.png'),
-          fit: BoxFit.cover,
-          opacity: 0.2, // 降低不透明度，使背景稍微淡化
+    // 使用預先構建方法，確保圓角從一開始就被應用
+    return PhysicalModel(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(25.r),
+      clipBehavior: Clip.antiAlias, // 使用抗鋸齒裁剪
+      elevation: 0, // 無陰影
+      child: Container(
+        width: size,
+        height: size,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          image: DecorationImage(
+            image: AssetImage('assets/images/background/bg3.png'),
+            fit: BoxFit.cover,
+            opacity: 0.2, // 降低不透明度，使背景稍微淡化
+          ),
         ),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // 放置所有人物 - 先將數組按照Y軸排序，讓"靠前"的人物在上面
-              ..._generateCharacterWidgets(size),
-            ],
-          );
-        },
+        child: AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, child) {
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // 放置所有人物 - 先將數組按照Y軸排序，讓"靠前"的人物在上面
+                ..._generateCharacterWidgets(size),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -687,49 +700,55 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // 第三頁：食物動畫
   Widget _buildFoodAnimation(double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        image: const DecorationImage(
-          image: AssetImage('assets/images/background/bg4.jpg'),
-          fit: BoxFit.cover,
-          opacity: 0.6, // 降低不透明度以保持食物清晰可見
+    // 使用與人物動畫相同的方式處理圓角問題
+    return PhysicalModel(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(25.r),
+      clipBehavior: Clip.antiAlias, // 使用抗鋸齒裁剪
+      elevation: 0, // 無陰影
+      child: Container(
+        width: size,
+        height: size,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          image: DecorationImage(
+            image: AssetImage('assets/images/background/bg4.jpg'),
+            fit: BoxFit.cover,
+            opacity: 0.6, // 降低不透明度以保持食物清晰可見
+          ),
         ),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          // 相機縮放效果
-          final zoomScale = Tween<double>(begin: 1.0, end: 1.2).evaluate(
-            CurvedAnimation(
-              parent: _animationController,
-              curve: const Interval(0.7, 1.0, curve: Curves.easeInOut),
-            ),
-          );
+        child: AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, child) {
+            // 相機縮放效果
+            final zoomScale = Tween<double>(begin: 1.0, end: 1.2).evaluate(
+              CurvedAnimation(
+                parent: _animationController,
+                curve: const Interval(0.7, 1.0, curve: Curves.easeInOut),
+              ),
+            );
 
-          return Transform.scale(
-            scale: zoomScale,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF23456B).withOpacity(0.15), // 降低背景色的不透明度
-                borderRadius: BorderRadius.circular(25),
+            return Transform.scale(
+              scale: zoomScale,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(
+                    0xFF23456B,
+                  ).withOpacity(0.15), // 降低背景色的不透明度
+                ),
+                child: Stack(
+                  // 確保Stack以中心為原點
+                  alignment: Alignment.center,
+                  fit: StackFit.expand,
+                  children: [
+                    // 從四面八方飛入的菜品 - 16宮格佈局
+                    ..._buildFoodWidgets(size),
+                  ],
+                ),
               ),
-              child: Stack(
-                // 確保Stack以中心為原點
-                alignment: Alignment.center,
-                fit: StackFit.expand,
-                children: [
-                  // 從四面八方飛入的菜品 - 16宮格佈局
-                  ..._buildFoodWidgets(size),
-                ],
-              ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
