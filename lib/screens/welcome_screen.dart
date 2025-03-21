@@ -4,6 +4,7 @@ import '../components/components.dart';
 import 'login_page.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:math' as math;
+import 'dart:math';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -75,6 +76,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   final List<Offset> _figureInitialPositions = [];
   final List<Offset> _figureFinalPositions = [];
   final int _virtualFigureCount = 50; // 增加到50個虛擬人物
+
+  // 添加人物佈局相關變數，使其能在不同方法間共享
+  List<int> _rowGrids = [15, 10, 7, 5, 4]; // 由上到下的格子數
+  List<double> _rowStartY = [];
+  List<double> _rowHeights = [];
 
   // 宣告動畫變數
   late Animation<double> _figureAnimation;
@@ -183,27 +189,59 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     // 清空數組以確保不會有舊數據
     _figureInitialPositions.clear();
     _figureFinalPositions.clear();
+    _rowStartY.clear();
+    _rowHeights.clear();
 
     // 定義正確的畫布邊界：為了確保出血效果正確
     final double canvasHalfSize = 150.0; // 假設畫布大小為300x300，中心點(0,0)
 
     // 定義5個橫排的格子數量
-    final List<int> rowGrids = [15, 10, 7, 5, 4]; // 由上到下的格子數
-    final int totalGrids = rowGrids.reduce((a, b) => a + b); // 總格子數
+    // _rowGrids = [15, 10, 7, 5, 4]; // 由上到下的格子數 (已在類中定義)
+    final int totalGrids = _rowGrids.reduce((a, b) => a + b); // 總格子數
 
     // 生成所有可能的格子位置
     List<Offset> gridPositions = [];
 
     // 計算每一行的高度
     final double totalHeight = canvasHalfSize * 2;
-    final double rowHeight = totalHeight / 3 / rowGrids.length;
+
+    // 使用漸進式行高：上方行較窄，下方行較寬
+    // 計算行高權重，使得上方行高低，下方行高高
+    List<double> rowHeightWeights = [];
+    for (int i = 0; i < _rowGrids.length; i++) {
+      // 指數增長的權重，使得上方行高低，下方行高高
+      rowHeightWeights.add(pow(1.5, i).toDouble());
+    }
+
+    // 計算權重總和
+    final double totalWeight = rowHeightWeights.reduce((a, b) => a + b);
+
+    // 定義Y座標的有效顯示範圍
+    final double yStart = canvasHalfSize / 3; // 起始位置提高
+    final double yEnd = canvasHalfSize + 30; // 底部位置降低
+    final double yRange = yEnd - yStart; // 總可用Y軸範圍
+
+    // 計算每一行的實際高度
+    _rowHeights =
+        rowHeightWeights
+            .map((weight) => yRange * (weight / totalWeight))
+            .toList();
+
+    // 計算每行的起始Y位置 - 從yStart開始
+    _rowStartY = [yStart];
+    for (int i = 1; i < _rowGrids.length; i++) {
+      _rowStartY.add(_rowStartY[i - 1] + _rowHeights[i - 1]);
+    }
+
+    // 將倒數第二行下移5個像素
+    _rowStartY[3] += 5;
 
     // 從上到下生成每一行的格子位置
-    for (int rowIndex = 0; rowIndex < rowGrids.length; rowIndex++) {
-      final int gridsInRow = rowGrids[rowIndex];
+    for (int rowIndex = 0; rowIndex < _rowGrids.length; rowIndex++) {
+      final int gridsInRow = _rowGrids[rowIndex];
 
       // 計算行的Y坐標（從上往下）
-      final double rowY = canvasHalfSize / 1.7 + rowHeight * (rowIndex + 0.5);
+      final double rowY = _rowStartY[rowIndex] + _rowHeights[rowIndex] / 2;
 
       // 計算每個格子的寬度
       final double gridWidth = (canvasHalfSize * 2) / gridsInRow;
@@ -233,37 +271,18 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
       // 將人物分配到一個格子位置，加上一些隨機偏移
       Offset gridPos = gridPositions[i];
-      double offsetX = random.nextDouble() * 5 - 2.5; // 小幅度隨機偏移
-      double offsetY = random.nextDouble() * 5 - 2.5;
+
+      // 更小的隨機偏移，使排列更整齊
+      double offsetX = random.nextDouble() * 3 - 1.5; // 小幅度隨機偏移
+      double offsetY = random.nextDouble() * 3 - 1.5;
 
       // 決定這個人物是否應該有出血效果（僅第一行和最後一行的邊緣格子）
       bool shouldBleed = false;
       double finalX = gridPos.dx + offsetX;
       double finalY = gridPos.dy + offsetY;
 
-      // 檢查是否是第一行或最後一行的邊緣格子
-      if ((i < rowGrids[0] && (i == 0 || i == rowGrids[0] - 1)) || // 第一行的左右邊緣
-          (i >= totalGrids - rowGrids.last &&
-              (i == totalGrids - rowGrids.last || i == totalGrids - 1))) {
-        // 最後一行的左右邊緣
-        // shouldBleed = random.nextDouble() < 0.7; // 70%機率有出血效果
-      }
-
-      // if (shouldBleed) {
-      //   // 出血效果：根據格子位置決定出血方向
-      //   if (finalX < -canvasHalfSize + 50) {
-      //     // 左側出血
-      //     finalX = -canvasHalfSize - 30 + random.nextDouble() * 20;
-      //   } else if (finalX > canvasHalfSize - 50) {
-      //     // 右側出血
-      //     finalX = canvasHalfSize + 30 + random.nextDouble() * 20;
-      //   }
-
-      //   // 底部最後一行可能向下出血
-      //   if (finalY > canvasHalfSize - 40 && random.nextBool()) {
-      //     finalY = canvasHalfSize + 30 + random.nextDouble() * 20;
-      //   }
-      // }
+      // 確保Y座標在有效範圍內
+      finalY = finalY.clamp(yStart, yEnd);
 
       _figureFinalPositions.add(Offset(finalX, finalY));
     }
@@ -504,6 +523,23 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     final figureCount = _figureFinalPositions.length;
 
+    // 為每一行建立獨立的人物索引列表
+    List<List<int>> rowFigureIndices = [];
+
+    // 初始化每行的人物索引列表
+    for (int rowIndex = 0; rowIndex < _rowGrids.length; rowIndex++) {
+      // 為每一行創建所有可能人物的索引，並打亂順序
+      List<int> availableFigures = List.generate(
+        _figuresPaths.length,
+        (index) => index,
+      )..shuffle(Random(rowIndex)); // 使用行索引作為種子確保每次運行結果一致但不同行間不同
+
+      rowFigureIndices.add(availableFigures);
+    }
+
+    // 跟踪每一行使用的人物索引
+    List<int> rowCurrentIndex = List.generate(_rowGrids.length, (_) => 0);
+
     for (int i = 0; i < figureCount; i++) {
       // 根據finalY決定人物大小和層次 - Y值越大表示越"靠前"
       final finalPos = _figureFinalPositions[i];
@@ -515,29 +551,54 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
       // 調整深度計算，讓Y值更大的人物（底部）更大
       double depthFactor;
-      // depthFactor = 1.0 - (distanceFromCenter / 300).clamp(0.0, 0.3);
-      // Y值越大（越靠下方），人物尺寸越大
-      if (finalPos.dy > 140) {
-        // 底部的人物更大
-        depthFactor = 1.8 - (distanceFromCenter / 300).clamp(0.0, 0.4);
-      } else if (finalPos.dy > 120) {
-        // 中間的人物更大
-        depthFactor = 1.4 - (distanceFromCenter / 300).clamp(0.0, 0.3);
-      } else if (finalPos.dy > 100) {
-        // 頂部的人物更小
-        depthFactor = 1.3 - (distanceFromCenter / 300).clamp(0.0, 0.3);
-      } else {
-        // 中間區域
-        depthFactor = 1.2 - (distanceFromCenter / 350).clamp(0.0, 0.4);
-      }
+      // 根據Y位置創建平滑漸變效果，範圍大約是 -150 到 150
+      // 將Y值歸一化到0-1範圍，然後計算大小係數
+      double normalizedY = (finalPos.dy + 150) / 300; // 將 -150 到 150 歸一化到 0-1
+
+      // 使用更溫和的二次曲線，減小上下層差異
+      // 基礎大小範圍：頂部0.7，底部1.4 (降低最大值防止過大)
+      double baseSize = 0.7 + (normalizedY * normalizedY);
+
+      // 適當增加距離中心的縮小效果
+      double distanceFactor = (distanceFromCenter / 350).clamp(0.0, 0.25);
+
+      depthFactor = baseSize - distanceFactor;
+
+      // 確保最小值和最大值在合理範圍
+      depthFactor = depthFactor.clamp(0.6, 2);
 
       // 計算動畫延遲 - 根據行數計算，讓越靠近底部的行越先出現
       double baseDelay = (finalPos.dy + 150) / 300 * 0.4; // 將Y值範圍轉換為0-0.4的延遲範圍
       double randomOffset = (i % 5) * 0.02; // 增加一些隨機性
       double delayTime = (baseDelay + randomOffset).clamp(0.0, 0.5);
 
-      // 確保不會訪問超出範圍的索引
-      int figureIndex = i % _figuresPaths.length;
+      // 確定人物所在行
+      int personRow = -1;
+      for (int rowIndex = 0; rowIndex < _rowGrids.length; rowIndex++) {
+        if (rowIndex == 0 && finalPos.dy <= _rowStartY[0] + _rowHeights[0]) {
+          personRow = 0;
+          break;
+        } else if (rowIndex > 0 &&
+            finalPos.dy >
+                _rowStartY[rowIndex - 1] + _rowHeights[rowIndex - 1] &&
+            finalPos.dy <= _rowStartY[rowIndex] + _rowHeights[rowIndex]) {
+          personRow = rowIndex;
+          break;
+        }
+      }
+
+      // 如果沒找到對應行，預設為最底行
+      if (personRow == -1) {
+        personRow = _rowGrids.length - 1;
+      }
+
+      // 獲取此行的下一個人物索引
+      int rowIndex = rowCurrentIndex[personRow];
+      int figureIndex =
+          rowFigureIndices[personRow][rowIndex % _figuresPaths.length];
+
+      // 更新此行的索引
+      rowCurrentIndex[personRow]++;
 
       // 計算透明度 - 上方的人物半透明
       double baseOpacity = finalPos.dy < -50 ? 0.7 : 1.0;
@@ -601,7 +662,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       );
 
       // 計算尺寸 - 讓大小變化更合理
-      final baseSize = size * 0.2; // 稍微縮小基礎大小
+      final baseSize = size * 0.21; // 縮小基礎大小
       final imageSize = baseSize * data['depth'];
 
       // 定位人物，根據排序後的位置
@@ -856,36 +917,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       }).toList()
       ..sort((a, b) {
         // 根據位置排序，讓Y值越大的食物越靠前顯示
-        final aTop = (a as Positioned).top ?? 0.0;
-        final bTop = (b as Positioned).top ?? 0.0;
+        final aTop = (a).top ?? 0.0;
+        final bTop = (b).top ?? 0.0;
         return aTop.compareTo(bTop);
       });
   }
-}
-
-// 自定義畫布，用於繪製連接線
-class ConnectionPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = const Color(0xFFB33D1C)
-          ..strokeWidth = 2
-          ..style = PaintingStyle.stroke;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width * 0.3;
-
-    // 從四個角落向中心畫線
-    canvas.drawLine(Offset(size.width * 0.2, size.height * 0.3), center, paint);
-    canvas.drawLine(Offset(size.width * 0.8, size.height * 0.3), center, paint);
-    canvas.drawLine(Offset(size.width * 0.2, size.height * 0.7), center, paint);
-    canvas.drawLine(Offset(size.width * 0.8, size.height * 0.7), center, paint);
-
-    // 中心畫一個圓圈表示匹配成功
-    canvas.drawCircle(center, radius * 0.2, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
