@@ -240,7 +240,7 @@ class _LoginPageState extends State<LoginPage> {
                     height: 70.h,
                     onPressed: _login,
                     textStyle: TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       color: const Color(0xFFD1D1D1),
                       fontFamily: 'OtsutomeFont',
                       fontWeight: FontWeight.bold,

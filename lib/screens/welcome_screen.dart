@@ -442,7 +442,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           width: 160.w, // 使用自適應寬度
                           height: 75.h, // 使用自適應高度
                           textStyle: TextStyle(
-                            fontSize: 20, // 使用自適應字體大小
+                            fontSize: 18, // 使用自適應字體大小
                             color: const Color(0xFFD1D1D1),
                             fontFamily: 'OtsutomeFont',
                             fontWeight: FontWeight.bold,
