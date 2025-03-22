@@ -1,7 +1,9 @@
-// 匯出所有組件
-export 'stroke_text_widget.dart';
-export 'icon_text_input.dart';
-export 'custom_checkbox.dart';
-export 'privacy_policy_dialog.dart';
+// 導出所有組件，方便在其他地方引用
 export 'image_button.dart';
+export 'google_sign_in_button.dart';
+export 'privacy_policy_dialog.dart';
+export 'custom_checkbox.dart';
 export 'progress_dots_indicator.dart';
+export 'icon_text_input.dart';
+export 'back_button.dart';
+export 'loading_image.dart';

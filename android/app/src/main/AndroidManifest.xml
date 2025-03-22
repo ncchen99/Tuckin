@@ -31,6 +31,10 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+    
+    <!-- 添加網絡權限，許多API需要這個權限 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
@@ -41,5 +45,8 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- 添加 Google 服務查詢支持 -->
+        <package android:name="com.google.android.gms"/>
+        <package android:name="com.android.vending"/>
     </queries>
 </manifest>

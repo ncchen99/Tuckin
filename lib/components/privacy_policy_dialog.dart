@@ -4,7 +4,9 @@ import '../utils/index.dart'; // 導入自適應佈局工具
 
 // 隱私條款對話框
 class PrivacyPolicyDialog extends StatelessWidget {
-  const PrivacyPolicyDialog({super.key});
+  final VoidCallback? onAgree;
+
+  const PrivacyPolicyDialog({super.key, this.onAgree});
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +73,11 @@ class PrivacyPolicyDialog extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
               onPressed: () {
+                // 先調用同意回調
+                if (onAgree != null) {
+                  onAgree!();
+                }
+                // 然後關閉對話框
                 Navigator.of(context).pop();
               },
             ),

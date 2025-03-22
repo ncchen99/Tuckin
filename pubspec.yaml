@@ -36,6 +36,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   stroke_text: ^1.0.0
   video_player: ^2.9.3
+  supabase_flutter: ^2.2.0
+  google_sign_in: ^6.2.1
+  font_awesome_flutter: ^10.7.0
+  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -84,9 +88,10 @@ flutter:
     - assets/images/icon/
     - assets/images/avatar/no_bg/
     - assets/images/dish/
+    - assets/images/illustrate/
     - assets/fonts/
     - assets/video/
-
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
