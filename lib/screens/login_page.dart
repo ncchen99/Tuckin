@@ -142,11 +142,10 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
 
-                // 中間彈性空間 - 隨鍵盤狀態動態調整
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  height: isInputFocused || isKeyboardVisible ? 20.h : 100.h,
-                  curve: Curves.easeOutQuad,
+                // 中間彈性空間 - 動態調整以適應各種螢幕尺寸
+                Expanded(
+                  flex: isInputFocused || isKeyboardVisible ? 1 : 3,
+                  child: Container(),
                 ),
 
                 // 輸入框
@@ -162,7 +161,7 @@ class _LoginPageState extends State<LoginPage> {
 
                 // 隱私條款勾選和底線整體包裝
                 Padding(
-                  padding: sizeConfig.getAdaptivePadding(top: 15, bottom: 25),
+                  padding: sizeConfig.getAdaptivePadding(top: 10, bottom: 15),
                   child: Center(
                     child: Column(
                       children: [
