@@ -115,11 +115,12 @@ class DatabaseService {
 
       // 從 userProfile 中提取食物偏好
       List<int> foodIds = [];
-      if (userProfile != null && userProfile['food_preferences_json'] != null) {
+      if (!(userProfile == null || userProfile.isEmpty) &&
+          userProfile['food_preferences_json'] != null) {
         // 將 JSON 轉換為 List<int>
         foodIds = List<int>.from(userProfile['food_preferences_json']);
       }
-
+      print("userProfile: $userProfile");
       // 組合所有資料
       return {
         'profile': userProfile ?? {},

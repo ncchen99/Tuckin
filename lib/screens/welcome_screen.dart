@@ -171,10 +171,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           );
 
           if (mounted) {
+            print("userProfile: $userProfile");
+
+            if (userProfile['profile'] != null &&
+                userProfile['profile'].isEmpty) {
+              // 從頭開始設定
+              Navigator.of(context).pushReplacementNamed('/profile_setup');
+            }
             // 建立完整的導航堆疊
-            if (userProfile['personality_type'] == null &&
+            else if (userProfile['personality_type'] == null &&
                 userProfile['food_preferences'] != null &&
-                userProfile['profile'] != null) {
+                userProfile['food_preferences'].isNotEmpty &&
+                userProfile['profile'] != null &&
+                userProfile['profile'].isNotEmpty) {
               // 只缺個性測驗，建立正確的導航堆疊
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(
@@ -200,8 +209,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   );
                 }
               }
-            } else if (userProfile['food_preferences'] == null &&
-                userProfile['profile'] != null) {
+            } else if ((userProfile['food_preferences'] == null ||
+                    userProfile['food_preferences'].isEmpty) &&
+                userProfile['profile'] != null &&
+                userProfile['profile'].isNotEmpty) {
               // 缺少食物偏好和個性測驗
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(
@@ -217,9 +228,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   ),
                 );
               }
-            } else if (userProfile['profile'] == null) {
-              // 從頭開始設定
-              Navigator.of(context).pushReplacementNamed('/profile_setup');
             }
           }
         }
