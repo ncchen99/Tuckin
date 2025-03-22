@@ -335,7 +335,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            '${option['id']}) ${option['text']}',
+                                            '${option['text']}',
                                             style: TextStyle(
                                               fontSize: 18.sp,
                                               fontFamily: 'OtsutomeFont',
@@ -429,7 +429,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            '${option['id']}) ${option['text']}',
+                                            '${option['text']}',
                                             style: TextStyle(
                                               fontSize: 18.sp,
                                               fontFamily: 'OtsutomeFont',
