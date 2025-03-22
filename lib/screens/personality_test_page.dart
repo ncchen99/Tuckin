@@ -15,61 +15,115 @@ class PersonalityTestPage extends StatefulWidget {
 class _PersonalityTestPageState extends State<PersonalityTestPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
-  int? _selectedPersonality;
+  String? _questionOneAnswer; // 問題1的答案 (a or b)
+  String? _questionTwoAnswer; // 問題2的答案 (a or b)
   bool _isLoading = false;
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
 
-  // 個性類型列表
-  final List<Map<String, dynamic>> _personalityTypes = [
+  // 個性類型問題與選項
+  final List<Map<String, dynamic>> _questions = [
     {
       'id': 1,
-      'name': '隨和型',
-      'description': '你是個隨和的人，願意接受各種餐廳的選擇，沒有太多偏好。',
-      'image': 'assets/images/personality/easygoing.png',
+      'question': '當您接收資訊時，您更喜歡哪種方式？',
+      'options': [
+        {'id': 'a', 'text': '以事實和數據為基礎的資訊', 'description': '例如：統計數字、報告、證據'},
+        {'id': 'b', 'text': '以情感和個人經驗為基礎的資訊', 'description': '例如：故事、感覺、個人意見'},
+      ],
     },
     {
       'id': 2,
-      'name': '嘗鮮型',
-      'description': '你喜歡探索新餐廳，嘗試你從未去過的地方。',
-      'image': 'assets/images/personality/explorer.png',
-    },
-    {
-      'id': 3,
-      'name': '懷舊型',
-      'description': '你總是懷念幾家最愛的餐廳，並經常回訪。',
-      'image': 'assets/images/personality/nostalgic.png',
-    },
-    {
-      'id': 4,
-      'name': '品質型',
-      'description': '無論價格如何，你都追求高品質的用餐體驗。',
-      'image': 'assets/images/personality/quality.png',
-    },
-    {
-      'id': 5,
-      'name': '經濟型',
-      'description': '你喜歡尋找划算的選擇，享受物超所值的餐點。',
-      'image': 'assets/images/personality/budget.png',
+      'question': '當您解釋某件事時，您更喜歡哪種方式？',
+      'options': [
+        {'id': 'a', 'text': '從頭到尾，逐步解釋', 'description': '例如：一步一步說明過程'},
+        {
+          'id': 'b',
+          'text': '直接切入重點，即使可能跳過一些細節',
+          'description': '例如：先說結論，再補充細節',
+        },
+      ],
     },
   ];
 
-  // 處理返回按鈕
-  void _handleBack() {
-    Navigator.of(context).pop();
+  // 分析結果映射
+  final Map<String, String> _personalityTypes = {
+    'aa': '分析型',
+    'ab': '功能型',
+    'bb': '直覺型',
+    'ba': '個人型',
+  };
+
+  // 分析結果描述
+  final Map<String, String> _personalityDescriptions = {
+    '分析型': '您喜歡以邏輯和數據為基礎的溝通，並希望資訊有條理。您可能更容易與注重事實和組織性的人成為朋友。',
+    '功能型': '您喜歡數據，但溝通更靈活，注重實用性。您可能更喜歡與能快速抓住重點的人交朋友。',
+    '直覺型': '您重視情感和直覺，喜歡簡潔直接的溝通。您可能更容易與創造力強、隨性的人產生共鳴。',
+    '個人型': '您重視情感連結，並希望溝通有結構。您可能更喜歡與同理心強、注重關係的人成為朋友。',
+  };
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
-  // 處理性格選擇
-  void _selectPersonality(int personalityId) {
+  // 處理返回按鈕
+  void _handleBack() {
+    if (_currentPage > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
+
+  // 處理問題1選擇
+  void _selectQuestionOneAnswer(String optionId) {
     setState(() {
-      _selectedPersonality = personalityId;
+      _questionOneAnswer = optionId;
     });
+  }
+
+  // 處理問題2選擇
+  void _selectQuestionTwoAnswer(String optionId) {
+    setState(() {
+      _questionTwoAnswer = optionId;
+    });
+  }
+
+  // 處理下一頁
+  void _handleNext() {
+    if (_questionOneAnswer == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('請選擇一個選項')));
+      return;
+    }
+
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  // 獲取個性類型結果
+  String _getPersonalityResult() {
+    if (_questionOneAnswer == null || _questionTwoAnswer == null) {
+      return '';
+    }
+
+    String key = '$_questionOneAnswer$_questionTwoAnswer';
+    return _personalityTypes[key] ?? '';
   }
 
   // 處理完成按鈕
   Future<void> _handleComplete() async {
-    if (_selectedPersonality == null) {
+    if (_questionTwoAnswer == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('請選擇一種性格類型')));
+      ).showSnackBar(const SnackBar(content: Text('請選擇一個選項')));
       return;
     }
 
@@ -88,10 +142,13 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
         return;
       }
 
+      // 獲取個性類型結果
+      String personalityResult = _getPersonalityResult();
+
       // 儲存用戶性格類型到 Supabase
       await _databaseService.updateUserPersonalityType(
         currentUser.id,
-        _selectedPersonality!.toString(),
+        personalityResult,
       );
 
       // 導航到主頁，添加滑動動畫
@@ -149,166 +206,289 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
           ),
         ),
         child: SafeArea(
-          child: Column(
+          child: Stack(
             children: [
-              // 頂部標題和返回按鈕放在同一行
-              Padding(
-                padding: EdgeInsets.only(top: 40.h, bottom: 8.h),
-                child: Row(
-                  children: [
-                    // 左側返回按鈕
-                    Padding(
-                      padding: EdgeInsets.only(left: 20.w, bottom: 8.h),
-                      child: BackIconButton(
-                        onPressed: _handleBack,
-                        width: 35.w,
-                        height: 35.h,
-                      ),
+              // 右下角背景圖片 - 放在Stack的第一個元素作為底層
+              Positioned(
+                right: -30.w, // 負值使圖片右側超出螢幕
+                bottom: -30.h, // 負值使圖片底部超出螢幕
+                child: Opacity(
+                  opacity: 0.65, // 降低透明度，使圖片更加融入背景
+                  child: ColorFiltered(
+                    // 降低彩度的矩陣
+                    colorFilter: const ColorFilter.matrix(<double>[
+                      0.6, 0.1, 0.1, 0, 0, // R影響
+                      0.1, 0.6, 0.1, 0, 0, // G影響
+                      0.1, 0.1, 0.6, 0, 0, // B影響
+                      0, 0, 0, 1, 0, // A影響
+                    ]),
+                    child: Image.asset(
+                      _currentPage == 0
+                          ? 'assets/images/illustrate/p1.png'
+                          : 'assets/images/illustrate/p2.png',
+                      width: 220.w, // 增大尺寸
+                      height: 220.h, // 增大尺寸
+                      fit: BoxFit.contain,
                     ),
-                    // 中央標題（只有主標題）
-                    Expanded(
-                      child: Text(
-                        '個性測驗',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 30.sp,
-                          fontFamily: 'OtsutomeFont',
-                          color: const Color(0xFF23456B),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    // 為了平衡布局，添加一個空白區域
-                    SizedBox(width: 55.w),
-                  ],
-                ),
-              ),
-
-              // 副標題單獨放在下方
-              Padding(
-                padding: EdgeInsets.only(bottom: 20.h),
-                child: Text(
-                  '請選擇最符合您吃飯習慣的類型',
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF23456B),
                   ),
                 ),
               ),
 
-              // 個性類型選擇區域
-              Expanded(
-                child: ListView.builder(
-                  padding: EdgeInsets.symmetric(horizontal: 20.w),
-                  itemCount: _personalityTypes.length,
-                  itemBuilder: (context, index) {
-                    final personality = _personalityTypes[index];
-                    final isSelected =
-                        _selectedPersonality == personality['id'];
-
-                    return GestureDetector(
-                      onTap: () => _selectPersonality(personality['id']),
-                      child: Container(
-                        margin: EdgeInsets.only(bottom: 15.h),
-                        padding: EdgeInsets.all(15.r),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(12.r),
-                          border: Border.all(
-                            color:
-                                isSelected
-                                    ? const Color(0xFF23456B)
-                                    : Colors.transparent,
-                            width: 3,
+              // 主要內容
+              Column(
+                children: [
+                  // 頂部標題和返回按鈕放在同一行
+                  Padding(
+                    padding: EdgeInsets.only(top: 40.h, bottom: 8.h),
+                    child: Row(
+                      children: [
+                        // 左側返回按鈕
+                        Padding(
+                          padding: EdgeInsets.only(left: 20.w, bottom: 8.h),
+                          child: BackIconButton(
+                            onPressed: _handleBack,
+                            width: 35.w,
+                            height: 35.h,
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            // 性格圖標
-                            Image.asset(
-                              personality['image'],
-                              width: 70.w,
-                              height: 70.h,
+                        // 中央標題（只有主標題）
+                        Expanded(
+                          child: Text(
+                            '個性測驗',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 30.sp,
+                              fontFamily: 'OtsutomeFont',
+                              color: const Color(0xFF23456B),
+                              fontWeight: FontWeight.bold,
                             ),
-                            SizedBox(width: 15.w),
+                          ),
+                        ),
+                        // 為了平衡布局，添加一個空白區域
+                        SizedBox(width: 55.w),
+                      ],
+                    ),
+                  ),
 
-                            // 性格資訊
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    personality['name'],
-                                    style: TextStyle(
-                                      fontSize: 20.sp,
-                                      fontFamily: 'OtsutomeFont',
-                                      color: const Color(0xFF23456B),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  SizedBox(height: 5.h),
-                                  Text(
-                                    personality['description'],
-                                    style: TextStyle(
-                                      fontSize: 14.sp,
-                                      fontFamily: 'OtsutomeFont',
-                                      color: const Color(0xFF23456B),
-                                    ),
-                                  ),
-                                ],
+                  // 問題頁面區域
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      onPageChanged: (int page) {
+                        setState(() {
+                          _currentPage = page;
+                        });
+                      },
+                      children: [
+                        // 問題 1
+                        Column(
+                          children: [
+                            // 副標題 - 問題1
+                            Padding(
+                              padding: EdgeInsets.only(bottom: 20.h, top: 20.h),
+                              child: Text(
+                                _questions[0]['question'],
+                                style: TextStyle(
+                                  fontSize: 18.sp,
+                                  fontFamily: 'OtsutomeFont',
+                                  color: const Color(0xFF23456B),
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
 
-                            // 選中標記
-                            /* if (isSelected)
-                              Container(
-                                width: 24.w,
-                                height: 24.h,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFB33D1C),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.check,
-                                  color: Colors.white,
-                                  size: 18.h,
-                                ),
-                              ), */
+                            // 問題1選項
+                            Expanded(
+                              child: ListView.builder(
+                                padding: EdgeInsets.symmetric(horizontal: 20.w),
+                                itemCount: _questions[0]['options'].length,
+                                itemBuilder: (context, index) {
+                                  final option =
+                                      _questions[0]['options'][index];
+                                  final isSelected =
+                                      _questionOneAnswer == option['id'];
+
+                                  return GestureDetector(
+                                    onTap:
+                                        () => _selectQuestionOneAnswer(
+                                          option['id'],
+                                        ),
+                                    child: Container(
+                                      margin: EdgeInsets.only(bottom: 15.h),
+                                      padding: EdgeInsets.all(20.r),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        border: Border.all(
+                                          color:
+                                              isSelected
+                                                  ? const Color(0xFFB33D1C)
+                                                  : Colors.transparent,
+                                          width: 3,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${option['id']}) ${option['text']}',
+                                            style: TextStyle(
+                                              fontSize: 18.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(height: 10.h),
+                                          Text(
+                                            option['description'],
+                                            style: TextStyle(
+                                              fontSize: 14.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                            // 下一步按鈕
+                            Container(
+                              margin: EdgeInsets.symmetric(vertical: 30.h),
+                              child: ImageButton(
+                                text: '下一步',
+                                imagePath: 'assets/images/ui/button/red_l.png',
+                                width: 150.w,
+                                height: 75.h,
+                                onPressed: _handleNext,
+                                isEnabled: _questionOneAnswer != null,
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
 
-              // 完成按鈕區域
-              Container(
-                margin: EdgeInsets.only(bottom: 30.h, top: 10.h),
-                child:
-                    _isLoading
-                        ? LoadingImage(
-                          width: 60.w,
-                          height: 60.h,
-                          color: const Color(0xFFB33D1C),
-                        )
-                        : ImageButton(
-                          text: '完成',
-                          imagePath: 'assets/images/ui/button/red_l.png',
-                          width: 150.w,
-                          height: 75.h,
-                          onPressed: _handleComplete,
+                        // 問題 2
+                        Column(
+                          children: [
+                            // 副標題 - 問題2
+                            Padding(
+                              padding: EdgeInsets.only(bottom: 20.h, top: 20.h),
+                              child: Text(
+                                _questions[1]['question'],
+                                style: TextStyle(
+                                  fontSize: 18.sp,
+                                  fontFamily: 'OtsutomeFont',
+                                  color: const Color(0xFF23456B),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+
+                            // 問題2選項
+                            Expanded(
+                              child: ListView.builder(
+                                padding: EdgeInsets.symmetric(horizontal: 20.w),
+                                itemCount: _questions[1]['options'].length,
+                                itemBuilder: (context, index) {
+                                  final option =
+                                      _questions[1]['options'][index];
+                                  final isSelected =
+                                      _questionTwoAnswer == option['id'];
+
+                                  return GestureDetector(
+                                    onTap:
+                                        () => _selectQuestionTwoAnswer(
+                                          option['id'],
+                                        ),
+                                    child: Container(
+                                      margin: EdgeInsets.only(bottom: 15.h),
+                                      padding: EdgeInsets.all(20.r),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        border: Border.all(
+                                          color:
+                                              isSelected
+                                                  ? const Color(0xFFB33D1C)
+                                                  : Colors.transparent,
+                                          width: 3,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${option['id']}) ${option['text']}',
+                                            style: TextStyle(
+                                              fontSize: 18.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(height: 10.h),
+                                          Text(
+                                            option['description'],
+                                            style: TextStyle(
+                                              fontSize: 14.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                            // 完成按鈕
+                            Container(
+                              margin: EdgeInsets.symmetric(vertical: 30.h),
+                              child:
+                                  _isLoading
+                                      ? LoadingImage(
+                                        width: 60.w,
+                                        height: 60.h,
+                                        color: const Color(0xFFB33D1C),
+                                      )
+                                      : ImageButton(
+                                        text: '完成',
+                                        imagePath:
+                                            'assets/images/ui/button/red_l.png',
+                                        width: 150.w,
+                                        height: 75.h,
+                                        onPressed: _handleComplete,
+                                        isEnabled: _questionTwoAnswer != null,
+                                      ),
+                            ),
+                          ],
                         ),
-              ),
+                      ],
+                    ),
+                  ),
 
-              // 進度指示器
-              Padding(
-                padding: EdgeInsets.only(bottom: 20.h),
-                child: const ProgressDotsIndicator(
-                  totalSteps: 5,
-                  currentStep: 4,
-                ),
+                  // 頁面底部：進度指示器
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 20.h),
+                    child: const ProgressDotsIndicator(
+                      totalSteps: 5,
+                      currentStep: 4,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

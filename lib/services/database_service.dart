@@ -67,25 +67,11 @@ class DatabaseService {
     List<int> foodPreferences,
   ) async {
     try {
-      // 首先刪除用戶的所有舊食物偏好
+      // 將食物偏好列表轉換為 JSONB 格式並直接更新 user_profiles 表
       await _supabaseService.client
-          .from(_foodPreferencesTable)
-          .delete()
+          .from(_userProfilesTable)
+          .update({'food_preferences_json': foodPreferences})
           .eq('user_id', userId);
-
-      // 如果有新的食物偏好，則插入它們
-      if (foodPreferences.isNotEmpty) {
-        // 創建要插入的記錄列表
-        final foodPreferenceRecords =
-            foodPreferences
-                .map((foodId) => {'user_id': userId, 'food_id': foodId})
-                .toList();
-
-        // 批量插入所有食物偏好
-        await _supabaseService.client
-            .from(_foodPreferencesTable)
-            .insert(foodPreferenceRecords);
-      }
 
       debugPrint('用戶食物偏好更新成功: $userId, 偏好: $foodPreferences');
     } catch (error) {
@@ -103,27 +89,11 @@ class DatabaseService {
     String personalityType,
   ) async {
     try {
-      // 檢查用戶的性格類型是否已存在
-      final existingRecord =
-          await _supabaseService.client
-              .from(_personalityTypesTable)
-              .select()
-              .eq('user_id', userId)
-              .maybeSingle();
-
-      if (existingRecord != null) {
-        // 更新現有記錄
-        await _supabaseService.client
-            .from(_personalityTypesTable)
-            .update({'personality_type': personalityType})
-            .eq('user_id', userId);
-      } else {
-        // 創建新記錄
-        await _supabaseService.client.from(_personalityTypesTable).insert({
-          'user_id': userId,
-          'personality_type': personalityType,
-        });
-      }
+      // 直接在 user_profiles 表中更新性格類型
+      await _supabaseService.client
+          .from(_userProfilesTable)
+          .update({'personality_type': personalityType})
+          .eq('user_id', userId);
 
       debugPrint('用戶性格類型更新成功: $userId, 類型: $personalityType');
     } catch (error) {
@@ -135,7 +105,7 @@ class DatabaseService {
   /// 獲取用戶的完整資料，包括基本資料、食物偏好和性格類型
   Future<Map<String, dynamic>> getUserCompleteProfile(String userId) async {
     try {
-      // 獲取基本資料
+      // 獲取基本資料，包括食物偏好的 JSON 欄位和性格類型
       final userProfile =
           await _supabaseService.client
               .from(_userProfilesTable)
@@ -143,34 +113,18 @@ class DatabaseService {
               .eq('user_id', userId)
               .maybeSingle();
 
-      // 獲取食物偏好
-      final foodPreferences = await _supabaseService.client
-          .from(_foodPreferencesTable)
-          .select('food_id')
-          .eq('user_id', userId);
-
-      // 提取食物 ID 列表
-      final foodIds =
-          (foodPreferences as List<dynamic>)
-              .map((item) => item['food_id'] as int)
-              .toList();
-
-      // 獲取性格類型
-      final personalityRecord =
-          await _supabaseService.client
-              .from(_personalityTypesTable)
-              .select('personality_type')
-              .eq('user_id', userId)
-              .maybeSingle();
+      // 從 userProfile 中提取食物偏好
+      List<int> foodIds = [];
+      if (userProfile != null && userProfile['food_preferences_json'] != null) {
+        // 將 JSON 轉換為 List<int>
+        foodIds = List<int>.from(userProfile['food_preferences_json']);
+      }
 
       // 組合所有資料
       return {
         'profile': userProfile ?? {},
         'food_preferences': foodIds,
-        'personality_type':
-            personalityRecord != null
-                ? personalityRecord['personality_type']
-                : null,
+        'personality_type': userProfile?['personality_type'],
       };
     } catch (error) {
       debugPrint('獲取用戶完整資料時出錯: $error');
@@ -181,7 +135,7 @@ class DatabaseService {
   /// 檢查用戶是否已完成設定
   Future<bool> hasCompletedSetup(String userId) async {
     try {
-      // 檢查用戶是否有基本資料
+      // 檢查用戶是否有基本資料、性格類型和食物偏好
       final userProfile =
           await _supabaseService.client
               .from(_userProfilesTable)
@@ -194,24 +148,14 @@ class DatabaseService {
       }
 
       // 檢查用戶是否有性格類型
-      final personalityRecord =
-          await _supabaseService.client
-              .from(_personalityTypesTable)
-              .select()
-              .eq('user_id', userId)
-              .maybeSingle();
-
-      if (personalityRecord == null) {
+      if (userProfile['personality_type'] == null) {
         return false;
       }
 
       // 檢查用戶是否有食物偏好
-      final foodPreferences = await _supabaseService.client
-          .from(_foodPreferencesTable)
-          .select()
-          .eq('user_id', userId);
-
-      if ((foodPreferences as List<dynamic>).isEmpty) {
+      final foodPreferences = userProfile['food_preferences_json'];
+      if (foodPreferences == null ||
+          (foodPreferences is List && foodPreferences.isEmpty)) {
         return false;
       }
 
