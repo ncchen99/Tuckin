@@ -74,6 +74,10 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
       setState(() {
         _currentPage--;
       });
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     } else {
       Navigator.of(context).pop();
     }

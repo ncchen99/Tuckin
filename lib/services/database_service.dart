@@ -120,7 +120,6 @@ class DatabaseService {
         // 將 JSON 轉換為 List<int>
         foodIds = List<int>.from(userProfile['food_preferences_json']);
       }
-      print("userProfile: $userProfile");
       // 組合所有資料
       return {
         'profile': userProfile ?? {},

@@ -22,7 +22,7 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   final int _totalPages = 3;
@@ -37,6 +37,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // 添加動畫控制器
   late AnimationController _animationController;
+
+  // 添加品牌加載頁面控制器
+  bool _isLoading = true;
+  late AnimationController _loadingAnimController;
+  late Animation<double> _fadeAnimation;
 
   // 食物動畫相關變量
   final List<String> _dishPaths = [
@@ -102,6 +107,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void initState() {
     super.initState();
+
+    // 初始化加載動畫控制器
+    _loadingAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _loadingAnimController, curve: Curves.easeOut),
+    );
+
     // 檢查用戶登入狀態並跳轉
     _checkUserLoginStatus();
 
@@ -150,87 +166,183 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // 檢查用戶登入狀態並根據情況跳轉到不同頁面
   Future<void> _checkUserLoginStatus() async {
-    // 檢查用戶是否已登入
-    if (_authService.isLoggedIn()) {
-      final currentUser = _authService.getCurrentUser();
-      if (currentUser != null) {
-        // 檢查用戶是否已完成設定
-        final hasCompletedSetup = await _databaseService.hasCompletedSetup(
-          currentUser.id,
-        );
-
-        if (hasCompletedSetup) {
-          // 用戶已完成所有設定，直接導航到主頁
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/home');
-          }
-        } else {
-          // 用戶已登入但未完成設定，檢查應該跳轉到哪個設定頁面
-          final userProfile = await _databaseService.getUserCompleteProfile(
+    try {
+      // 檢查用戶是否已登入
+      if (_authService.isLoggedIn()) {
+        final currentUser = _authService.getCurrentUser();
+        if (currentUser != null) {
+          // 檢查用戶是否已完成設定
+          final hasCompletedSetup = await _databaseService.hasCompletedSetup(
             currentUser.id,
           );
 
-          if (mounted) {
-            print("userProfile: $userProfile");
-
-            if (userProfile['profile'] != null &&
-                userProfile['profile'].isEmpty) {
-              // 從頭開始設定
-              Navigator.of(context).pushReplacementNamed('/profile_setup');
+          if (hasCompletedSetup) {
+            // 用戶已完成所有設定，直接導航到主頁
+            if (mounted) {
+              Navigator.of(context).pushReplacementNamed('/home').then((_) {
+                // 導航完成後才隱藏加載頁面
+                setState(() {
+                  _isLoading = false;
+                });
+                _loadingAnimController.forward();
+              });
             }
-            // 建立完整的導航堆疊
-            else if (userProfile['personality_type'] == null &&
-                userProfile['food_preferences'] != null &&
-                userProfile['food_preferences'].isNotEmpty &&
-                userProfile['profile'] != null &&
-                userProfile['profile'].isNotEmpty) {
-              // 只缺個性測驗，建立正確的導航堆疊
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => const ProfileSetupPage(),
-                ),
-                (route) => false, // 清除所有現有路由
-              );
+          } else {
+            // 用戶已登入但未完成設定，檢查應該跳轉到哪個設定頁面
+            final userProfile = await _databaseService.getUserCompleteProfile(
+              currentUser.id,
+            );
 
-              if (mounted) {
-                // 添加食物偏好頁面
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const FoodPreferencePage(),
-                  ),
-                );
+            if (mounted) {
+              print("userProfile: $userProfile");
 
-                // 添加個性測驗頁面
-                if (mounted) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const PersonalityTestPage(),
-                    ),
-                  );
-                }
+              if (userProfile['profile'] != null &&
+                  userProfile['profile'].isEmpty) {
+                // 從頭開始設定
+                Navigator.of(
+                  context,
+                ).pushReplacementNamed('/profile_setup').then((_) {
+                  // 隱藏加載頁面
+                  setState(() {
+                    _isLoading = false;
+                  });
+                  _loadingAnimController.forward();
+                });
               }
-            } else if ((userProfile['food_preferences'] == null ||
-                    userProfile['food_preferences'].isEmpty) &&
-                userProfile['profile'] != null &&
-                userProfile['profile'].isNotEmpty) {
-              // 缺少食物偏好和個性測驗
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => const ProfileSetupPage(),
-                ),
-                (route) => false, // 清除所有現有路由
-              );
+              // 建立完整的導航堆疊
+              else if (userProfile['personality_type'] == null &&
+                  userProfile['food_preferences'] != null &&
+                  userProfile['food_preferences'].isNotEmpty &&
+                  userProfile['profile'] != null &&
+                  userProfile['profile'].isNotEmpty) {
+                // 用戶已完成基本資料和食物偏好設定，但未完成個性測驗
+                print("檢測到用戶需要完成個性測驗 - 建立完整頁面堆疊");
 
-              if (mounted) {
+                // 使用特殊技巧建立頁面堆疊，同時直接進入個性測驗頁面
+                // 利用PageRouteBuilder來實現透明背景切換
+
+                // 先將ProfileSetupPage加入堆疊但設為透明（用戶看不到）
+                Navigator.of(context)
+                    .push(
+                      PageRouteBuilder(
+                        opaque: false,
+                        pageBuilder:
+                            (context, _, __) => const ProfileSetupPage(),
+                        transitionDuration: Duration.zero,
+                      ),
+                    )
+                    .then((_) {
+                      // 不會執行到這裡，因為我們在食物偏好頁面直接替換了個性測驗頁面
+                    });
+
+                // 立即將FoodPreferencePage加入堆疊但設為透明（用戶看不到）
+                Navigator.of(context)
+                    .push(
+                      PageRouteBuilder(
+                        opaque: false,
+                        pageBuilder:
+                            (context, _, __) => const FoodPreferencePage(),
+                        transitionDuration: Duration.zero,
+                      ),
+                    )
+                    .then((_) {
+                      // 不會執行到這裡，因為我們在這之後直接push了個性測驗頁面
+                    });
+
+                // 最後顯示PersonalityTestPage（用戶能看到的唯一頁面）
+                Navigator.of(context)
+                    .push(
+                      MaterialPageRoute(
+                        builder: (context) => const PersonalityTestPage(),
+                      ),
+                    )
+                    .then((_) {
+                      // 在最後一個頁面導航完成後隱藏加載頁面
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      _loadingAnimController.forward();
+                    });
+              } else if ((userProfile['food_preferences'] == null ||
+                      userProfile['food_preferences'].isEmpty) &&
+                  userProfile['profile'] != null &&
+                  userProfile['profile'].isNotEmpty) {
+                // 用戶已完成基本資料但缺少食物偏好設定
+                print("檢測到用戶需要完成食物偏好設定 - 建立頁面堆疊");
+
+                // 先將ProfileSetupPage加入堆疊但設為透明（用戶看不到）
                 Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const FoodPreferencePage(),
+                  PageRouteBuilder(
+                    opaque: false,
+                    pageBuilder: (context, _, __) => const ProfileSetupPage(),
+                    transitionDuration: Duration.zero,
                   ),
                 );
+
+                // 直接顯示FoodPreferencePage（用戶能看到的唯一頁面）
+                Navigator.of(context)
+                    .push(
+                      MaterialPageRoute(
+                        builder: (context) => const FoodPreferencePage(),
+                      ),
+                    )
+                    .then((_) {
+                      // 在最後一個頁面導航完成後隱藏加載頁面
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      _loadingAnimController.forward();
+                    });
+              } else if (userProfile['personality_type'] != null &&
+                  userProfile['food_preferences'] != null &&
+                  userProfile['food_preferences'].isNotEmpty &&
+                  userProfile['profile'] != null &&
+                  userProfile['profile'].isNotEmpty) {
+                // 用戶已完成所有設定，直接導航到主頁
+                if (mounted) {
+                  Navigator.of(context).pushReplacementNamed('/home').then((_) {
+                    // 導航完成後才隱藏加載頁面
+                    setState(() {
+                      _isLoading = false;
+                    });
+                    _loadingAnimController.forward();
+                  });
+                }
+              } else {
+                // 其他情況，直接顯示歡迎頁
+                setState(() {
+                  _isLoading = false;
+                });
+                _loadingAnimController.forward();
               }
             }
           }
+        } else {
+          // 無效的用戶，隱藏加載頁面
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            _loadingAnimController.forward();
+          }
         }
+      } else {
+        // 用戶未登入，隱藏加載頁面顯示歡迎頁
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          _loadingAnimController.forward();
+        }
+      }
+    } catch (e) {
+      print("用戶檢查錯誤: $e");
+      // 發生錯誤時，確保加載頁面消失
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _loadingAnimController.forward();
       }
     }
   }
@@ -399,6 +511,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _pageController.dispose();
     _videoController.dispose();
     _animationController.dispose();
+    _loadingAnimController.dispose();
     super.dispose();
   }
 
@@ -452,106 +565,166 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final squareSize = math.min(screenWidth, screenHeight * 0.6);
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/background/bg1.png'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // 主要內容區域 - 確保正方形
-              AspectRatio(
-                aspectRatio: 1.0, // 強制1:1的比例
-                child: Padding(
-                  padding: EdgeInsets.all(25.r), // 使用自適應圓角
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // 使用LayoutBuilder獲取實際可用空間
-                      final actualSize = math.max(
-                        constraints.maxWidth,
-                        constraints.maxHeight,
-                      );
-                      return SizedBox(
-                        width: actualSize,
-                        height: actualSize,
-                        child: PageView(
-                          controller: _pageController,
-                          onPageChanged: _onPageChanged,
-                          children: [
-                            // 第一頁：方形影片播放區域
-                            _buildVideoSquare(actualSize),
-                            // 第二頁：人物動畫
-                            _buildFiguresAnimation(actualSize),
-                            // 第三頁：食物動畫
-                            _buildFoodAnimation(actualSize),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/background/bg1.png'),
+                fit: BoxFit.cover,
               ),
-
-              // 底部說明區域
-              Expanded(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 30.w), // 使用自適應寬度
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // 說明文字
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            _introTexts[_currentPage],
-                            style: TextStyle(
-                              fontSize: 18.sp, // 使用自適應字體大小
-                              color: const Color(0xFF23456B),
-                              fontFamily: 'OtsutomeFont',
-                              fontWeight: FontWeight.bold,
-                              height: 1.4,
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // 主要內容區域 - 確保正方形
+                  AspectRatio(
+                    aspectRatio: 1.0, // 強制1:1的比例
+                    child: Padding(
+                      padding: EdgeInsets.all(25.r), // 使用自適應圓角
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          // 使用LayoutBuilder獲取實際可用空間
+                          final actualSize = math.max(
+                            constraints.maxWidth,
+                            constraints.maxHeight,
+                          );
+                          return SizedBox(
+                            width: actualSize,
+                            height: actualSize,
+                            child: PageView(
+                              controller: _pageController,
+                              onPageChanged: _onPageChanged,
+                              children: [
+                                // 第一頁：方形影片播放區域
+                                _buildVideoSquare(actualSize),
+                                // 第二頁：人物動畫
+                                _buildFiguresAnimation(actualSize),
+                                // 第三頁：食物動畫
+                                _buildFoodAnimation(actualSize),
+                              ],
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
+                          );
+                        },
                       ),
+                    ),
+                  ),
 
-                      // 下一步按鈕
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 40.h), // 統一底部間距
-                        child: ImageButton(
-                          imagePath: 'assets/images/ui/button/red_m.png',
-                          text: _currentPage < _totalPages - 1 ? '下一步' : '開始使用',
-                          width: 160.w, // 使用自適應寬度
-                          height: 75.h, // 使用自適應高度
-                          textStyle: TextStyle(
-                            fontSize: 18, // 使用自適應字體大小
-                            color: const Color(0xFFD1D1D1),
-                            fontFamily: 'OtsutomeFont',
-                            fontWeight: FontWeight.bold,
+                  // 底部說明區域
+                  Expanded(
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 30.w,
+                      ), // 使用自適應寬度
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          // 說明文字
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                _introTexts[_currentPage],
+                                style: TextStyle(
+                                  fontSize: 18.sp, // 使用自適應字體大小
+                                  color: const Color(0xFF23456B),
+                                  fontFamily: 'OtsutomeFont',
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.4,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                           ),
-                          onPressed: _goToNextPage,
-                        ),
-                      ),
 
-                      // 分頁指示器
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 20.h), // 與登入頁面統一底部間距
-                        child: ProgressDotsIndicator(
-                          totalSteps: _totalPages,
-                          currentStep: _currentPage + 1,
-                        ),
+                          // 下一步按鈕
+                          Padding(
+                            padding: EdgeInsets.only(bottom: 40.h), // 統一底部間距
+                            child: ImageButton(
+                              imagePath: 'assets/images/ui/button/red_m.png',
+                              text:
+                                  _currentPage < _totalPages - 1
+                                      ? '下一步'
+                                      : '開始使用',
+                              width: 160.w, // 使用自適應寬度
+                              height: 75.h, // 使用自適應高度
+                              textStyle: TextStyle(
+                                fontSize: 18, // 使用自適應字體大小
+                                color: const Color(0xFFD1D1D1),
+                                fontFamily: 'OtsutomeFont',
+                                fontWeight: FontWeight.bold,
+                              ),
+                              onPressed: _goToNextPage,
+                            ),
+                          ),
+
+                          // 分頁指示器
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: 20.h,
+                            ), // 與登入頁面統一底部間距
+                            child: ProgressDotsIndicator(
+                              totalSteps: _totalPages,
+                              currentStep: _currentPage + 1,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 品牌加載覆蓋層
+          AnimatedBuilder(
+            animation: _fadeAnimation,
+            builder: (context, child) {
+              return Visibility(
+                visible: _isLoading || _fadeAnimation.value > 0.01,
+                child: Opacity(
+                  opacity: _fadeAnimation.value,
+                  child: Container(
+                    color: const Color(0xFFF5F5F5), // 淺灰色背景
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // 品牌標誌（添加陰影效果）
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // 底部陰影層
+                              Positioned(
+                                top: 3.h, // 陰影偏移
+                                child: Image.asset(
+                                  'assets/images/icon/tuckin_t_brand.png',
+                                  width: 200.w,
+                                  height: 200.w,
+                                  fit: BoxFit.contain,
+                                  color: Colors.black.withOpacity(0.4),
+                                  colorBlendMode: BlendMode.srcIn,
+                                ),
+                              ),
+                              // 主圖層
+                              Image.asset(
+                                'assets/images/icon/tuckin_t_brand.png',
+                                width: 200.w,
+                                height: 200.w,
+                                fit: BoxFit.contain,
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 30.h),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              );
+            },
           ),
-        ),
+        ],
       ),
     );
   }
