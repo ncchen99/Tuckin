@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../components/components.dart';
 import '../utils/index.dart'; // 導入自適應佈局工具
+import '../services/auth_service.dart'; // 導入驗證服務
+import '../services/database_service.dart'; // 導入資料庫服務
 import 'login_page.dart';
+import 'profile_setup_page.dart';
+import 'food_preference_page.dart';
+import 'personality_test_page.dart';
+import 'home_page.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:math' as math;
 import 'dart:math';
@@ -19,6 +25,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   final PageController _pageController = PageController();
   int _currentPage = 0;
   final int _totalPages = 3;
+
+  // 添加驗證服務和資料庫服務
+  final AuthService _authService = AuthService();
+  final DatabaseService _databaseService = DatabaseService();
 
   // 添加影片控制器
   late VideoPlayerController _videoController;
@@ -91,6 +101,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void initState() {
     super.initState();
+    // 檢查用戶登入狀態並跳轉
+    _checkUserLoginStatus();
+
     // 初始化影片播放器
     _videoController = VideoPlayerController.asset('assets/video/intro.mp4')
       ..initialize().then((_) {
@@ -132,6 +145,85 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     // 初始化人物動畫數據
     _initFigureAnimationData();
+  }
+
+  // 檢查用戶登入狀態並根據情況跳轉到不同頁面
+  Future<void> _checkUserLoginStatus() async {
+    // 檢查用戶是否已登入
+    if (_authService.isLoggedIn()) {
+      final currentUser = _authService.getCurrentUser();
+      if (currentUser != null) {
+        // 檢查用戶是否已完成設定
+        final hasCompletedSetup = await _databaseService.hasCompletedSetup(
+          currentUser.id,
+        );
+
+        if (hasCompletedSetup) {
+          // 用戶已完成所有設定，直接導航到主頁
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed('/home');
+          }
+        } else {
+          // 用戶已登入但未完成設定，檢查應該跳轉到哪個設定頁面
+          final userProfile = await _databaseService.getUserCompleteProfile(
+            currentUser.id,
+          );
+
+          if (mounted) {
+            // 建立完整的導航堆疊
+            if (userProfile['personality_type'] == null &&
+                userProfile['food_preferences'] != null &&
+                userProfile['profile'] != null) {
+              // 只缺個性測驗，建立正確的導航堆疊
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => const ProfileSetupPage(),
+                ),
+                (route) => false, // 清除所有現有路由
+              );
+
+              if (mounted) {
+                // 添加食物偏好頁面
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const FoodPreferencePage(),
+                  ),
+                );
+
+                // 添加個性測驗頁面
+                if (mounted) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const PersonalityTestPage(),
+                    ),
+                  );
+                }
+              }
+            } else if (userProfile['food_preferences'] == null &&
+                userProfile['profile'] != null) {
+              // 缺少食物偏好和個性測驗
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => const ProfileSetupPage(),
+                ),
+                (route) => false, // 清除所有現有路由
+              );
+
+              if (mounted) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const FoodPreferencePage(),
+                  ),
+                );
+              }
+            } else if (userProfile['profile'] == null) {
+              // 從頭開始設定
+              Navigator.of(context).pushReplacementNamed('/profile_setup');
+            }
+          }
+        }
+      }
+    }
   }
 
   void _initDishAnimationData() {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tuckin/services/auth_service.dart';
+import 'package:tuckin/services/database_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:tuckin/utils/route_observer.dart'; // 導入路由觀察器
 
 // 導入頁面
 import 'screens/welcome_screen.dart';
@@ -12,6 +14,9 @@ import 'screens/personality_test_page.dart';
 import 'screens/home_page.dart';
 
 import 'utils/index.dart'; // 導入工具類
+
+// 創建路由觀察器實例
+final TuckinRouteObserver routeObserver = TuckinRouteObserver();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +47,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 獲取認證和資料庫服務實例
+    final authService = AuthService();
+    final databaseService = DatabaseService();
+
     return MaterialApp(
       title: 'Tuckin',
       theme: ThemeData(
@@ -61,6 +70,8 @@ class MyApp extends StatelessWidget {
           child: child!,
         );
       },
+      // 添加路由觀察器
+      navigatorObservers: [routeObserver],
       initialRoute: '/',
       routes: {
         '/': (context) => const WelcomeScreen(),

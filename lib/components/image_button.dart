@@ -86,7 +86,7 @@ class _ImageButtonState extends State<ImageButton> {
                   0,
                 ]),
                 child: Opacity(
-                  opacity: 0.6, // 降低透明度增強禁用效果
+                  opacity: 0.8, // 降低透明度增強禁用效果
                   child: Image.asset(
                     widget.imagePath,
                     width: widget.width,
