@@ -3,6 +3,7 @@ import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
+import 'package:tuckin/utils/route_transitions.dart'; // 導入轉場動畫
 import 'personality_test_page.dart'; // 下一個頁面
 
 class FoodPreferencePage extends StatefulWidget {
@@ -41,6 +42,7 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
 
   // 處理返回按鈕
   void _handleBack() {
+    // 添加向左滑動的動畫效果
     Navigator.of(context).pop();
   }
 
@@ -88,9 +90,12 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
         foodPreferences,
       );
 
-      // 導航到下一個頁面 - 個性測驗頁
+      // 導航到下一個頁面 - 個性測驗頁，添加滑動動畫
       if (mounted) {
-        Navigator.of(context).pushNamed('/personality_test');
+        Navigator.push(
+          context,
+          rightSlideTransition(page: const PersonalityTestPage()),
+        );
       }
     } catch (error) {
       ScaffoldMessenger.of(

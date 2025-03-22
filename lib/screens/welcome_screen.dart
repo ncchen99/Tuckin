@@ -12,6 +12,7 @@ import 'home_page.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:math' as math;
 import 'dart:math';
+import 'package:tuckin/utils/route_transitions.dart'; // 導入轉場動畫
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -393,6 +394,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     super.dispose();
   }
 
+  // 轉到下一頁
   void _goToNextPage() {
     if (_currentPage < _totalPages - 1) {
       _pageController.nextPage(
@@ -400,24 +402,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         curve: Curves.easeInOut,
       );
     } else {
-      // 進入登入頁面，使用向右滑動的轉場動畫
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder:
-              (context, animation, secondaryAnimation) => const LoginPage(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1, 0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
+      // 導航到登入頁面，添加滑動動畫
+      Navigator.push(context, rightSlideTransition(page: const LoginPage()));
     }
   }
 

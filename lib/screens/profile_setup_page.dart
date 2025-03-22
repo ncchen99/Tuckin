@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
+import 'package:tuckin/screens/food_preference_page.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
-import 'food_preference_page.dart'; // 下一個頁面
+import 'package:tuckin/utils/route_transitions.dart'; // 確保導入轉場動畫
 
 class ProfileSetupPage extends StatefulWidget {
   const ProfileSetupPage({super.key});
@@ -81,9 +82,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       // 儲存用戶資料到 Supabase
       await _databaseService.updateUserProfile(userData);
 
-      // 導航到下一個頁面 - 飲食偏好設定頁
+      // 導航到下一個頁面 - 飲食偏好設定頁，添加向右滑動動畫
       if (mounted) {
-        Navigator.of(context).pushNamed('/food_preference');
+        Navigator.push(
+          context,
+          rightSlideTransition(page: const FoodPreferencePage()),
+        );
       }
     } catch (error) {
       ScaffoldMessenger.of(

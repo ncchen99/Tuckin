@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
+import 'package:tuckin/screens/home_page.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
-import 'home_page.dart'; // 下一個頁面
+import 'package:tuckin/utils/route_transitions.dart'; // 導入轉場動畫
 
 class PersonalityTestPage extends StatefulWidget {
   const PersonalityTestPage({super.key});
@@ -70,10 +71,9 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   // 處理返回按鈕
   void _handleBack() {
     if (_currentPage > 0) {
-      _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      setState(() {
+        _currentPage--;
+      });
     } else {
       Navigator.of(context).pop();
     }
@@ -119,11 +119,20 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   }
 
   // 處理完成按鈕
-  Future<void> _handleComplete() async {
+  void _handleComplete() {
+    // 確保第二個問題有選擇
     if (_questionTwoAnswer == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('請選擇一個選項')));
+      ).showSnackBar(const SnackBar(content: Text('請選擇第二個問題的選項')));
+      return;
+    }
+
+    final currentUser = _authService.getCurrentUser();
+    if (currentUser == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('您尚未登入，請先登入')));
       return;
     }
 
@@ -131,43 +140,31 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
       _isLoading = true;
     });
 
-    try {
-      // 獲取當前用戶
-      final currentUser = _authService.getCurrentUser();
+    // 根據回答確定人格類型
+    final personalityType = _getPersonalityResult();
 
-      if (currentUser == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('您尚未登入，請先登入')));
-        return;
-      }
-
-      // 獲取個性類型結果
-      String personalityResult = _getPersonalityResult();
-
-      // 儲存用戶性格類型到 Supabase
-      await _databaseService.updateUserPersonalityType(
-        currentUser.id,
-        personalityResult,
-      );
-
-      // 導航到主頁
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('儲存資料失敗: $error')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
+    // 保存人格類型到數據庫
+    _databaseService
+        .updateUserPersonalityType(currentUser.id, personalityType)
+        .then((_) {
+          setState(() {
+            _isLoading = false;
+          });
+          // 導航到主頁，添加滑動動畫
+          Navigator.pushAndRemoveUntil(
+            context,
+            rightSlideTransition(page: const HomePage()),
+            (route) => false,
+          );
+        })
+        .catchError((error) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('儲存資料失敗: $error')));
         });
-      }
-    }
   }
 
   @override
