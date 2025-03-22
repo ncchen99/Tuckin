@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/screens/food_preference_page.dart';
+import 'package:tuckin/screens/home_page.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
@@ -23,6 +24,51 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   int _selectedGender = 0;
 
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserProfile();
+  }
+
+  // 檢查用戶資料是否已設定
+  Future<void> _checkUserProfile() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // 獲取當前用戶
+      final currentUser = _authService.getCurrentUser();
+
+      if (currentUser == null) {
+        return;
+      }
+
+      // 檢查用戶是否已完成設定
+      final hasCompleted = await _databaseService.hasCompletedSetup(
+        currentUser.id,
+      );
+
+      // 如果已完成設定，直接導航到主頁
+      if (hasCompleted && mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          rightSlideTransition(page: const HomePage()),
+          (route) => false,
+        );
+      }
+    } catch (error) {
+      // 錯誤處理
+      debugPrint('檢查用戶資料錯誤: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {

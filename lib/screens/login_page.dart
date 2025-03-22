@@ -259,13 +259,16 @@ class _LoginPageState extends State<LoginPage> {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               // 勾選框
-                              CustomCheckbox(
-                                value: _agreeToTerms,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _agreeToTerms = value ?? false;
-                                  });
-                                },
+                              Padding(
+                                padding: EdgeInsets.only(bottom: 2.h),
+                                child: CustomCheckbox(
+                                  value: _agreeToTerms,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _agreeToTerms = value ?? false;
+                                    });
+                                  },
+                                ),
                               ),
                               SizedBox(width: 8.w),
                               // 隱私條款文字
@@ -273,6 +276,7 @@ class _LoginPageState extends State<LoginPage> {
                                 onTap: _showPrivacyPolicy,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Text(
                                       '我同意',
@@ -281,6 +285,7 @@ class _LoginPageState extends State<LoginPage> {
                                         color: const Color(0xFF23456B),
                                         fontFamily: 'OtsutomeFont',
                                         fontWeight: FontWeight.w500,
+                                        height: 1.2,
                                       ),
                                     ),
                                     Container(
@@ -297,6 +302,7 @@ class _LoginPageState extends State<LoginPage> {
                                             0xFF23456B,
                                           ),
                                           decorationThickness: 2,
+                                          height: 1.2,
                                         ),
                                       ),
                                     ),
