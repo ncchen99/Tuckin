@@ -256,7 +256,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                                     // 文字說明
                                     Expanded(
                                       child: Text(
-                                        '僅限成大學生參與',
+                                        '只想與成大學生聚餐',
                                         style: TextStyle(
                                           fontSize: 16.sp,
                                           fontFamily: 'OtsutomeFont',
