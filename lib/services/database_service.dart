@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
 /// 資料庫服務，處理與資料庫相關的 CRUD 操作

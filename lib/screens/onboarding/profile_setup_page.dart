@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/screens/food_preference_page.dart';
+import 'package:tuckin/screens/onboarding/food_preference_page.dart';
 import 'package:tuckin/screens/home_page.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';

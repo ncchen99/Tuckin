@@ -1,9 +1,9 @@
 // 導出所有組件，方便在其他地方引用
-export 'image_button.dart';
-export 'google_sign_in_button.dart';
-export 'privacy_policy_dialog.dart';
-export 'custom_checkbox.dart';
-export 'progress_dots_indicator.dart';
-export 'icon_text_input.dart';
-export 'back_button.dart';
-export 'loading_image.dart';
+export 'common/image_button.dart';
+export 'onboarding/google_sign_in_button.dart';
+export 'onboarding/privacy_policy_dialog.dart';
+export 'common/custom_checkbox.dart';
+export 'common/progress_dots_indicator.dart';
+export 'common/icon_text_input.dart';
+export 'common/back_button.dart';
+export 'common/loading_image.dart';

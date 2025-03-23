@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/index.dart';
+import '../../utils/index.dart';
 
 class LoadingImage extends StatelessWidget {
   final double width;

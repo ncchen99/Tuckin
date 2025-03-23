@@ -4,14 +4,19 @@ import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tuckin/utils/route_observer.dart'; // 導入路由觀察器
+import 'package:tuckin/utils/route_transitions.dart'; // 導入路由轉場效果
 
 // 導入頁面
-import 'screens/welcome_screen.dart';
-import 'screens/login_page.dart';
-import 'screens/profile_setup_page.dart';
-import 'screens/food_preference_page.dart';
-import 'screens/personality_test_page.dart';
+import 'screens/onboarding/welcome_screen.dart';
+import 'screens/onboarding/login_page.dart';
+import 'screens/onboarding/profile_setup_page.dart';
+import 'screens/onboarding/food_preference_page.dart';
+import 'screens/onboarding/personality_test_page.dart';
 import 'screens/home_page.dart';
+// 導入晚餐相關頁面
+import 'screens/dinner/dinner_reservation_page.dart';
+import 'screens/dinner/matching_status_page.dart';
+// TODO: 導入其他頁面，包括出席確認頁面、餐廳選擇頁面、晚餐資訊頁面和評分頁面
 
 import 'utils/index.dart'; // 導入工具類
 
@@ -74,12 +79,57 @@ class MyApp extends StatelessWidget {
       navigatorObservers: [routeObserver],
       initialRoute: '/',
       routes: {
+        // 初始頁面
         '/': (context) => const WelcomeScreen(),
+
+        // 用戶引導頁面
         '/login': (context) => const LoginPage(),
         '/profile_setup': (context) => const ProfileSetupPage(),
         '/food_preference': (context) => const FoodPreferencePage(),
         '/personality_test': (context) => const PersonalityTestPage(),
+
+        // 主流程頁面
         '/home': (context) => const HomePage(),
+        '/dinner_reservation': (context) => const DinnerReservationPage(),
+        '/matching_status': (context) => const MatchingStatusPage(),
+
+        // TODO: 添加以下頁面的路由
+        // '/attendance_confirmation': (context) => const AttendanceConfirmationPage(),
+        // '/restaurant_selection': (context) => const RestaurantSelectionPage(),
+        // '/dinner_info': (context) => const DinnerInfoPage(),
+        // '/dinner_rating': (context) => const DinnerRatingPage(),
+
+        // 輔助頁面路由
+        // '/notifications': (context) => const NotificationsPage(),
+        // '/user_settings': (context) => const UserSettingsPage(),
+        // '/user_profile': (context) => const UserProfilePage(),
+        // '/help_faq': (context) => const HelpFaqPage(),
+      },
+      // 處理未命名路由的情況
+      onGenerateRoute: (settings) {
+        // 這裡可以處理動態路由，例如帶參數的路由
+        debugPrint('正在產生路由: ${settings.name}');
+
+        // 例如: /dinner_info/123 可以解析為晚餐ID為123的晚餐資訊頁面
+        final uri = Uri.parse(settings.name ?? '/');
+
+        // 處理動態路由邏輯
+        if (uri.pathSegments.length >= 2) {
+          if (uri.pathSegments[0] == 'dinner_info') {
+            final id = uri.pathSegments[1];
+            // TODO: 返回帶有ID參數的晚餐資訊頁面
+            // return MaterialPageRoute(
+            //   builder: (context) => DinnerInfoPage(dinnerId: id),
+            // );
+          }
+        }
+
+        // 如果沒有匹配的路由，返回錯誤頁面或主頁
+        return MaterialPageRoute(
+          builder:
+              (context) =>
+                  const Scaffold(body: Center(child: Text('404 - 頁面不存在'))),
+        );
       },
       debugShowCheckedModeBanner: false, // 移除調試標記
     );

@@ -25,6 +25,7 @@ class _HomePageState extends State<HomePage> {
         ),
         child: SafeArea(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Padding(
                 padding: EdgeInsets.only(top: 50.h, bottom: 20.h),
@@ -51,7 +52,7 @@ class _HomePageState extends State<HomePage> {
                   child: Column(
                     children: [
                       Text(
-                        '設定完成！',
+                        '歡迎使用Tuckin',
                         style: TextStyle(
                           fontSize: 24.sp,
                           fontFamily: 'OtsutomeFont',
@@ -61,7 +62,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       SizedBox(height: 10.h),
                       Text(
-                        '感謝您完成所有設定！\n您現在可以開始使用 Tuckin 了！',
+                        '成大專屬的聚餐交友平台\n現在就開始您的社交之旅吧！',
                         style: TextStyle(
                           fontSize: 18.sp,
                           fontFamily: 'OtsutomeFont',
@@ -69,22 +70,36 @@ class _HomePageState extends State<HomePage> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      SizedBox(height: 20.h),
-                      ImageButton(
-                        text: '開始探索',
-                        imagePath: 'assets/images/ui/button/blue_l.png',
-                        width: 150.w,
-                        height: 75.h,
-                        onPressed: () {
-                          // TODO: 實現主功能頁面導航
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('即將推出更多功能，敬請期待！')),
-                          );
-                        },
-                      ),
                     ],
                   ),
                 ),
+              ),
+
+              SizedBox(height: 40.h),
+
+              // 主循環核心功能按鈕
+              Column(
+                children: [
+                  ImageButton(
+                    text: '聚餐預約',
+                    imagePath: 'assets/images/ui/button/red_l.png',
+                    width: 180.w,
+                    height: 85.h,
+                    onPressed: () {
+                      Navigator.of(context).pushNamed('/dinner_reservation');
+                    },
+                  ),
+                  SizedBox(height: 20.h),
+                  ImageButton(
+                    text: '配對狀態',
+                    imagePath: 'assets/images/ui/button/blue_l.png',
+                    width: 180.w,
+                    height: 85.h,
+                    onPressed: () {
+                      Navigator.of(context).pushNamed('/matching_status');
+                    },
+                  ),
+                ],
               ),
 
               Expanded(child: Container()),

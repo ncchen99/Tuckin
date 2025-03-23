@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../components/components.dart';
-import '../utils/index.dart'; // 導入自適應佈局工具
-import '../services/auth_service.dart'; // 導入驗證服務
-import '../services/database_service.dart'; // 導入資料庫服務
+import '../../components/components.dart';
+import '../../utils/index.dart'; // 導入自適應佈局工具
+import '../../services/auth_service.dart'; // 導入驗證服務
+import '../../services/database_service.dart'; // 導入資料庫服務
 import 'login_page.dart';
 import 'profile_setup_page.dart';
 import 'food_preference_page.dart';
 import 'personality_test_page.dart';
-import 'home_page.dart';
+import '../home_page.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:math' as math;
 import 'dart:math';
