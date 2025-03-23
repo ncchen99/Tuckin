@@ -29,6 +29,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   void initState() {
     super.initState();
     _checkUserProfile();
+    // 添加監聽器，當暱稱輸入框變更時重新渲染頁面
+    _nicknameController.addListener(_updateButtonState);
   }
 
   // 檢查用戶資料是否已設定
@@ -72,9 +74,22 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   @override
   void dispose() {
+    _nicknameController.removeListener(_updateButtonState);
     _nicknameController.dispose();
     _personalDescController.dispose();
     super.dispose();
+  }
+
+  // 更新按鈕狀態的方法
+  void _updateButtonState() {
+    setState(() {
+      // 強制刷新界面
+    });
+  }
+
+  // 檢查表單是否有效
+  bool _isFormValid() {
+    return _nicknameController.text.trim().isNotEmpty && _selectedGender != 0;
   }
 
   // 處理返回按鈕 - 在這個頁面禁用返回功能
@@ -122,7 +137,10 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         'user_id': currentUser.id,
         'nickname': _nicknameController.text.trim(),
         'gender': _selectedGender == 1 ? 'male' : 'female',
-        'personal_desc': _personalDescController.text.trim(),
+        'personal_desc':
+            _personalDescController.text.trim().isEmpty
+                ? '' // 如果個人亮點描述為空，則設為空字串
+                : _personalDescController.text.trim(),
       };
 
       // 儲存用戶資料到 Supabase
@@ -404,6 +422,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                             width: 150.w,
                             height: 75.h,
                             onPressed: _handleNextStep,
+                            isEnabled: _isFormValid(), // 根據表單有效性決定按鈕是否啟用
                           ),
 
                       // 進度指示器

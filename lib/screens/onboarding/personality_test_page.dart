@@ -5,6 +5,7 @@ import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:tuckin/utils/route_transitions.dart'; // 導入轉場動畫
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PersonalityTestPage extends StatefulWidget {
   const PersonalityTestPage({super.key});
@@ -154,6 +155,10 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
           // 更新用戶狀態為 booking (聚餐預約狀態)
           try {
             await _databaseService.updateUserStatus(currentUser.id, 'booking');
+
+            // 設置一個標誌表示是新用戶第一次使用
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('is_new_user', true);
           } catch (error) {
             debugPrint('更新用戶狀態出錯: $error');
           }

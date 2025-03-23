@@ -291,4 +291,20 @@ class DatabaseService {
       return 'initial'; // 發生錯誤時返回初始狀態
     }
   }
+
+  // 獲取用戶個人資料
+  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    try {
+      final response =
+          await _supabaseService.client
+              .from('user_profiles')
+              .select()
+              .eq('user_id', userId)
+              .single();
+      return response;
+    } catch (e) {
+      debugPrint('獲取用戶資料失敗: $e');
+      return null;
+    }
+  }
 }

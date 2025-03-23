@@ -79,10 +79,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 獲取認證和資料庫服務實例
-    final authService = AuthService();
-    final databaseService = DatabaseService();
-
     return MaterialApp(
       title: 'Tuckin',
       theme: ThemeData(

@@ -355,50 +355,12 @@ class _LoginPageState extends State<LoginPage> {
                 Positioned(
                   top: 20.h,
                   right: 20.w,
-                  child: AnimatedOpacity(
-                    opacity: _showTip ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 500),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 15.w,
-                        vertical: 10.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(
-                          color: const Color(0xFF23456B),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: const Color(0xFF23456B),
-                            size: 20.h,
-                          ),
-                          SizedBox(width: 8.w),
-                          Text(
-                            '用學校Gmail登入即可獲得認證',
-                            style: TextStyle(
-                              fontSize: 14.sp,
-                              color: const Color(0xFF23456B),
-                              fontFamily: 'OtsutomeFont',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: InfoTipBox(
+                    message: '用學校Gmail登入即可獲得認證',
+                    show: _showTip,
+                    onHide: () {
+                      // 提示框完全隱藏後的回調
+                    },
                   ),
                 ),
             ],

@@ -64,30 +64,39 @@ class IconTextInput extends StatelessWidget {
           ),
           SizedBox(width: 5.w), // 增加圖標與文字的間距
           // 帶陰影的圖標
-          Stack(
-            alignment: Alignment.center, // 確保圖標居中對齊
-            children: [
-              // 底部陰影圖片
-              Positioned(
-                left: 0,
-                top: 2,
-                child: Image.asset(
-                  iconPath,
-                  width: 30.w,
-                  height: 30.h,
-                  fit: BoxFit.contain,
-                  color: Colors.black.withValues(alpha: 0.4),
-                  colorBlendMode: BlendMode.srcIn,
+          Container(
+            width: 32.w, // 給定更大的容器尺寸來容納陰影
+            height: 32.h,
+            child: Stack(
+              clipBehavior: Clip.none, // 防止陰影被裁切
+              alignment: Alignment.center, // 確保圖標居中對齊
+              children: [
+                // 底部陰影圖片
+                Positioned(
+                  left: 0, // 向右偏移
+                  top: 2, // 向下偏移
+                  child: Image.asset(
+                    iconPath,
+                    width: 30.w,
+                    height: 30.h,
+                    fit: BoxFit.contain,
+                    color: Colors.black.withOpacity(0.4),
+                    colorBlendMode: BlendMode.srcIn,
+                  ),
                 ),
-              ),
-              // 圖片主圖層
-              Image.asset(
-                iconPath,
-                width: 30.w,
-                height: 30.h,
-                fit: BoxFit.contain,
-              ),
-            ],
+                // 圖片主圖層
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  child: Image.asset(
+                    iconPath,
+                    width: 30.w,
+                    height: 30.h,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

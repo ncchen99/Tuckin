@@ -110,6 +110,11 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
     }
   }
 
+  // 檢查是否至少選擇了一種食物類型
+  bool _isFormValid() {
+    return _selectedFoods.isNotEmpty;
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -287,6 +292,7 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
                               width: 150.w,
                               height: 75.h,
                               onPressed: _handleNextStep,
+                              isEnabled: _isFormValid(), // 根據選擇狀態決定按鈕是否啟用
                             ),
                   ),
 
