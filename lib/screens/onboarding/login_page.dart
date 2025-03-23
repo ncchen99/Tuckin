@@ -3,6 +3,7 @@ import 'package:tuckin/services/auth_service.dart';
 import '../../components/components.dart';
 import '../../../utils/index.dart'; // 導入自適應佈局工具
 import 'profile_setup_page.dart'; // 導入基本資料填寫頁面
+import '../../../services/database_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -13,6 +14,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final AuthService _authService = AuthService();
+  final DatabaseService _databaseService = DatabaseService();
   bool _agreeToTerms = false;
   bool _isLoading = false;
   bool _isNCKUEmail = false; // 添加成大email標記
@@ -98,10 +100,15 @@ class _LoginPageState extends State<LoginPage> {
       final response = await _authService.signInWithGoogle(context);
 
       if (response != null && response.user?.email != null) {
-        // 檢查是否為成大email
-        setState(() {
-          _isNCKUEmail = _authService.isNCKUEmail(response.user!.email);
-        });
+        // 設置成大標記
+        _isNCKUEmail = _authService.isNCKUEmail(response.user!.email);
+
+        // 設置用戶初始狀態為 initial
+        try {
+          await _databaseService.updateUserStatus(response.user!.id, 'initial');
+        } catch (error) {
+          debugPrint('更新用戶狀態出錯: $error');
+        }
 
         // 登入成功，進行下一步操作
         // 導航到基本資料填寫頁面，添加滑動動畫

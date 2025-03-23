@@ -5,6 +5,7 @@ import 'package:tuckin/services/database_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tuckin/utils/route_observer.dart'; // 導入路由觀察器
 import 'package:tuckin/utils/route_transitions.dart'; // 導入路由轉場效果
+import 'package:tuckin/components/components.dart'; // 導入共用組件
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -16,12 +17,18 @@ import 'screens/home_page.dart';
 // 導入晚餐相關頁面
 import 'screens/dinner/dinner_reservation_page.dart';
 import 'screens/dinner/matching_status_page.dart';
-// TODO: 導入其他頁面，包括出席確認頁面、餐廳選擇頁面、晚餐資訊頁面和評分頁面
+import 'screens/dinner/attendance_confirmation_page.dart';
+import 'screens/dinner/restaurant_selection_page.dart';
+import 'screens/dinner/dinner_info_page.dart';
+import 'screens/dinner/rating_page.dart';
 
 import 'utils/index.dart'; // 導入工具類
 
 // 創建路由觀察器實例
 final TuckinRouteObserver routeObserver = TuckinRouteObserver();
+
+// 全局變數，存儲初始路由
+String initialRoute = '/';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +49,26 @@ void main() async {
     await AuthService().initialize();
   } catch (e) {
     debugPrint('AuthService 初始化錯誤: $e');
+  }
+
+  // 檢查用戶登入狀態和用戶狀態
+  final authService = AuthService();
+  final databaseService = DatabaseService();
+
+  if (authService.isLoggedIn()) {
+    final currentUser = authService.getCurrentUser();
+    if (currentUser != null) {
+      try {
+        final userStatus = await databaseService.getUserStatus(currentUser.id);
+
+        // 如果狀態不是 initial，直接導航到主頁
+        if (userStatus != 'initial') {
+          initialRoute = '/home';
+        }
+      } catch (e) {
+        debugPrint('檢查用戶狀態出錯: $e');
+      }
+    }
   }
 
   runApp(const MyApp());
@@ -72,12 +99,13 @@ class MyApp extends StatelessWidget {
             textScaler: const TextScaler.linear(1.0), // 固定文字縮放比例
             devicePixelRatio: 1.0, // 可選：統一像素比例
           ),
-          child: child!,
+          // 包裹到SplashScreen中以顯示加載頁面
+          child: SplashScreen(child: child!),
         );
       },
       // 添加路由觀察器
       navigatorObservers: [routeObserver],
-      initialRoute: '/',
+      initialRoute: initialRoute,
       routes: {
         // 初始頁面
         '/': (context) => const WelcomeScreen(),
@@ -92,12 +120,11 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomePage(),
         '/dinner_reservation': (context) => const DinnerReservationPage(),
         '/matching_status': (context) => const MatchingStatusPage(),
-
-        // TODO: 添加以下頁面的路由
-        // '/attendance_confirmation': (context) => const AttendanceConfirmationPage(),
-        // '/restaurant_selection': (context) => const RestaurantSelectionPage(),
-        // '/dinner_info': (context) => const DinnerInfoPage(),
-        // '/dinner_rating': (context) => const DinnerRatingPage(),
+        '/attendance_confirmation':
+            (context) => const AttendanceConfirmationPage(),
+        '/restaurant_selection': (context) => const RestaurantSelectionPage(),
+        '/dinner_info': (context) => const DinnerInfoPage(),
+        '/dinner_rating': (context) => const RatingPage(),
 
         // 輔助頁面路由
         // '/notifications': (context) => const NotificationsPage(),
@@ -117,7 +144,7 @@ class MyApp extends StatelessWidget {
         if (uri.pathSegments.length >= 2) {
           if (uri.pathSegments[0] == 'dinner_info') {
             final id = uri.pathSegments[1];
-            // TODO: 返回帶有ID參數的晚餐資訊頁面
+            // 返回帶有ID參數的晚餐資訊頁面
             // return MaterialPageRoute(
             //   builder: (context) => DinnerInfoPage(dinnerId: id),
             // );

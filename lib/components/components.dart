@@ -7,3 +7,4 @@ export 'common/progress_dots_indicator.dart';
 export 'common/icon_text_input.dart';
 export 'common/back_button.dart';
 export 'common/loading_image.dart';
+export 'common/splash_screen.dart';

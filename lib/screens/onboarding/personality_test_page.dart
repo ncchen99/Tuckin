@@ -150,7 +150,14 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
     // 保存人格類型到數據庫
     _databaseService
         .updateUserPersonalityType(currentUser.id, personalityType)
-        .then((_) {
+        .then((_) async {
+          // 更新用戶狀態為 booking (聚餐預約狀態)
+          try {
+            await _databaseService.updateUserStatus(currentUser.id, 'booking');
+          } catch (error) {
+            debugPrint('更新用戶狀態出錯: $error');
+          }
+
           setState(() {
             _isLoading = false;
           });

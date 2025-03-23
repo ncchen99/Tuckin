@@ -17,8 +17,9 @@ class DatabaseService {
 
   // 表名常量
   static const String _userProfilesTable = 'user_profiles';
-  static const String _foodPreferencesTable = 'food_preferences';
-  static const String _personalityTypesTable = 'personality_types';
+  static const String _personalityResultsTable = 'user_personality_results';
+  static const String _userFoodPreferencesTable = 'user_food_preferences';
+  static const String _userStatusTable = 'user_status';
 
   /// 更新用戶基本資料
   ///
@@ -49,6 +50,13 @@ class DatabaseService {
       } else {
         // 創建新用戶
         await _supabaseService.client.from(_userProfilesTable).insert(userData);
+
+        // 新增用戶狀態記錄
+        await _supabaseService.client.from(_userStatusTable).insert({
+          'user_id': userId,
+          'status': 'initial', // 初始狀態
+        });
+
         debugPrint('用戶資料創建成功: $userId');
       }
     } catch (error) {
@@ -66,11 +74,23 @@ class DatabaseService {
     List<int> foodPreferences,
   ) async {
     try {
-      // 將食物偏好列表轉換為 JSONB 格式並直接更新 user_profiles 表
+      // 刪除現有的食物偏好
       await _supabaseService.client
-          .from(_userProfilesTable)
-          .update({'food_preferences_json': foodPreferences})
+          .from(_userFoodPreferencesTable)
+          .delete()
           .eq('user_id', userId);
+
+      // 插入新的食物偏好
+      final foodPreferenceData =
+          foodPreferences
+              .map((prefId) => {'user_id': userId, 'preference_id': prefId})
+              .toList();
+
+      if (foodPreferenceData.isNotEmpty) {
+        await _supabaseService.client
+            .from(_userFoodPreferencesTable)
+            .insert(foodPreferenceData);
+      }
 
       debugPrint('用戶食物偏好更新成功: $userId, 偏好: $foodPreferences');
     } catch (error) {
@@ -88,11 +108,27 @@ class DatabaseService {
     String personalityType,
   ) async {
     try {
-      // 直接在 user_profiles 表中更新性格類型
-      await _supabaseService.client
-          .from(_userProfilesTable)
-          .update({'personality_type': personalityType})
-          .eq('user_id', userId);
+      // 檢查是否已有性格資料
+      final existingPersonality =
+          await _supabaseService.client
+              .from(_personalityResultsTable)
+              .select()
+              .eq('user_id', userId)
+              .maybeSingle();
+
+      if (existingPersonality != null) {
+        // 更新現有性格類型
+        await _supabaseService.client
+            .from(_personalityResultsTable)
+            .update({'personality_type': personalityType})
+            .eq('user_id', userId);
+      } else {
+        // 新增性格類型
+        await _supabaseService.client.from(_personalityResultsTable).insert({
+          'user_id': userId,
+          'personality_type': personalityType,
+        });
+      }
 
       debugPrint('用戶性格類型更新成功: $userId, 類型: $personalityType');
     } catch (error) {
@@ -104,7 +140,7 @@ class DatabaseService {
   /// 獲取用戶的完整資料，包括基本資料、食物偏好和性格類型
   Future<Map<String, dynamic>> getUserCompleteProfile(String userId) async {
     try {
-      // 獲取基本資料，包括食物偏好的 JSON 欄位和性格類型
+      // 獲取基本資料
       final userProfile =
           await _supabaseService.client
               .from(_userProfilesTable)
@@ -112,18 +148,43 @@ class DatabaseService {
               .eq('user_id', userId)
               .maybeSingle();
 
-      // 從 userProfile 中提取食物偏好
+      // 獲取性格類型
+      final personalityResult =
+          await _supabaseService.client
+              .from(_personalityResultsTable)
+              .select()
+              .eq('user_id', userId)
+              .maybeSingle();
+
+      // 獲取食物偏好
+      final foodPreferences = await _supabaseService.client
+          .from(_userFoodPreferencesTable)
+          .select('preference_id')
+          .eq('user_id', userId);
+
+      // 獲取用戶狀態
+      final userStatus =
+          await _supabaseService.client
+              .from(_userStatusTable)
+              .select()
+              .eq('user_id', userId)
+              .maybeSingle();
+
+      // 從關聯表中提取食物偏好ID列表
       List<int> foodIds = [];
-      if (!(userProfile == null || userProfile.isEmpty) &&
-          userProfile['food_preferences_json'] != null) {
-        // 將 JSON 轉換為 List<int>
-        foodIds = List<int>.from(userProfile['food_preferences_json']);
+      if (foodPreferences != null && foodPreferences.isNotEmpty) {
+        foodIds =
+            foodPreferences
+                .map<int>((item) => item['preference_id'] as int)
+                .toList();
       }
+
       // 組合所有資料
       return {
         'profile': userProfile ?? {},
         'food_preferences': foodIds,
-        'personality_type': userProfile?['personality_type'],
+        'personality_type': personalityResult?['personality_type'],
+        'user_status': userStatus?['status'] ?? 'initial',
       };
     } catch (error) {
       debugPrint('獲取用戶完整資料時出錯: $error');
@@ -134,7 +195,7 @@ class DatabaseService {
   /// 檢查用戶是否已完成設定
   Future<bool> hasCompletedSetup(String userId) async {
     try {
-      // 檢查用戶是否有基本資料、性格類型和食物偏好
+      // 檢查用戶是否有基本資料
       final userProfile =
           await _supabaseService.client
               .from(_userProfilesTable)
@@ -147,14 +208,24 @@ class DatabaseService {
       }
 
       // 檢查用戶是否有性格類型
-      if (userProfile['personality_type'] == null) {
+      final personalityResult =
+          await _supabaseService.client
+              .from(_personalityResultsTable)
+              .select()
+              .eq('user_id', userId)
+              .maybeSingle();
+
+      if (personalityResult == null) {
         return false;
       }
 
       // 檢查用戶是否有食物偏好
-      final foodPreferences = userProfile['food_preferences_json'];
-      if (foodPreferences == null ||
-          (foodPreferences is List && foodPreferences.isEmpty)) {
+      final foodPreferences = await _supabaseService.client
+          .from(_userFoodPreferencesTable)
+          .select()
+          .eq('user_id', userId);
+
+      if (foodPreferences == null || foodPreferences.isEmpty) {
         return false;
       }
 
@@ -163,6 +234,61 @@ class DatabaseService {
     } catch (error) {
       debugPrint('檢查用戶設定狀態時出錯: $error');
       return false;
+    }
+  }
+
+  /// 更新用戶狀態
+  ///
+  /// [userId] 用戶 ID
+  /// [status] 狀態值，可以是 'initial', 'booking', 'waiting_matching', 'waiting_confirmation',
+  ///          'waiting_attendance', 'rating'
+  Future<void> updateUserStatus(String userId, String status) async {
+    try {
+      // 檢查用戶狀態是否已存在
+      final existingStatus =
+          await _supabaseService.client
+              .from(_userStatusTable)
+              .select()
+              .eq('user_id', userId)
+              .maybeSingle();
+
+      if (existingStatus != null) {
+        // 更新現有狀態
+        await _supabaseService.client
+            .from(_userStatusTable)
+            .update({'status': status})
+            .eq('user_id', userId);
+      } else {
+        // 創建新狀態記錄
+        await _supabaseService.client.from(_userStatusTable).insert({
+          'user_id': userId,
+          'status': status,
+        });
+      }
+
+      debugPrint('用戶狀態更新成功: $userId, 狀態: $status');
+    } catch (error) {
+      debugPrint('更新用戶狀態時出錯: $error');
+      rethrow;
+    }
+  }
+
+  /// 獲取用戶當前狀態
+  ///
+  /// [userId] 用戶 ID
+  Future<String> getUserStatus(String userId) async {
+    try {
+      final statusData =
+          await _supabaseService.client
+              .from(_userStatusTable)
+              .select()
+              .eq('user_id', userId)
+              .maybeSingle();
+
+      return statusData?['status'] ?? 'initial';
+    } catch (error) {
+      debugPrint('獲取用戶狀態時出錯: $error');
+      return 'initial'; // 發生錯誤時返回初始狀態
     }
   }
 }

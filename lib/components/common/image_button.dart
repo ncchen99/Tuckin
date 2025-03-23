@@ -43,6 +43,7 @@ class _ImageButtonState extends State<ImageButton> {
   Widget build(BuildContext context) {
     // 根據按鈕尺寸計算適當的陰影偏移量和比例
     final bool isSmallButton = widget.imagePath.contains('_m');
+    final bool isRedButton = widget.imagePath.contains('red');
 
     // 將尺寸適配為自適應尺寸
     final adaptiveShadowOffset = (isSmallButton ? 3.h : 4.h); // 減小小號按鈕的陰影偏移
@@ -224,7 +225,10 @@ class _ImageButtonState extends State<ImageButton> {
                               ? widget.textStyle.fontSize ?? 18
                               : widget.textStyle.fontSize ?? 20, // 根據按鈕大小調整字體
                     ),
-                    strokeColor: const Color(0xFF23456B), // 深藍色邊框
+                    strokeColor:
+                        isRedButton
+                            ? const Color(0xFF23456B)
+                            : const Color.fromARGB(255, 77, 74, 71), // 深藍色邊框
                     strokeWidth: (isSmallButton ? 3.r : 4.r), // 自適應邊框寬度
                     textAlign: TextAlign.center,
                   ),
