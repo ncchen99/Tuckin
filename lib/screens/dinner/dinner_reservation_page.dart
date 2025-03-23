@@ -5,6 +5,7 @@ import 'package:tuckin/utils/index.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class DinnerReservationPage extends StatefulWidget {
   const DinnerReservationPage({super.key});
@@ -14,8 +15,6 @@ class DinnerReservationPage extends StatefulWidget {
 }
 
 class _DinnerReservationPageState extends State<DinnerReservationPage> {
-  // 用戶選擇的日期 (0: 星期一, 1: 星期四)
-  int? _selectedDate;
   // 是否僅限成大學生參與
   bool _onlyNckuStudents = true;
   // 控制提示框顯示
@@ -27,10 +26,81 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
   final DatabaseService _databaseService = DatabaseService();
   String _username = ''; // 用戶名稱
 
+  // 下次聚餐日期
+  late DateTime _nextDinnerDate;
+  // 是否為單周（顯示星期一）
+  late bool _isSingleWeek;
+  // 顯示星期幾文字
+  late String _weekdayText;
+  // 是否可以預約
+  late bool _canReserve;
+
   @override
   void initState() {
     super.initState();
     _checkIfNewUser();
+    _calculateDates();
+  }
+
+  // 計算日期
+  void _calculateDates() {
+    final now = DateTime.now();
+    final currentDay = now.weekday;
+
+    // 計算當前是第幾週（從年初起算）
+    final int weekNumber =
+        (now.difference(DateTime(now.year, 1, 1)).inDays / 7).floor() + 1;
+
+    // 判斷當前週是單數週還是雙數週
+    _isSingleWeek = weekNumber % 2 == 1;
+
+    // 設定本週聚餐日是星期一還是星期四
+    _weekdayText = _isSingleWeek ? '星期一' : '星期四';
+
+    // 計算本週的聚餐日期 (先計算本週的開始日期，然後加上對應的天數)
+    final int targetWeekday =
+        _isSingleWeek ? DateTime.monday : DateTime.thursday;
+
+    // 計算本週日期 (回到本週日，然後加上目標天數)
+    // 先計算到本週日的天數 (週日是7，週一是1，所以用7減週幾)
+    int daysToSunday =
+        currentDay == DateTime.sunday ? 0 : (DateTime.sunday - currentDay);
+
+    // 本週日的日期
+    DateTime thisWeekSunday = now.subtract(Duration(days: 7 - daysToSunday));
+
+    // 本週的目標聚餐日
+    DateTime thisWeekTarget = thisWeekSunday.add(Duration(days: targetWeekday));
+
+    // 下週的目標聚餐日
+    DateTime nextWeekTarget = thisWeekTarget.add(const Duration(days: 7));
+
+    // 判斷是否已經過了本週的聚餐日，或者距離聚餐日不足2天
+    // 用絕對時間來比較，而不只是日期，這樣可以更精確
+    bool isPastOrTooClose = now.isAfter(
+      thisWeekTarget.subtract(const Duration(days: 2)),
+    );
+
+    if (isPastOrTooClose) {
+      // 如果已經過了本週聚餐日期或時間太接近，則預約下週聚餐
+      _nextDinnerDate = nextWeekTarget;
+    } else {
+      // 否則預約本週聚餐
+      _nextDinnerDate = thisWeekTarget;
+    }
+
+    // 既然都是未來日期，所以一定可以預約
+    _canReserve = true;
+
+    // 調試輸出
+    debugPrint('當前週數: $weekNumber (${_isSingleWeek ? "單週" : "雙週"})');
+    debugPrint('當前星期幾: $currentDay');
+    debugPrint(
+      '本週目標聚餐日: ${DateFormat('yyyy-MM-dd').format(thisWeekTarget)} ($_weekdayText)',
+    );
+    debugPrint('下週目標聚餐日: ${DateFormat('yyyy-MM-dd').format(nextWeekTarget)}');
+    debugPrint('是否已過或太接近: $isPastOrTooClose');
+    debugPrint('選擇的聚餐日期: ${DateFormat('yyyy-MM-dd').format(_nextDinnerDate)}');
   }
 
   // 檢查是否為新用戶
@@ -105,14 +175,14 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                   Expanded(
                     child: SingleChildScrollView(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.w),
+                        padding: EdgeInsets.symmetric(horizontal: 24.w),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             SizedBox(height: 20.h),
                             // 標題
                             Text(
-                              '選擇聚餐日期',
+                              '下次聚餐時間',
                               style: TextStyle(
                                 fontSize: 24.sp,
                                 fontFamily: 'OtsutomeFont',
@@ -123,115 +193,93 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                             SizedBox(height: 10.h),
                             // 說明文字
                             Text(
-                              '請選擇您希望參加的聚餐日期，每週僅能參加一次聚餐活動',
+                              '這次的活動在星期${_isSingleWeek ? "一" : "四"}舉行，歡迎預約參加',
                               style: TextStyle(
                                 fontSize: 16.sp,
                                 fontFamily: 'OtsutomeFont',
                                 color: const Color(0xFF23456B),
                               ),
                             ),
-                            SizedBox(height: 30.h),
+                            SizedBox(height: 25.h),
 
-                            // 日期選擇區域
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // 星期一選項
-                                _buildDateCard(
-                                  context,
-                                  '星期一',
-                                  'assets/images/icon/tue.png',
-                                  '晚間 7:00',
-                                  0,
-                                ),
-                                // 星期四選項
-                                _buildDateCard(
-                                  context,
-                                  '星期四',
-                                  'assets/images/icon/thu.png',
-                                  '晚間 7:00',
-                                  1,
-                                ),
-                              ],
-                            ),
-
-                            SizedBox(height: 30.h),
-
-                            // 預約截止時間提示
-                            Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.all(15.r),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.9),
-                                borderRadius: BorderRadius.circular(10.r),
-                                border: Border.all(
-                                  color: const Color(0xFF23456B),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Text(
-                                '預約截止時間：周五午夜 12:00',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontFamily: 'OtsutomeFont',
-                                  color: const Color(0xFF23456B),
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            // 日期卡片（單周星期一或雙周星期四）
+                            Center(
+                              child: _buildDateCard(
+                                context,
+                                _weekdayText,
+                                _isSingleWeek
+                                    ? 'assets/images/icon/mon.png'
+                                    : 'assets/images/icon/thu.png',
+                                '晚間 7:00',
+                                DateFormat('MM/dd').format(_nextDinnerDate),
                               ),
                             ),
 
-                            SizedBox(height: 20.h),
+                            SizedBox(height: 25.h),
 
-                            // 成大限定選項
-                            Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.all(15.r),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.9),
-                                borderRadius: BorderRadius.circular(10.r),
-                                border: Border.all(
-                                  color: const Color(0xFF23456B),
-                                  width: 1.5,
+                            // 成大限定選項 - 置中
+                            Center(
+                              child: Container(
+                                width: 270.w,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 15.w,
+                                  vertical: 12.h,
                                 ),
-                              ),
-                              child: Row(
-                                children: [
-                                  CustomCheckbox(
-                                    value: _onlyNckuStudents,
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setState(() {
-                                          _onlyNckuStudents = value;
-                                        });
-                                      }
-                                    },
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(10.r),
+                                  border: Border.all(
+                                    color: const Color(0xFF23456B),
+                                    width: 1.5,
                                   ),
-                                  SizedBox(width: 10.w),
-                                  Expanded(
-                                    child: Text(
-                                      '僅限成大學生參與',
-                                      style: TextStyle(
-                                        fontSize: 16.sp,
-                                        fontFamily: 'OtsutomeFont',
-                                        color: const Color(0xFF23456B),
-                                        fontWeight: FontWeight.bold,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    // 勾選框
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 2.h,
+                                      ),
+                                      child: CustomCheckbox(
+                                        value: _onlyNckuStudents,
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            setState(() {
+                                              _onlyNckuStudents = value;
+                                            });
+                                          }
+                                        },
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(width: 10.w),
+                                    // 文字說明
+                                    Expanded(
+                                      child: Text(
+                                        '僅限成大學生參與',
+                                        style: TextStyle(
+                                          fontSize: 16.sp,
+                                          fontFamily: 'OtsutomeFont',
+                                          color: const Color(0xFF23456B),
+                                          fontWeight: FontWeight.bold,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
 
-                            SizedBox(height: 50.h),
+                            SizedBox(height: 45.h),
 
-                            // 提交按鈕
+                            // 預約按鈕
                             Center(
                               child: ImageButton(
-                                text: '開始配對',
+                                text: '預約',
                                 imagePath: 'assets/images/ui/button/red_l.png',
-                                width: 180.w,
-                                height: 75.h,
+                                width: 160.w,
+                                height: 68.h,
                                 onPressed: () {
                                   // 導航到配對狀態頁面
                                   Navigator.pushNamed(
@@ -239,10 +287,26 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                                     '/matching_status',
                                   );
                                 },
-                                isEnabled:
-                                    _selectedDate != null, // 如果未選擇日期，則禁用按鈕
+                                isEnabled: _canReserve, // 根據是否可以預約來啟用/禁用按鈕
                               ),
                             ),
+
+                            // 顯示預約狀態提示（如果不能預約）
+                            if (!_canReserve)
+                              Padding(
+                                padding: EdgeInsets.only(top: 15.h),
+                                child: Center(
+                                  child: Text(
+                                    '當前聚餐活動預約已截止',
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFFB33D1C),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
 
                             SizedBox(height: 30.h),
                           ],
@@ -259,7 +323,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                   top: 70.h, // 調整位置，確保在HeaderBar下方
                   right: 20.w,
                   child: InfoTipBox(
-                    message: '歡迎您，$_username！\n準備好預約您的第一次聚餐了嗎？',
+                    message: '嗨囉 $_username！\n 每次相遇都是生命中的美好！',
                     show: _showWelcomeTip,
                     onHide: () {
                       // 提示框完全隱藏後的回調
@@ -273,72 +337,84 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     );
   }
 
-  // 構建日期選擇卡片
+  // 構建日期卡片
   Widget _buildDateCard(
     BuildContext context,
     String day,
     String iconPath,
     String time,
-    int dateIndex,
+    String formattedDate,
   ) {
-    final isSelected = _selectedDate == dateIndex;
+    // 計算適當的陰影偏移量
+    final adaptiveShadowOffset = 3.h;
 
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedDate = dateIndex;
-        });
-      },
-      child: Container(
-        width: 150.w,
-        padding: EdgeInsets.all(15.r),
-        decoration: BoxDecoration(
-          color:
-              isSelected
-                  ? const Color(0xFF23456B)
-                  : Colors.white.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(10.r),
-          border: Border.all(color: const Color(0xFF23456B), width: 1.5),
-        ),
-        child: Column(
-          children: [
-            // 日期圖示
-            Image.asset(
-              iconPath,
-              width: 50.w,
-              height: 50.w,
-              color: isSelected ? Colors.white : const Color(0xFF23456B),
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(
-                  Icons.calendar_today,
-                  size: 50.w,
-                  color: isSelected ? Colors.white : const Color(0xFF23456B),
-                );
-              },
+    return Container(
+      width: 270.w,
+      padding: EdgeInsets.symmetric(vertical: 24.h),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: const Color(0xFF23456B), width: 1.5),
+      ),
+      child: Column(
+        children: [
+          // 圖片及陰影
+          SizedBox(
+            width: 60.w,
+            height: 60.h,
+            child: Stack(
+              clipBehavior: Clip.none, // 允許陰影超出容器範圍
+              children: [
+                // 底部陰影
+                Positioned(
+                  left: 0,
+                  top: adaptiveShadowOffset,
+                  child: Image.asset(
+                    iconPath,
+                    width: 60.w,
+                    height: 60.h,
+                    color: Colors.black.withOpacity(0.4),
+                    colorBlendMode: BlendMode.srcIn,
+                  ),
+                ),
+                // 主圖像
+                Image.asset(iconPath, width: 60.w, height: 60.h),
+              ],
             ),
-            SizedBox(height: 10.h),
-            // 日期文字
-            Text(
-              day,
-              style: TextStyle(
-                fontSize: 18.sp,
-                fontFamily: 'OtsutomeFont',
-                color: isSelected ? Colors.white : const Color(0xFF23456B),
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          SizedBox(height: 16.h),
+          // 日期文字
+          Text(
+            day,
+            style: TextStyle(
+              fontSize: 22.sp,
+              fontFamily: 'OtsutomeFont',
+              color: const Color(0xFF23456B),
+              fontWeight: FontWeight.bold,
             ),
-            SizedBox(height: 5.h),
-            // 時間文字
-            Text(
-              time,
-              style: TextStyle(
-                fontSize: 14.sp,
-                fontFamily: 'OtsutomeFont',
-                color: isSelected ? Colors.white : const Color(0xFF23456B),
-              ),
+          ),
+          SizedBox(height: 8.h),
+          // 具體日期 (MM/DD)
+          Text(
+            formattedDate,
+            style: TextStyle(
+              fontSize: 20.sp,
+              fontFamily: 'OtsutomeFont',
+              color: const Color(0xFF23456B),
+              fontWeight: FontWeight.bold,
             ),
-          ],
-        ),
+          ),
+          SizedBox(height: 8.h),
+          // 時間文字
+          Text(
+            time,
+            style: TextStyle(
+              fontSize: 18.sp,
+              fontFamily: 'OtsutomeFont',
+              color: const Color(0xFF23456B),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -61,14 +61,26 @@ void main() async {
       try {
         final userStatus = await databaseService.getUserStatus(currentUser.id);
 
+        // 調試輸出
+        debugPrint('當前用戶狀態: $userStatus');
+        debugPrint('當前用戶ID: ${currentUser.id}');
+        debugPrint('當前用戶郵箱: ${currentUser.email}');
+
         // 如果狀態不是 initial，直接導航到主頁
         if (userStatus != 'initial') {
           initialRoute = '/home';
+          debugPrint('設置初始路由為: $initialRoute');
+        } else {
+          debugPrint('用戶狀態為initial，保持初始路由: $initialRoute');
         }
       } catch (e) {
         debugPrint('檢查用戶狀態出錯: $e');
       }
+    } else {
+      debugPrint('用戶已登入但無法獲取用戶資訊');
     }
+  } else {
+    debugPrint('用戶未登入，使用默認初始路由: $initialRoute');
   }
 
   runApp(const MyApp());

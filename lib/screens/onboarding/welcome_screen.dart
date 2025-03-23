@@ -177,9 +177,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           );
 
           if (hasCompletedSetup) {
+            // 設定用戶的狀態為booking
+            await _databaseService.updateUserStatus(currentUser.id, 'booking');
+
             // 用戶已完成所有設定，直接導航到主頁
             if (mounted) {
-              Navigator.of(context).pushReplacementNamed('/home').then((_) {
+              Navigator.of(
+                context,
+              ).pushReplacementNamed('/dinner_reservation').then((_) {
                 // 導航完成後才隱藏加載頁面
                 setState(() {
                   _isLoading = false;
