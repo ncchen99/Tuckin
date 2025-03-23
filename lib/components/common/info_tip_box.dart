@@ -73,7 +73,7 @@ class InfoTipBox extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(width: 8.w),
+            SizedBox(width: 4.w),
             Flexible(
               child: Text(
                 message,

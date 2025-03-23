@@ -113,7 +113,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Padding(
-                        padding: EdgeInsets.only(top: 50.h, bottom: 20.h),
+                        padding: EdgeInsets.only(top: 50.h, bottom: 50.h),
                         child: Image.asset(
                           'assets/images/icon/tuckin_t_brand.png',
                           width: 150.w,
@@ -147,7 +147,7 @@ class _HomePageState extends State<HomePage> {
                               ),
                               SizedBox(height: 10.h),
                               Text(
-                                '成大專屬的聚餐交友平台\n現在就開始您的社交之旅吧！',
+                                '每次相遇都是生命中的美好\n現在就點擊預約吧！',
                                 style: TextStyle(
                                   fontSize: 18.sp,
                                   fontFamily: 'OtsutomeFont',
@@ -160,13 +160,13 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
 
-                      SizedBox(height: 40.h),
+                      SizedBox(height: 100.h),
 
                       // 主循環核心功能按鈕
                       Column(
                         children: [
                           ImageButton(
-                            text: '聚餐預約',
+                            text: '預約',
                             imagePath: 'assets/images/ui/button/red_l.png',
                             width: 180.w,
                             height: 85.h,
@@ -174,18 +174,6 @@ class _HomePageState extends State<HomePage> {
                               Navigator.of(
                                 context,
                               ).pushNamed('/dinner_reservation');
-                            },
-                          ),
-                          SizedBox(height: 20.h),
-                          ImageButton(
-                            text: '配對狀態',
-                            imagePath: 'assets/images/ui/button/blue_l.png',
-                            width: 180.w,
-                            height: 85.h,
-                            onPressed: () {
-                              Navigator.of(
-                                context,
-                              ).pushNamed('/matching_status');
                             },
                           ),
                         ],

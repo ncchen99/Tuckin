@@ -625,7 +625,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               child: Text(
                                 _introTexts[_currentPage],
                                 style: TextStyle(
-                                  fontSize: 18.sp, // 使用自適應字體大小
+                                  fontSize: 20.sp, // 使用自適應字體大小
                                   color: const Color(0xFF23456B),
                                   fontFamily: 'OtsutomeFont',
                                   fontWeight: FontWeight.bold,
