@@ -203,71 +203,66 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                             SizedBox(height: 25.h),
 
                             // 日期卡片（單周星期一或雙周星期四）
-                            Center(
-                              child: _buildDateCard(
-                                context,
-                                _weekdayText,
-                                _isSingleWeek
-                                    ? 'assets/images/icon/mon.png'
-                                    : 'assets/images/icon/thu.png',
-                                '晚間 7:00',
-                                DateFormat('MM/dd').format(_nextDinnerDate),
-                              ),
+                            _buildDateCard(
+                              context,
+                              _weekdayText,
+                              _isSingleWeek
+                                  ? 'assets/images/icon/mon.png'
+                                  : 'assets/images/icon/thu.png',
+                              '晚間 7:00',
+                              DateFormat('MM/dd').format(_nextDinnerDate),
                             ),
 
                             SizedBox(height: 25.h),
 
-                            // 成大限定選項 - 置中
-                            Center(
-                              child: Container(
-                                width: 270.w,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 15.w,
-                                  vertical: 12.h,
+                            // 成大限定選項 - 對齊標題邊界
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 15.w,
+                                vertical: 12.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(10.r),
+                                border: Border.all(
+                                  color: const Color(0xFF23456B),
+                                  width: 1.5,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(10.r),
-                                  border: Border.all(
-                                    color: const Color(0xFF23456B),
-                                    width: 1.5,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // 勾選框
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 2.h,
+                                    ),
+                                    child: CustomCheckbox(
+                                      value: _onlyNckuStudents,
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          setState(() {
+                                            _onlyNckuStudents = value;
+                                          });
+                                        }
+                                      },
+                                    ),
                                   ),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    // 勾選框
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 2.h,
-                                      ),
-                                      child: CustomCheckbox(
-                                        value: _onlyNckuStudents,
-                                        onChanged: (value) {
-                                          if (value != null) {
-                                            setState(() {
-                                              _onlyNckuStudents = value;
-                                            });
-                                          }
-                                        },
+                                  SizedBox(width: 10.w),
+                                  // 文字說明
+                                  Expanded(
+                                    child: Text(
+                                      '想與校內同學聚餐',
+                                      style: TextStyle(
+                                        fontSize: 16.sp,
+                                        fontFamily: 'OtsutomeFont',
+                                        color: const Color(0xFF23456B),
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.4,
                                       ),
                                     ),
-                                    SizedBox(width: 10.w),
-                                    // 文字說明
-                                    Expanded(
-                                      child: Text(
-                                        '只想與成大學生聚餐',
-                                        style: TextStyle(
-                                          fontSize: 16.sp,
-                                          fontFamily: 'OtsutomeFont',
-                                          color: const Color(0xFF23456B),
-                                          fontWeight: FontWeight.bold,
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
 
@@ -349,7 +344,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     final adaptiveShadowOffset = 3.h;
 
     return Container(
-      width: 270.w,
+      width: double.infinity,
       padding: EdgeInsets.symmetric(vertical: 24.h),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.9),
