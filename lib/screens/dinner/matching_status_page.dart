@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:tuckin/components/common/header_bar.dart';
-import 'package:tuckin/components/common/image_button.dart';
-import 'package:tuckin/components/common/loading_image.dart';
-import 'package:tuckin/utils/index.dart';
-import 'package:tuckin/services/auth_service.dart';
+import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/auth_service.dart';
+import 'package:tuckin/utils/index.dart';
+import 'dart:async';
 
 class MatchingStatusPage extends StatefulWidget {
   const MatchingStatusPage({super.key});
@@ -16,8 +15,10 @@ class MatchingStatusPage extends StatefulWidget {
 class _MatchingStatusPageState extends State<MatchingStatusPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final NavigationService _navigationService = NavigationService();
   bool _isLoading = true;
   bool _isCancelling = false; // 追蹤取消預約操作的狀態
+  String _status = 'waiting_matching'; // 初始狀態：等待配對
   String _userStatus = 'waiting_matching'; // 預設為等待配對狀態
   bool _isPageMounted = false; // 追蹤頁面是否完全掛載
 
@@ -63,21 +64,17 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
           if (mounted) {
             if (status == 'booking') {
               debugPrint('用戶處於預約階段，導向到預約頁面');
-              Navigator.of(context).pushReplacementNamed('/dinner_reservation');
+              _navigationService.navigateToDinnerReservation(context);
             } else if (status == 'waiting_confirmation') {
-              Navigator.of(
-                context,
-              ).pushReplacementNamed('/attendance_confirmation');
+              _navigationService.navigateToAttendanceConfirmation(context);
             } else if (status == 'waiting_restaurant') {
-              Navigator.of(
-                context,
-              ).pushReplacementNamed('/restaurant_selection');
+              _navigationService.navigateToRestaurantSelection(context);
             } else if (status == 'waiting_dinner') {
-              Navigator.of(context).pushReplacementNamed('/dinner_info');
+              _navigationService.navigateToDinnerInfo(context);
             } else if (status == 'rating') {
-              Navigator.of(context).pushReplacementNamed('/dinner_rating');
+              _navigationService.navigateToDinnerRating(context);
             } else {
-              Navigator.of(context).pushReplacementNamed('/');
+              _navigationService.navigateToHome(context);
             }
           }
         }
@@ -117,7 +114,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
         // 操作完成後跳轉到預約頁面
         if (mounted) {
           debugPrint('用戶主動取消預約，導向到預約頁面');
-          Navigator.of(context).pushReplacementNamed('/dinner_reservation');
+          _navigationService.navigateToDinnerReservation(context);
         }
       }
     } catch (e) {
@@ -132,6 +129,16 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
         ).showSnackBar(SnackBar(content: Text('取消預約失敗: $e')));
       }
     }
+  }
+
+  // 在通知圖標點擊處理函數中使用導航服務
+  void _handleNotificationTap() {
+    _navigationService.navigateToNotifications(context);
+  }
+
+  // 在用戶設置圖標點擊處理函數中使用導航服務
+  void _handleProfileTap() {
+    _navigationService.navigateToUserSettings(context);
   }
 
   @override
@@ -169,14 +176,8 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
               // 頂部導航欄
               HeaderBar(
                 title: '',
-                onNotificationTap: () {
-                  // 導航到通知頁面
-                  Navigator.pushNamed(context, '/notifications');
-                },
-                onProfileTap: () {
-                  // 導航到個人資料頁面
-                  Navigator.pushNamed(context, '/user_settings');
-                },
+                onNotificationTap: _handleNotificationTap,
+                onProfileTap: _handleProfileTap,
               ),
 
               Expanded(

@@ -81,6 +81,36 @@ class AuthService {
     }
   }
 
+  // 使用電子郵件和密碼登入
+  Future<bool> signInWithEmailAndPassword(String email, String password) async {
+    try {
+      final response = await _supabaseService.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      return response.user != null;
+    } catch (error) {
+      debugPrint('郵箱密碼登入錯誤: $error');
+      return false;
+    }
+  }
+
+  // 使用電子郵件和密碼註冊
+  Future<bool> signUpWithEmailAndPassword(String email, String password) async {
+    try {
+      final response = await _supabaseService.client.auth.signUp(
+        email: email,
+        password: password,
+      );
+
+      return response.user != null;
+    } catch (error) {
+      debugPrint('郵箱密碼註冊錯誤: $error');
+      return false;
+    }
+  }
+
   // 登出
   Future<void> signOut() async {
     await _supabaseService.client.auth.signOut();

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../utils/index.dart';
+import '../../services/auth_service.dart';
 
 /// 品牌加載頁面組件
 ///
 /// 在應用啟動時顯示品牌標誌，並在指定時間後淡出
+/// 同時檢查用戶狀態並導航到適當頁面
 class SplashScreen extends StatefulWidget {
   /// 要顯示的子組件(通常是實際的應用內容)
   final Widget child;
@@ -26,6 +28,8 @@ class _SplashScreenState extends State<SplashScreen>
   bool _isLoading = true;
   late AnimationController _loadingAnimController;
   late Animation<double> _fadeAnimation;
+  final NavigationService _navigationService = NavigationService();
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
@@ -48,8 +52,26 @@ class _SplashScreenState extends State<SplashScreen>
           _isLoading = false;
         });
         _loadingAnimController.forward();
+
+        // 在動畫完成後檢查用戶狀態並導航
+        _loadingAnimController.addStatusListener((status) {
+          if (status == AnimationStatus.completed) {
+            _checkUserStatusAndNavigate();
+          }
+        });
       }
     });
+  }
+
+  /// 檢查用戶狀態並導航到適當頁面
+  Future<void> _checkUserStatusAndNavigate() async {
+    if (mounted && ModalRoute.of(context)?.settings.name == '/') {
+      // 只在主頁面時進行狀態檢查和導航
+      // 避免在子頁面顯示時進行不必要的導航
+      if (_authService.isLoggedIn()) {
+        await _navigationService.navigateToUserStatusPage(context);
+      }
+    }
   }
 
   @override

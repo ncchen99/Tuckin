@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
 
 class HomePage extends StatefulWidget {
@@ -13,79 +12,36 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final AuthService _authService = AuthService();
-  final DatabaseService _databaseService = DatabaseService();
+  final NavigationService _navigationService = NavigationService();
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _checkUserStatusAndNavigate();
+    // 簡化為使用導航服務檢查用戶狀態
+    _checkUserStatus();
   }
 
-  Future<void> _checkUserStatusAndNavigate() async {
+  Future<void> _checkUserStatus() async {
     if (!mounted) return;
 
     try {
-      // 獲取當前用戶
-      final currentUser = _authService.getCurrentUser();
-      if (currentUser == null) {
-        // 用戶未登入，留在主頁
+      // 只使用導航服務檢查並導航到適當的頁面
+      await _navigationService.navigateToUserStatusPage(context);
+
+      // 如果導航服務決定留在主頁，則更新加載狀態
+      if (mounted && ModalRoute.of(context)?.settings.name == '/home') {
         setState(() {
           _isLoading = false;
         });
-        return;
-      }
-
-      // 獲取用戶狀態
-      final userStatus = await _databaseService.getUserStatus(currentUser.id);
-
-      if (!mounted) return;
-
-      // 根據用戶狀態導航到相應頁面
-      switch (userStatus) {
-        case 'booking':
-          // 聚餐預約狀態 -> 聚餐預約頁面
-          Navigator.of(context).pushReplacementNamed('/dinner_reservation');
-          break;
-        case 'waiting_matching':
-          // 等待配對狀態 -> 配對狀態頁面
-          Navigator.of(context).pushReplacementNamed('/matching_status');
-          break;
-        case 'matching_failed':
-          // 配對失敗狀態 -> 保留在匹配狀態頁面
-          Navigator.of(context).pushReplacementNamed('/matching_status');
-          break;
-        case 'waiting_confirmation':
-          // 等待確認狀態 -> 出席確認頁面
-          Navigator.of(
-            context,
-          ).pushReplacementNamed('/attendance_confirmation');
-          break;
-        case 'waiting_restaurant':
-          // 等待餐廳狀態 -> 餐廳選擇頁面
-          Navigator.of(context).pushReplacementNamed('/restaurant_selection');
-          break;
-        case 'waiting_dinner':
-          // 等待聚餐狀態 -> 聚餐資訊頁面
-          Navigator.of(context).pushReplacementNamed('/dinner_info');
-          break;
-        case 'rating':
-          // 評分狀態 -> 評分頁面
-          Navigator.of(context).pushReplacementNamed('/dinner_rating');
-          break;
-        case 'initial':
-        default:
-          // 初始狀態或其他狀態，保持在主頁
-          setState(() {
-            _isLoading = false;
-          });
-          break;
       }
     } catch (e) {
-      debugPrint('獲取用戶狀態出錯: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      debugPrint('檢查用戶狀態出錯: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -196,9 +152,8 @@ class _HomePageState extends State<HomePage> {
                           onPressed: () async {
                             await _authService.signOut();
                             if (mounted) {
-                              Navigator.of(
-                                context,
-                              ).pushNamedAndRemoveUntil('/', (route) => false);
+                              // 使用導航服務處理登出後的導航
+                              _navigationService.navigateAfterSignOut(context);
                             }
                           },
                         ),

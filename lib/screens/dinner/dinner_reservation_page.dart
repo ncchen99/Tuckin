@@ -27,6 +27,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
   // 添加服務
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final NavigationService _navigationService = NavigationService();
   String _username = ''; // 用戶名稱
 
   // 下次聚餐日期
@@ -147,6 +148,22 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     }
   }
 
+  // 處理通知按鈕點擊
+  void _handleNotificationTap() {
+    Navigator.pushNamed(context, '/notifications');
+  }
+
+  // 處理用戶設置按鈕點擊
+  void _handleUserProfileTap() {
+    Navigator.pushNamed(context, '/user_settings');
+  }
+
+  // 導航到匹配狀態頁面
+  Future<void> _navigateToMatchingStatus() async {
+    // 使用 NavigationService 導航到匹配狀態頁面
+    _navigationService.navigateToUserStatusPage(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -165,14 +182,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                   // 頂部導航欄
                   HeaderBar(
                     title: '聚餐預約',
-                    onNotificationTap: () {
-                      // 導航到通知頁面
-                      Navigator.pushNamed(context, '/notifications');
-                    },
-                    onProfileTap: () {
-                      // 導航到個人資料頁面
-                      Navigator.pushNamed(context, '/user_settings');
-                    },
+                    onNotificationTap: _handleNotificationTap,
+                    onProfileTap: _handleUserProfileTap,
                   ),
 
                   Expanded(
@@ -304,10 +315,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
 
                                               // 導航到配對狀態頁面
                                               if (!mounted) return;
-                                              Navigator.pushReplacementNamed(
-                                                context,
-                                                '/matching_status',
-                                              );
+                                              await _navigateToMatchingStatus();
                                             }
                                           } catch (e) {
                                             debugPrint('預約時出錯: $e');

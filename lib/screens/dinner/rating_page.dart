@@ -14,19 +14,78 @@ class RatingPage extends StatefulWidget {
 class _RatingPageState extends State<RatingPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final NavigationService _navigationService = NavigationService();
   bool _isLoading = true;
+  double _rating = 0;
 
   @override
   void initState() {
     super.initState();
-    // TODO: 載入評分資料
-    _loadRatingData();
+    _checkUserStatus();
   }
 
-  Future<void> _loadRatingData() async {
-    setState(() {
-      _isLoading = false;
-    });
+  Future<void> _checkUserStatus() async {
+    try {
+      final currentUser = _authService.getCurrentUser();
+      if (currentUser != null) {
+        final userStatus = await _databaseService.getUserStatus(currentUser.id);
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (userStatus != 'rating') {
+          if (mounted) {
+            _navigationService.navigateToUserStatusPage(context);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('檢查用戶狀態時出錯: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 用戶提交評分
+  Future<void> _handleSubmitRating() async {
+    try {
+      final currentUser = _authService.getCurrentUser();
+      if (currentUser != null) {
+        // 儲存用戶評分
+        // 註：需要在 DatabaseService 中實現相應方法
+        // await _databaseService.saveDinnerRating(
+        //   currentUser.id,
+        //   _rating,
+        // );
+
+        // 更新用戶狀態
+        await _databaseService.updateUserStatus(currentUser.id, 'available');
+
+        if (mounted) {
+          _navigationService.navigateToHome(context);
+        }
+      }
+    } catch (e) {
+      debugPrint('提交評分時出錯: $e');
+    }
+  }
+
+  // 用戶跳過評分
+  Future<void> _handleSkipRating() async {
+    try {
+      final currentUser = _authService.getCurrentUser();
+      if (currentUser != null) {
+        // 更新用戶狀態
+        await _databaseService.updateUserStatus(currentUser.id, 'available');
+
+        if (mounted) {
+          _navigationService.navigateToHome(context);
+        }
+      }
+    } catch (e) {
+      debugPrint('跳過評分時出錯: $e');
+    }
   }
 
   @override

@@ -15,6 +15,7 @@ class RestaurantSelectionPage extends StatefulWidget {
 class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final NavigationService _navigationService = NavigationService();
   bool _isLoading = true;
 
   @override
@@ -28,6 +29,32 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     setState(() {
       _isLoading = false;
     });
+  }
+
+  // 使用導航服務處理返回
+  void _handleBack() {
+    Navigator.of(context).pop();
+  }
+
+  // 使用導航服務處理選擇餐廳後的導航
+  Future<void> _handleSelectRestaurant() async {
+    try {
+      final currentUser = _authService.getCurrentUser();
+      if (currentUser != null) {
+        // 更新用戶狀態
+        await _databaseService.updateUserStatus(
+          currentUser.id,
+          'waiting_dinner',
+        );
+
+        if (mounted) {
+          // 使用導航服務導航到晚餐信息頁面
+          _navigationService.navigateToUserStatusPage(context);
+        }
+      }
+    } catch (e) {
+      debugPrint('選擇餐廳時出錯: $e');
+    }
   }
 
   @override
@@ -53,11 +80,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                         padding: EdgeInsets.symmetric(vertical: 20.h),
                         child: Row(
                           children: [
-                            BackIconButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                              },
-                            ),
+                            BackIconButton(onPressed: _handleBack),
                             Expanded(
                               child: Center(
                                 child: Text(

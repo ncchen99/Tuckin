@@ -9,3 +9,4 @@ export 'common/back_button.dart';
 export 'common/loading_image.dart';
 export 'common/splash_screen.dart';
 export 'common/info_tip_box.dart';
+export 'common/header_bar.dart';

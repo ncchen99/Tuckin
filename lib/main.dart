@@ -7,6 +7,7 @@ import 'package:tuckin/utils/route_observer.dart'; // 導入路由觀察器
 import 'package:tuckin/utils/route_transitions.dart'; // 導入路由轉場效果
 import 'package:tuckin/components/components.dart'; // 導入共用組件
 import 'package:connectivity_plus/connectivity_plus.dart'; // 導入網絡狀態檢測
+import 'package:tuckin/utils/navigation_service.dart'; // 導入導航服務
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -52,36 +53,13 @@ void main() async {
     debugPrint('AuthService 初始化錯誤: $e');
   }
 
-  // 檢查用戶登入狀態和用戶狀態
-  final authService = AuthService();
-  final databaseService = DatabaseService();
-
-  if (authService.isLoggedIn()) {
-    final currentUser = authService.getCurrentUser();
-    if (currentUser != null) {
-      try {
-        final userStatus = await databaseService.getUserStatus(currentUser.id);
-
-        // 調試輸出
-        debugPrint('當前用戶狀態: $userStatus');
-        debugPrint('當前用戶ID: ${currentUser.id}');
-        debugPrint('當前用戶郵箱: ${currentUser.email}');
-
-        // 如果狀態不是 initial，直接導航到主頁
-        if (userStatus != 'initial') {
-          initialRoute = '/home';
-          debugPrint('設置初始路由為: $initialRoute');
-        } else {
-          debugPrint('用戶狀態為initial，保持初始路由: $initialRoute');
-        }
-      } catch (e) {
-        debugPrint('檢查用戶狀態出錯: $e');
-      }
-    } else {
-      debugPrint('用戶已登入但無法獲取用戶資訊');
-    }
-  } else {
-    debugPrint('用戶未登入，使用默認初始路由: $initialRoute');
+  // 使用導航服務確定初始路由
+  try {
+    initialRoute = await NavigationService().determineInitialRoute();
+    debugPrint('設置初始路由為: $initialRoute');
+  } catch (e) {
+    debugPrint('確定初始路由出錯: $e');
+    initialRoute = '/'; // 發生錯誤時，使用默認初始路由
   }
 
   runApp(const MyApp());

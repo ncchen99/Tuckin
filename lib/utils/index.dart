@@ -10,3 +10,6 @@ export 'extensions.dart';
 
 // 導出響應式組件
 export 'responsive_widget.dart';
+
+// 導出導航服務
+export 'navigation_service.dart';

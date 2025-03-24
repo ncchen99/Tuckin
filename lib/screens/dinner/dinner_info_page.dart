@@ -14,19 +14,63 @@ class DinnerInfoPage extends StatefulWidget {
 class _DinnerInfoPageState extends State<DinnerInfoPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final NavigationService _navigationService = NavigationService();
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // TODO: 載入聚餐資訊
-    _loadDinnerInfo();
+    _checkUserStatus();
   }
 
-  Future<void> _loadDinnerInfo() async {
-    setState(() {
-      _isLoading = false;
-    });
+  Future<void> _checkUserStatus() async {
+    try {
+      final currentUser = _authService.getCurrentUser();
+      if (currentUser != null) {
+        final userStatus = await _databaseService.getUserStatus(currentUser.id);
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (userStatus != 'waiting_dinner') {
+          if (mounted) {
+            _navigationService.navigateToUserStatusPage(context);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('檢查用戶狀態時出錯: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 用戶完成晚餐
+  Future<void> _handleFinishDinner() async {
+    try {
+      final currentUser = _authService.getCurrentUser();
+      if (currentUser != null) {
+        // 更新用戶狀態
+        await _databaseService.updateUserStatus(currentUser.id, 'rating');
+
+        if (mounted) {
+          _navigationService.navigateToDinnerRating(context);
+        }
+      }
+    } catch (e) {
+      debugPrint('完成晚餐時出錯: $e');
+    }
+  }
+
+  // 在通知圖標點擊處理函數中使用導航服務
+  void _handleNotificationTap() {
+    _navigationService.navigateToNotifications(context);
+  }
+
+  // 在用戶設置圖標點擊處理函數中使用導航服務
+  void _handleProfileTap() {
+    _navigationService.navigateToUserSettings(context);
   }
 
   @override
