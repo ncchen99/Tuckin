@@ -40,7 +40,11 @@ CREATE TABLE IF NOT EXISTS user_status (
     UNIQUE(user_id)
 );
 
--- 確保狀態只能為有效值
+-- 先刪除現有的約束
+ALTER TABLE user_status
+DROP CONSTRAINT IF EXISTS status_check;
+
+-- 然後添加包含新狀態的約束
 ALTER TABLE user_status
 ADD CONSTRAINT status_check
 CHECK (status IN (
@@ -49,6 +53,7 @@ CHECK (status IN (
     'waiting_matching', -- 等待配對階段
     'waiting_confirmation', -- 等待確認階段
     'waiting_attendance', -- 等待出席階段
+    'matching_failed', -- 配對失敗階段
     'rating' -- 評分階段
 ));
 

@@ -177,148 +177,243 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           );
 
           if (hasCompletedSetup) {
-            // 設定用戶的狀態為booking
-            await _databaseService.updateUserStatus(currentUser.id, 'booking');
-
-            // 用戶已完成所有設定，直接導航到主頁
-            if (mounted) {
-              Navigator.of(
-                context,
-              ).pushReplacementNamed('/dinner_reservation').then((_) {
-                // 導航完成後才隱藏加載頁面
-                setState(() {
-                  _isLoading = false;
-                });
-                _loadingAnimController.forward();
-              });
-            }
-          } else {
-            // 用戶已登入但未完成設定，檢查應該跳轉到哪個設定頁面
-            final userProfile = await _databaseService.getUserCompleteProfile(
+            // 獲取用戶當前狀態
+            final currentStatus = await _databaseService.getUserStatus(
               currentUser.id,
             );
 
+            // 只有當用戶處於 initial 或 booking 狀態時才更新狀態
+            // 避免干擾其他狀態如 waiting_matching 或 matching_failed
+            if (currentStatus == 'initial') {
+              await _databaseService.updateUserStatus(
+                currentUser.id,
+                'booking',
+              );
+            }
+
+            // 根據用戶當前狀態決定跳轉頁面
             if (mounted) {
-              print("userProfile: $userProfile");
+              debugPrint('WelcomeScreen: 用戶狀態為 $currentStatus，準備導航');
 
-              if (userProfile['profile'] != null &&
-                  userProfile['profile'].isEmpty) {
-                // 從頭開始設定
-                Navigator.of(
-                  context,
-                ).pushReplacementNamed('/profile_setup').then((_) {
-                  // 隱藏加載頁面
-                  setState(() {
-                    _isLoading = false;
-                  });
-                  _loadingAnimController.forward();
-                });
-              }
-              // 建立完整的導航堆疊
-              else if (userProfile['personality_type'] == null &&
-                  userProfile['food_preferences'] != null &&
-                  userProfile['food_preferences'].isNotEmpty &&
-                  userProfile['profile'] != null &&
-                  userProfile['profile'].isNotEmpty) {
-                // 用戶已完成基本資料和食物偏好設定，但未完成個性測驗
-                print("檢測到用戶需要完成個性測驗 - 建立完整頁面堆疊");
-
-                // 使用特殊技巧建立頁面堆疊，同時直接進入個性測驗頁面
-                // 利用PageRouteBuilder來實現透明背景切換
-
-                // 先將ProfileSetupPage加入堆疊但設為透明（用戶看不到）
-                Navigator.of(context)
-                    .push(
-                      PageRouteBuilder(
-                        opaque: false,
-                        pageBuilder:
-                            (context, _, __) => const ProfileSetupPage(),
-                        transitionDuration: Duration.zero,
-                      ),
-                    )
-                    .then((_) {
-                      // 不會執行到這裡，因為我們在食物偏好頁面直接替換了個性測驗頁面
-                    });
-
-                // 立即將FoodPreferencePage加入堆疊但設為透明（用戶看不到）
-                Navigator.of(context)
-                    .push(
-                      PageRouteBuilder(
-                        opaque: false,
-                        pageBuilder:
-                            (context, _, __) => const FoodPreferencePage(),
-                        transitionDuration: Duration.zero,
-                      ),
-                    )
-                    .then((_) {
-                      // 不會執行到這裡，因為我們在這之後直接push了個性測驗頁面
-                    });
-
-                // 最後顯示PersonalityTestPage（用戶能看到的唯一頁面）
-                Navigator.of(context)
-                    .push(
-                      MaterialPageRoute(
-                        builder: (context) => const PersonalityTestPage(),
-                      ),
-                    )
-                    .then((_) {
-                      // 在最後一個頁面導航完成後隱藏加載頁面
-                      setState(() {
-                        _isLoading = false;
-                      });
-                      _loadingAnimController.forward();
-                    });
-              } else if ((userProfile['food_preferences'] == null ||
-                      userProfile['food_preferences'].isEmpty) &&
-                  userProfile['profile'] != null &&
-                  userProfile['profile'].isNotEmpty) {
-                // 用戶已完成基本資料但缺少食物偏好設定
-                print("檢測到用戶需要完成食物偏好設定 - 建立頁面堆疊");
-
-                // 先將ProfileSetupPage加入堆疊但設為透明（用戶看不到）
-                Navigator.of(context).push(
-                  PageRouteBuilder(
-                    opaque: false,
-                    pageBuilder: (context, _, __) => const ProfileSetupPage(),
-                    transitionDuration: Duration.zero,
-                  ),
-                );
-
-                // 直接顯示FoodPreferencePage（用戶能看到的唯一頁面）
-                Navigator.of(context)
-                    .push(
-                      MaterialPageRoute(
-                        builder: (context) => const FoodPreferencePage(),
-                      ),
-                    )
-                    .then((_) {
-                      // 在最後一個頁面導航完成後隱藏加載頁面
-                      setState(() {
-                        _isLoading = false;
-                      });
-                      _loadingAnimController.forward();
-                    });
-              } else if (userProfile['personality_type'] != null &&
-                  userProfile['food_preferences'] != null &&
-                  userProfile['food_preferences'].isNotEmpty &&
-                  userProfile['profile'] != null &&
-                  userProfile['profile'].isNotEmpty) {
-                // 用戶已完成所有設定，直接導航到主頁
-                if (mounted) {
-                  Navigator.of(context).pushReplacementNamed('/home').then((_) {
+              // 根據狀態導航到適當頁面
+              switch (currentStatus) {
+                case 'waiting_matching':
+                case 'matching_failed':
+                  Navigator.of(
+                    context,
+                  ).pushReplacementNamed('/matching_status').then((_) {
                     // 導航完成後才隱藏加載頁面
+                    if (mounted) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      _loadingAnimController.forward();
+                    }
+                  });
+                  break;
+                case 'waiting_confirmation':
+                  Navigator.of(
+                    context,
+                  ).pushReplacementNamed('/attendance_confirmation').then((_) {
+                    if (mounted) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      _loadingAnimController.forward();
+                    }
+                  });
+                  break;
+                case 'waiting_restaurant':
+                  Navigator.of(
+                    context,
+                  ).pushReplacementNamed('/restaurant_selection').then((_) {
+                    if (mounted) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      _loadingAnimController.forward();
+                    }
+                  });
+                  break;
+                case 'waiting_dinner':
+                  Navigator.of(
+                    context,
+                  ).pushReplacementNamed('/dinner_info').then((_) {
+                    if (mounted) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      _loadingAnimController.forward();
+                    }
+                  });
+                  break;
+                case 'rating':
+                  Navigator.of(
+                    context,
+                  ).pushReplacementNamed('/dinner_rating').then((_) {
+                    if (mounted) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      _loadingAnimController.forward();
+                    }
+                  });
+                  break;
+                case 'initial':
+                case 'booking':
+                default:
+                  Navigator.of(
+                    context,
+                  ).pushReplacementNamed('/dinner_reservation').then((_) {
+                    if (mounted) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      _loadingAnimController.forward();
+                    }
+                  });
+                  break;
+              }
+            } else {
+              // 用戶已登入但未完成設定，檢查應該跳轉到哪個設定頁面
+              final userProfile = await _databaseService.getUserCompleteProfile(
+                currentUser.id,
+              );
+
+              if (mounted) {
+                print("userProfile: $userProfile");
+
+                if (userProfile['profile'] != null &&
+                    userProfile['profile'].isEmpty) {
+                  // 從頭開始設定
+                  Navigator.of(
+                    context,
+                  ).pushReplacementNamed('/profile_setup').then((_) {
+                    // 隱藏加載頁面
+                    if (mounted) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      _loadingAnimController.forward();
+                    }
+                  });
+                }
+                // 建立完整的導航堆疊
+                else if (userProfile['personality_type'] == null &&
+                    userProfile['food_preferences'] != null &&
+                    userProfile['food_preferences'].isNotEmpty &&
+                    userProfile['profile'] != null &&
+                    userProfile['profile'].isNotEmpty) {
+                  // 用戶已完成基本資料和食物偏好設定，但未完成個性測驗
+                  print("檢測到用戶需要完成個性測驗 - 建立完整頁面堆疊");
+
+                  // 使用特殊技巧建立頁面堆疊，同時直接進入個性測驗頁面
+                  // 利用PageRouteBuilder來實現透明背景切換
+
+                  // 先將ProfileSetupPage加入堆疊但設為透明（用戶看不到）
+                  Navigator.of(context)
+                      .push(
+                        PageRouteBuilder(
+                          opaque: false,
+                          pageBuilder:
+                              (context, _, __) => const ProfileSetupPage(),
+                          transitionDuration: Duration.zero,
+                        ),
+                      )
+                      .then((_) {
+                        // 不會執行到這裡，因為我們在食物偏好頁面直接替換了個性測驗頁面
+                      });
+
+                  // 立即將FoodPreferencePage加入堆疊但設為透明（用戶看不到）
+                  Navigator.of(context)
+                      .push(
+                        PageRouteBuilder(
+                          opaque: false,
+                          pageBuilder:
+                              (context, _, __) => const FoodPreferencePage(),
+                          transitionDuration: Duration.zero,
+                        ),
+                      )
+                      .then((_) {
+                        // 不會執行到這裡，因為我們在這之後直接push了個性測驗頁面
+                      });
+
+                  // 最後顯示PersonalityTestPage（用戶能看到的唯一頁面）
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (context) => const PersonalityTestPage(),
+                        ),
+                      )
+                      .then((_) {
+                        // 在最後一個頁面導航完成後隱藏加載頁面
+                        if (mounted) {
+                          setState(() {
+                            _isLoading = false;
+                          });
+                          _loadingAnimController.forward();
+                        }
+                      });
+                } else if ((userProfile['food_preferences'] == null ||
+                        userProfile['food_preferences'].isEmpty) &&
+                    userProfile['profile'] != null &&
+                    userProfile['profile'].isNotEmpty) {
+                  // 用戶已完成基本資料但缺少食物偏好設定
+                  print("檢測到用戶需要完成食物偏好設定 - 建立頁面堆疊");
+
+                  // 先將ProfileSetupPage加入堆疊但設為透明（用戶看不到）
+                  Navigator.of(context).push(
+                    PageRouteBuilder(
+                      opaque: false,
+                      pageBuilder: (context, _, __) => const ProfileSetupPage(),
+                      transitionDuration: Duration.zero,
+                    ),
+                  );
+
+                  // 直接顯示FoodPreferencePage（用戶能看到的唯一頁面）
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (context) => const FoodPreferencePage(),
+                        ),
+                      )
+                      .then((_) {
+                        // 在最後一個頁面導航完成後隱藏加載頁面
+                        if (mounted) {
+                          setState(() {
+                            _isLoading = false;
+                          });
+                          _loadingAnimController.forward();
+                        }
+                      });
+                } else if (userProfile['personality_type'] != null &&
+                    userProfile['food_preferences'] != null &&
+                    userProfile['food_preferences'].isNotEmpty &&
+                    userProfile['profile'] != null &&
+                    userProfile['profile'].isNotEmpty) {
+                  // 用戶已完成所有設定，直接導航到主頁
+                  if (mounted) {
+                    Navigator.of(context).pushReplacementNamed('/home').then((
+                      _,
+                    ) {
+                      // 導航完成後才隱藏加載頁面
+                      if (mounted) {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                        _loadingAnimController.forward();
+                      }
+                    });
+                  }
+                } else {
+                  // 其他情況，直接顯示歡迎頁
+                  if (mounted) {
                     setState(() {
                       _isLoading = false;
                     });
                     _loadingAnimController.forward();
-                  });
+                  }
                 }
-              } else {
-                // 其他情況，直接顯示歡迎頁
-                setState(() {
-                  _isLoading = false;
-                });
-                _loadingAnimController.forward();
               }
             }
           }

@@ -51,6 +51,10 @@ class _HomePageState extends State<HomePage> {
           // 等待配對狀態 -> 配對狀態頁面
           Navigator.of(context).pushReplacementNamed('/matching_status');
           break;
+        case 'matching_failed':
+          // 配對失敗狀態 -> 保留在匹配狀態頁面
+          Navigator.of(context).pushReplacementNamed('/matching_status');
+          break;
         case 'waiting_confirmation':
           // 等待確認狀態 -> 出席確認頁面
           Navigator.of(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/components/common/header_bar.dart';
+import 'package:tuckin/components/common/loading_image.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
@@ -21,6 +22,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
   bool _showWelcomeTip = false;
   // 是否為新用戶
   bool _isNewUser = false;
+  // 預約進行中
+  bool _isReserving = false;
   // 添加服務
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
@@ -270,20 +273,62 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
 
                             // 預約按鈕
                             Center(
-                              child: ImageButton(
-                                text: '預約',
-                                imagePath: 'assets/images/ui/button/red_l.png',
-                                width: 160.w,
-                                height: 68.h,
-                                onPressed: () {
-                                  // 導航到配對狀態頁面
-                                  Navigator.pushNamed(
-                                    context,
-                                    '/matching_status',
-                                  );
-                                },
-                                isEnabled: _canReserve, // 根據是否可以預約來啟用/禁用按鈕
-                              ),
+                              child:
+                                  _isReserving
+                                      ? LoadingImage(
+                                        width: 60.w,
+                                        height: 60.h,
+                                        color: const Color(0xFFB33D1C),
+                                      )
+                                      : ImageButton(
+                                        text: '預約',
+                                        imagePath:
+                                            'assets/images/ui/button/red_l.png',
+                                        width: 160.w,
+                                        height: 68.h,
+                                        onPressed: () async {
+                                          setState(() {
+                                            _isReserving = true;
+                                          });
+
+                                          try {
+                                            final currentUser =
+                                                _authService.getCurrentUser();
+                                            if (currentUser != null) {
+                                              // 更新用戶狀態為等待配對階段
+                                              await _databaseService
+                                                  .updateUserStatus(
+                                                    currentUser.id,
+                                                    'waiting_matching',
+                                                  );
+
+                                              // 導航到配對狀態頁面
+                                              if (!mounted) return;
+                                              Navigator.pushReplacementNamed(
+                                                context,
+                                                '/matching_status',
+                                              );
+                                            }
+                                          } catch (e) {
+                                            debugPrint('預約時出錯: $e');
+                                            // 出錯時恢復狀態
+                                            if (mounted) {
+                                              setState(() {
+                                                _isReserving = false;
+                                              });
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text('預約失敗: $e'),
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                        isEnabled:
+                                            _canReserve, // 根據是否可以預約來啟用/禁用按鈕
+                                      ),
                             ),
 
                             // 顯示預約狀態提示（如果不能預約）
@@ -355,8 +400,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
         children: [
           // 圖片及陰影
           SizedBox(
-            width: 60.w,
-            height: 60.h,
+            width: 80.w,
+            height: 80.h,
             child: Stack(
               clipBehavior: Clip.none, // 允許陰影超出容器範圍
               children: [
@@ -366,14 +411,14 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                   top: adaptiveShadowOffset,
                   child: Image.asset(
                     iconPath,
-                    width: 60.w,
-                    height: 60.h,
+                    width: 80.w,
+                    height: 80.h,
                     color: Colors.black.withOpacity(0.4),
                     colorBlendMode: BlendMode.srcIn,
                   ),
                 ),
                 // 主圖像
-                Image.asset(iconPath, width: 60.w, height: 60.h),
+                Image.asset(iconPath, width: 80.w, height: 80.h),
               ],
             ),
           ),
