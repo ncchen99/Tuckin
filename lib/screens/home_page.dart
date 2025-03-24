@@ -47,121 +47,128 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body:
-          _isLoading
-              ? Container(
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/background/bg1.png'),
-                    fit: BoxFit.cover,
+    return WillPopScope(
+      onWillPop: () async {
+        return false; // 禁用返回按鈕
+      },
+      child: Scaffold(
+        body:
+            _isLoading
+                ? Container(
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage('assets/images/background/bg1.png'),
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                ),
-                child: const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF23456B)),
-                ),
-              )
-              : Container(
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/background/bg1.png'),
-                    fit: BoxFit.cover,
+                  child: const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF23456B)),
                   ),
-                ),
-                child: SafeArea(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.only(top: 50.h, bottom: 50.h),
-                        child: Image.asset(
-                          'assets/images/icon/tuckin_t_brand.png',
-                          width: 150.w,
+                )
+                : Container(
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage('assets/images/background/bg1.png'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(top: 50.h, bottom: 50.h),
+                          child: Image.asset(
+                            'assets/images/icon/tuckin_t_brand.png',
+                            width: 150.w,
+                          ),
                         ),
-                      ),
 
-                      // 歡迎訊息
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.w),
-                        child: Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(20.r),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(15.r),
-                            border: Border.all(
-                              color: const Color(0xFF23456B),
-                              width: 2,
+                        // 歡迎訊息
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20.w),
+                          child: Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(20.r),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(15.r),
+                              border: Border.all(
+                                color: const Color(0xFF23456B),
+                                width: 2,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  '歡迎使用Tuckin',
+                                  style: TextStyle(
+                                    fontSize: 24.sp,
+                                    fontFamily: 'OtsutomeFont',
+                                    color: const Color(0xFF23456B),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 10.h),
+                                Text(
+                                  '每次相遇都是生命中的美好\n現在就點擊預約吧！',
+                                  style: TextStyle(
+                                    fontSize: 18.sp,
+                                    fontFamily: 'OtsutomeFont',
+                                    color: const Color(0xFF23456B),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
                           ),
-                          child: Column(
-                            children: [
-                              Text(
-                                '歡迎使用Tuckin',
-                                style: TextStyle(
-                                  fontSize: 24.sp,
-                                  fontFamily: 'OtsutomeFont',
-                                  color: const Color(0xFF23456B),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: 10.h),
-                              Text(
-                                '每次相遇都是生命中的美好\n現在就點擊預約吧！',
-                                style: TextStyle(
-                                  fontSize: 18.sp,
-                                  fontFamily: 'OtsutomeFont',
-                                  color: const Color(0xFF23456B),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
                         ),
-                      ),
 
-                      SizedBox(height: 100.h),
+                        SizedBox(height: 100.h),
 
-                      // 主循環核心功能按鈕
-                      Column(
-                        children: [
-                          ImageButton(
-                            text: '預約',
-                            imagePath: 'assets/images/ui/button/red_l.png',
-                            width: 180.w,
-                            height: 85.h,
-                            onPressed: () {
-                              Navigator.of(
-                                context,
-                              ).pushNamed('/dinner_reservation');
+                        // 主循環核心功能按鈕
+                        Column(
+                          children: [
+                            ImageButton(
+                              text: '預約',
+                              imagePath: 'assets/images/ui/button/red_l.png',
+                              width: 180.w,
+                              height: 85.h,
+                              onPressed: () {
+                                Navigator.of(
+                                  context,
+                                ).pushNamed('/dinner_reservation');
+                              },
+                            ),
+                          ],
+                        ),
+
+                        Expanded(child: Container()),
+
+                        // 登出按鈕
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 30.h),
+                          child: ImageButton(
+                            text: '登出',
+                            imagePath: 'assets/images/ui/button/blue_m.png',
+                            width: 120.w,
+                            height: 60.h,
+                            onPressed: () async {
+                              await _authService.signOut();
+                              if (mounted) {
+                                // 使用導航服務處理登出後的導航
+                                _navigationService.navigateAfterSignOut(
+                                  context,
+                                );
+                              }
                             },
                           ),
-                        ],
-                      ),
-
-                      Expanded(child: Container()),
-
-                      // 登出按鈕
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 30.h),
-                        child: ImageButton(
-                          text: '登出',
-                          imagePath: 'assets/images/ui/button/blue_m.png',
-                          width: 120.w,
-                          height: 60.h,
-                          onPressed: () async {
-                            await _authService.signOut();
-                            if (mounted) {
-                              // 使用導航服務處理登出後的導航
-                              _navigationService.navigateAfterSignOut(context);
-                            }
-                          },
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
+      ),
     );
   }
 }

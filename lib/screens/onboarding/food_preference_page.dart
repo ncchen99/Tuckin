@@ -43,7 +43,8 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
   // 處理返回按鈕
   void _handleBack() {
     // 使用NavigationService導航到profile_setup頁面
-    Navigator.of(context).pushReplacementNamed('/profile_setup');
+    final navigationService = NavigationService();
+    navigationService.navigateToPreviousSetupStep(context, 'food_preference');
   }
 
   // 處理食物選擇

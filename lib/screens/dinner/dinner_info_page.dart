@@ -75,64 +75,71 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/background/bg1.png'),
-            fit: BoxFit.cover,
+    return WillPopScope(
+      onWillPop: () async {
+        return false; // 禁用返回按鈕
+      },
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/background/bg1.png'),
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child:
-              _isLoading
-                  ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF23456B)),
-                  )
-                  : Column(
-                    children: [
-                      // 頁面標題
-                      Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20.h),
-                        child: Row(
-                          children: [
-                            BackIconButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                              },
-                            ),
-                            Expanded(
-                              child: Center(
-                                child: Text(
-                                  '聚餐資訊',
-                                  style: TextStyle(
-                                    fontSize: 24.sp,
-                                    fontFamily: 'OtsutomeFont',
-                                    color: const Color(0xFF23456B),
-                                    fontWeight: FontWeight.bold,
+          child: SafeArea(
+            child:
+                _isLoading
+                    ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF23456B),
+                      ),
+                    )
+                    : Column(
+                      children: [
+                        // 頁面標題
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20.h),
+                          child: Row(
+                            children: [
+                              BackIconButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                              Expanded(
+                                child: Center(
+                                  child: Text(
+                                    '聚餐資訊',
+                                    style: TextStyle(
+                                      fontSize: 24.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            SizedBox(width: 55.w), // 平衡左側的返回按鈕
-                          ],
+                              SizedBox(width: 55.w), // 平衡左側的返回按鈕
+                            ],
+                          ),
                         ),
-                      ),
 
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            '聚餐資訊頁面開發中...',
-                            style: TextStyle(
-                              fontSize: 20.sp,
-                              fontFamily: 'OtsutomeFont',
-                              color: const Color(0xFF23456B),
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              '聚餐資訊頁面開發中...',
+                              style: TextStyle(
+                                fontSize: 20.sp,
+                                fontFamily: 'OtsutomeFont',
+                                color: const Color(0xFF23456B),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+          ),
         ),
       ),
     );

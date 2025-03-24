@@ -166,219 +166,224 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/background/bg1.png'),
-            fit: BoxFit.cover,
+    return WillPopScope(
+      onWillPop: () async {
+        return false; // 禁用返回按鈕
+      },
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/background/bg1.png'),
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  // 頂部導航欄
-                  HeaderBar(
-                    title: '聚餐預約',
-                    onNotificationTap: _handleNotificationTap,
-                    onProfileTap: _handleUserProfileTap,
-                  ),
+          child: SafeArea(
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    // 頂部導航欄
+                    HeaderBar(
+                      title: '聚餐預約',
+                      onNotificationTap: _handleNotificationTap,
+                      onProfileTap: _handleUserProfileTap,
+                    ),
 
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 24.w),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(height: 20.h),
-                            // 標題
-                            Text(
-                              '下次聚餐時間',
-                              style: TextStyle(
-                                fontSize: 24.sp,
-                                fontFamily: 'OtsutomeFont',
-                                color: const Color(0xFF23456B),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(height: 10.h),
-                            // 說明文字
-                            Text(
-                              '這次的活動在星期${_isSingleWeek ? "一" : "四"}舉行，歡迎預約參加',
-                              style: TextStyle(
-                                fontSize: 16.sp,
-                                fontFamily: 'OtsutomeFont',
-                                color: const Color(0xFF23456B),
-                              ),
-                            ),
-                            SizedBox(height: 25.h),
-
-                            // 日期卡片（單周星期一或雙周星期四）
-                            _buildDateCard(
-                              context,
-                              _weekdayText,
-                              _isSingleWeek
-                                  ? 'assets/images/icon/mon.png'
-                                  : 'assets/images/icon/thu.png',
-                              '晚間 7:00',
-                              DateFormat('MM/dd').format(_nextDinnerDate),
-                            ),
-
-                            SizedBox(height: 25.h),
-
-                            // 成大限定選項 - 對齊標題邊界
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 15.w,
-                                vertical: 12.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.9),
-                                borderRadius: BorderRadius.circular(10.r),
-                                border: Border.all(
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24.w),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(height: 20.h),
+                              // 標題
+                              Text(
+                                '下次聚餐時間',
+                                style: TextStyle(
+                                  fontSize: 24.sp,
+                                  fontFamily: 'OtsutomeFont',
                                   color: const Color(0xFF23456B),
-                                  width: 1.5,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  // 勾選框
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 2.h,
-                                    ),
-                                    child: CustomCheckbox(
-                                      value: _onlyNckuStudents,
-                                      onChanged: (value) {
-                                        if (value != null) {
-                                          setState(() {
-                                            _onlyNckuStudents = value;
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                  SizedBox(width: 10.w),
-                                  // 文字說明
-                                  Expanded(
-                                    child: Text(
-                                      '想與校內同學聚餐',
-                                      style: TextStyle(
-                                        fontSize: 16.sp,
-                                        fontFamily: 'OtsutomeFont',
-                                        color: const Color(0xFF23456B),
-                                        fontWeight: FontWeight.bold,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              SizedBox(height: 10.h),
+                              // 說明文字
+                              Text(
+                                '這次的活動在星期${_isSingleWeek ? "一" : "四"}舉行，歡迎預約參加',
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontFamily: 'OtsutomeFont',
+                                  color: const Color(0xFF23456B),
+                                ),
                               ),
-                            ),
+                              SizedBox(height: 25.h),
 
-                            SizedBox(height: 45.h),
+                              // 日期卡片（單周星期一或雙周星期四）
+                              _buildDateCard(
+                                context,
+                                _weekdayText,
+                                _isSingleWeek
+                                    ? 'assets/images/icon/mon.png'
+                                    : 'assets/images/icon/thu.png',
+                                '晚間 7:00',
+                                DateFormat('MM/dd').format(_nextDinnerDate),
+                              ),
 
-                            // 預約按鈕
-                            Center(
-                              child:
-                                  _isReserving
-                                      ? LoadingImage(
-                                        width: 60.w,
-                                        height: 60.h,
-                                        color: const Color(0xFFB33D1C),
-                                      )
-                                      : ImageButton(
-                                        text: '預約',
-                                        imagePath:
-                                            'assets/images/ui/button/red_l.png',
-                                        width: 160.w,
-                                        height: 68.h,
-                                        onPressed: () async {
-                                          setState(() {
-                                            _isReserving = true;
-                                          });
+                              SizedBox(height: 25.h),
 
-                                          try {
-                                            final currentUser =
-                                                _authService.getCurrentUser();
-                                            if (currentUser != null) {
-                                              // 更新用戶狀態為等待配對階段
-                                              await _databaseService
-                                                  .updateUserStatus(
-                                                    currentUser.id,
-                                                    'waiting_matching',
-                                                  );
-
-                                              // 導航到配對狀態頁面
-                                              if (!mounted) return;
-                                              await _navigateToMatchingStatus();
-                                            }
-                                          } catch (e) {
-                                            debugPrint('預約時出錯: $e');
-                                            // 出錯時恢復狀態
-                                            if (mounted) {
-                                              setState(() {
-                                                _isReserving = false;
-                                              });
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('預約失敗: $e'),
-                                                ),
-                                              );
-                                            }
+                              // 成大限定選項 - 對齊標題邊界
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 15.w,
+                                  vertical: 12.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(10.r),
+                                  border: Border.all(
+                                    color: const Color(0xFF23456B),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    // 勾選框
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 2.h,
+                                      ),
+                                      child: CustomCheckbox(
+                                        value: _onlyNckuStudents,
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            setState(() {
+                                              _onlyNckuStudents = value;
+                                            });
                                           }
                                         },
-                                        isEnabled:
-                                            _canReserve, // 根據是否可以預約來啟用/禁用按鈕
                                       ),
-                            ),
-
-                            // 顯示預約狀態提示（如果不能預約）
-                            if (!_canReserve)
-                              Padding(
-                                padding: EdgeInsets.only(top: 15.h),
-                                child: Center(
-                                  child: Text(
-                                    '當前聚餐活動預約已截止',
-                                    style: TextStyle(
-                                      fontSize: 14.sp,
-                                      fontFamily: 'OtsutomeFont',
-                                      color: const Color(0xFFB33D1C),
-                                      fontWeight: FontWeight.bold,
                                     ),
-                                  ),
+                                    SizedBox(width: 10.w),
+                                    // 文字說明
+                                    Expanded(
+                                      child: Text(
+                                        '想與校內同學聚餐',
+                                        style: TextStyle(
+                                          fontSize: 16.sp,
+                                          fontFamily: 'OtsutomeFont',
+                                          color: const Color(0xFF23456B),
+                                          fontWeight: FontWeight.bold,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
 
-                            SizedBox(height: 30.h),
-                          ],
+                              SizedBox(height: 45.h),
+
+                              // 預約按鈕
+                              Center(
+                                child:
+                                    _isReserving
+                                        ? LoadingImage(
+                                          width: 60.w,
+                                          height: 60.h,
+                                          color: const Color(0xFFB33D1C),
+                                        )
+                                        : ImageButton(
+                                          text: '預約',
+                                          imagePath:
+                                              'assets/images/ui/button/red_l.png',
+                                          width: 160.w,
+                                          height: 68.h,
+                                          onPressed: () async {
+                                            setState(() {
+                                              _isReserving = true;
+                                            });
+
+                                            try {
+                                              final currentUser =
+                                                  _authService.getCurrentUser();
+                                              if (currentUser != null) {
+                                                // 更新用戶狀態為等待配對階段
+                                                await _databaseService
+                                                    .updateUserStatus(
+                                                      currentUser.id,
+                                                      'waiting_matching',
+                                                    );
+
+                                                // 導航到配對狀態頁面
+                                                if (!mounted) return;
+                                                await _navigateToMatchingStatus();
+                                              }
+                                            } catch (e) {
+                                              debugPrint('預約時出錯: $e');
+                                              // 出錯時恢復狀態
+                                              if (mounted) {
+                                                setState(() {
+                                                  _isReserving = false;
+                                                });
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text('預約失敗: $e'),
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          },
+                                          isEnabled:
+                                              _canReserve, // 根據是否可以預約來啟用/禁用按鈕
+                                        ),
+                              ),
+
+                              // 顯示預約狀態提示（如果不能預約）
+                              if (!_canReserve)
+                                Padding(
+                                  padding: EdgeInsets.only(top: 15.h),
+                                  child: Center(
+                                    child: Text(
+                                      '當前聚餐活動預約已截止',
+                                      style: TextStyle(
+                                        fontSize: 14.sp,
+                                        fontFamily: 'OtsutomeFont',
+                                        color: const Color(0xFFB33D1C),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                              SizedBox(height: 30.h),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-
-              // 右上角歡迎提示框 - 只對新用戶顯示
-              if (_showWelcomeTip && _isNewUser && _username.isNotEmpty)
-                Positioned(
-                  top: 70.h, // 調整位置，確保在HeaderBar下方
-                  right: 20.w,
-                  child: InfoTipBox(
-                    message: '嗨囉 $_username！\n每次相遇都是生命中的美好！',
-                    show: _showWelcomeTip,
-                    onHide: () {
-                      // 提示框完全隱藏後的回調
-                    },
-                  ),
+                  ],
                 ),
-            ],
+
+                // 右上角歡迎提示框 - 只對新用戶顯示
+                if (_showWelcomeTip && _isNewUser && _username.isNotEmpty)
+                  Positioned(
+                    top: 70.h, // 調整位置，確保在HeaderBar下方
+                    right: 20.w,
+                    child: InfoTipBox(
+                      message: '嗨囉 $_username！\n每次相遇都是生命中的美好！',
+                      show: _showWelcomeTip,
+                      onHide: () {
+                        // 提示框完全隱藏後的回調
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

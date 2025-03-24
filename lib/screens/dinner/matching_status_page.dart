@@ -147,7 +147,31 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
     final adaptiveShadowOffset = 3.h;
 
     if (_isLoading) {
-      return Scaffold(
+      return WillPopScope(
+        onWillPop: () async {
+          return false; // 禁用返回按鈕
+        },
+        child: Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/background/bg1.png'),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(color: Color(0xFF23456B)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return WillPopScope(
+      onWillPop: () async {
+        return false; // 禁用返回按鈕
+      },
+      child: Scaffold(
         body: Container(
           decoration: const BoxDecoration(
             image: DecorationImage(
@@ -155,147 +179,133 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
               fit: BoxFit.cover,
             ),
           ),
-          child: const Center(
-            child: CircularProgressIndicator(color: Color(0xFF23456B)),
-          ),
-        ),
-      );
-    }
+          child: SafeArea(
+            child: Column(
+              children: [
+                // 頂部導航欄
+                HeaderBar(
+                  title: '',
+                  onNotificationTap: _handleNotificationTap,
+                  onProfileTap: _handleProfileTap,
+                ),
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/background/bg1.png'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // 頂部導航欄
-              HeaderBar(
-                title: '',
-                onNotificationTap: _handleNotificationTap,
-                onProfileTap: _handleProfileTap,
-              ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24.w),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: 130.h),
 
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: 130.h),
-
-                      // 提示文字 - 根據用戶狀態顯示不同的文字
-                      Center(
-                        child: Text(
-                          _userStatus == 'matching_failed' ? '很抱歉！' : '預約成功！',
-                          style: TextStyle(
-                            fontSize: 24.sp,
-                            fontFamily: 'OtsutomeFont',
-                            color: const Color(0xFF23456B),
-                            fontWeight: FontWeight.bold,
+                        // 提示文字 - 根據用戶狀態顯示不同的文字
+                        Center(
+                          child: Text(
+                            _userStatus == 'matching_failed' ? '很抱歉！' : '預約成功！',
+                            style: TextStyle(
+                              fontSize: 24.sp,
+                              fontFamily: 'OtsutomeFont',
+                              color: const Color(0xFF23456B),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
                         ),
-                      ),
 
-                      SizedBox(height: 20.h),
+                        SizedBox(height: 20.h),
 
-                      // 圖示 - 根據用戶狀態顯示不同的圖示
-                      Center(
-                        child: SizedBox(
-                          width: 150.w,
-                          height: 150.h,
-                          child: Stack(
-                            clipBehavior: Clip.none, // 允許陰影超出容器範圍
-                            children: [
-                              // 底部陰影
-                              Positioned(
-                                left: 0,
-                                top: adaptiveShadowOffset,
-                                child: Image.asset(
+                        // 圖示 - 根據用戶狀態顯示不同的圖示
+                        Center(
+                          child: SizedBox(
+                            width: 150.w,
+                            height: 150.h,
+                            child: Stack(
+                              clipBehavior: Clip.none, // 允許陰影超出容器範圍
+                              children: [
+                                // 底部陰影
+                                Positioned(
+                                  left: 0,
+                                  top: adaptiveShadowOffset,
+                                  child: Image.asset(
+                                    _userStatus == 'matching_failed'
+                                        ? 'assets/images/icon/sorry.png'
+                                        : 'assets/images/icon/match.png',
+                                    width: 150.w,
+                                    height: 150.h,
+                                    color: Colors.black.withOpacity(0.4),
+                                    colorBlendMode: BlendMode.srcIn,
+                                  ),
+                                ),
+                                // 主圖像
+                                Image.asset(
                                   _userStatus == 'matching_failed'
                                       ? 'assets/images/icon/sorry.png'
                                       : 'assets/images/icon/match.png',
                                   width: 150.w,
                                   height: 150.h,
-                                  color: Colors.black.withOpacity(0.4),
-                                  colorBlendMode: BlendMode.srcIn,
                                 ),
-                              ),
-                              // 主圖像
-                              Image.asset(
-                                _userStatus == 'matching_failed'
-                                    ? 'assets/images/icon/sorry.png'
-                                    : 'assets/images/icon/match.png',
-                                width: 150.w,
-                                height: 150.h,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
 
-                      SizedBox(height: 30.h),
+                        SizedBox(height: 30.h),
 
-                      // 提示文字 - 根據用戶狀態顯示不同的文字
-                      Center(
-                        child: Text(
-                          _userStatus == 'matching_failed'
-                              ? '沒有找到一起吃飯的朋友'
-                              : '找到再跟你說',
-                          style: TextStyle(
-                            fontSize: 20.sp,
-                            fontFamily: 'OtsutomeFont',
-                            color: const Color(0xFF23456B),
-                            fontWeight: FontWeight.bold,
+                        // 提示文字 - 根據用戶狀態顯示不同的文字
+                        Center(
+                          child: Text(
+                            _userStatus == 'matching_failed'
+                                ? '沒有找到一起吃飯的朋友'
+                                : '找到再跟你說',
+                            style: TextStyle(
+                              fontSize: 20.sp,
+                              fontFamily: 'OtsutomeFont',
+                              color: const Color(0xFF23456B),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
                         ),
-                      ),
 
-                      // 將剩餘空間推到底部
-                      SizedBox(height: 80.h),
+                        // 將剩餘空間推到底部
+                        SizedBox(height: 80.h),
 
-                      // 取消預約按鈕或加載動畫
-                      Center(
-                        child:
-                            _isCancelling
-                                ? LoadingImage(
-                                  width: 60.w,
-                                  height: 60.h,
-                                  color: const Color(0xFF23456B),
-                                )
-                                : ImageButton(
-                                  text:
-                                      _userStatus == 'matching_failed'
-                                          ? '預約下次'
-                                          : '取消預約',
-                                  imagePath:
-                                      'assets/images/ui/button/blue_l.png',
-                                  width: 160.w,
-                                  height: 68.h,
-                                  onPressed: () {
-                                    // 防止頁面載入期間被點擊
-                                    if (_isPageMounted && !_isLoading) {
-                                      _handleCancelReservation();
-                                    } else {
-                                      debugPrint('頁面未完全掛載或載入中，忽略點擊事件');
-                                    }
-                                  },
-                                ),
-                      ),
-                      const Spacer(),
+                        // 取消預約按鈕或加載動畫
+                        Center(
+                          child:
+                              _isCancelling
+                                  ? LoadingImage(
+                                    width: 60.w,
+                                    height: 60.h,
+                                    color: const Color(0xFF23456B),
+                                  )
+                                  : ImageButton(
+                                    text:
+                                        _userStatus == 'matching_failed'
+                                            ? '預約下次'
+                                            : '取消預約',
+                                    imagePath:
+                                        'assets/images/ui/button/blue_l.png',
+                                    width: 160.w,
+                                    height: 68.h,
+                                    onPressed: () {
+                                      // 防止頁面載入期間被點擊
+                                      if (_isPageMounted && !_isLoading) {
+                                        _handleCancelReservation();
+                                      } else {
+                                        debugPrint('頁面未完全掛載或載入中，忽略點擊事件');
+                                      }
+                                    },
+                                  ),
+                        ),
+                        const Spacer(),
 
-                      SizedBox(height: 30.h),
-                    ],
+                        SizedBox(height: 30.h),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

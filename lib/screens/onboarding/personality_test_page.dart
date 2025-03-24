@@ -81,7 +81,11 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
       );
     } else {
       // 在第一頁時，導航回food_preference頁面
-      Navigator.of(context).pushReplacementNamed('/food_preference');
+      final navigationService = NavigationService();
+      navigationService.navigateToPreviousSetupStep(
+        context,
+        'personality_test',
+      );
     }
   }
 

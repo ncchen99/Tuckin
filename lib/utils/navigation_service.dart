@@ -307,6 +307,21 @@ class NavigationService {
     }
   }
 
+  ///
+  /// 從 profile_setup <- food_preference <- personality_test
+  void navigateToPreviousSetupStep(BuildContext context, String currentStep) {
+    switch (currentStep) {
+      case 'food_preference':
+        Navigator.of(context).pushNamed('/profile_setup');
+        break;
+      case 'personality_test':
+        Navigator.of(context).pushNamed('/food_preference');
+        break;
+      default:
+        break;
+    }
+  }
+
   /// 登出後導航回歡迎頁面
   void navigateAfterSignOut(BuildContext context) {
     Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
@@ -344,7 +359,7 @@ class NavigationService {
 
   /// 導航到晚餐評分頁面
   void navigateToDinnerRating(BuildContext context) {
-    Navigator.of(context).pushReplacementNamed('/dinner_rating');
+    Navigator.of(context).pushReplacementNamed('/dinner_info');
   }
 
   /// 導航到通知頁面
