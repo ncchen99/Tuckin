@@ -41,6 +41,7 @@ dependencies:
   font_awesome_flutter: ^10.7.0
   flutter_dotenv: ^5.1.0
   intl: ^0.20.2
+  connectivity_plus: ^6.1.3
 
 dev_dependencies:
   flutter_test:

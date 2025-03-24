@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tuckin/utils/route_observer.dart'; // 導入路由觀察器
 import 'package:tuckin/utils/route_transitions.dart'; // 導入路由轉場效果
 import 'package:tuckin/components/components.dart'; // 導入共用組件
+import 'package:connectivity_plus/connectivity_plus.dart'; // 導入網絡狀態檢測
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -86,8 +87,61 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _isOffline = false;
+  final Connectivity _connectivity = Connectivity();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkConnectivity();
+    _setupConnectivityListener();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _checkConnectivity() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      final isOffline =
+          !results.contains(ConnectivityResult.wifi) &&
+          !results.contains(ConnectivityResult.mobile) &&
+          !results.contains(ConnectivityResult.ethernet);
+      setState(() {
+        _isOffline = isOffline;
+      });
+      debugPrint('初始網絡狀態: ${_isOffline ? '離線' : '在線'}, 結果: $results');
+    } catch (e) {
+      debugPrint('檢查網絡連接錯誤: $e');
+    }
+  }
+
+  void _setupConnectivityListener() {
+    _connectivity.onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
+      if (mounted) {
+        final isOffline =
+            !results.contains(ConnectivityResult.wifi) &&
+            !results.contains(ConnectivityResult.mobile) &&
+            !results.contains(ConnectivityResult.ethernet);
+        setState(() {
+          _isOffline = isOffline;
+        });
+        debugPrint('網絡狀態變更: ${_isOffline ? '離線' : '在線'}, 結果: $results');
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,8 +161,44 @@ class MyApp extends StatelessWidget {
             textScaler: const TextScaler.linear(1.0), // 固定文字縮放比例
             devicePixelRatio: 1.0, // 可選：統一像素比例
           ),
-          // 包裹到SplashScreen中以顯示加載頁面
-          child: SplashScreen(child: child!),
+          // 顯示離線狀態或正常內容
+          child: Stack(
+            children: [
+              SplashScreen(child: child!),
+              if (_isOffline)
+                Positioned(
+                  bottom:
+                      MediaQuery.of(context).padding.bottom, // 放在底部，避開底部安全區域
+                  left: 0,
+                  right: 0,
+                  child: Material(
+                    elevation: 4,
+                    color: const Color(0xFFB33D1C), // 使用主題橘色 #B33D1C
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.signal_wifi_off,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '網路不給力',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       },
       // 添加路由觀察器
