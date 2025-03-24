@@ -146,12 +146,10 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       // 儲存用戶資料到 Supabase
       await _databaseService.updateUserProfile(userData);
 
-      // 導航到下一個頁面 - 飲食偏好設定頁，添加向右滑動動畫
+      // 使用NavigationService進行導航
       if (mounted) {
-        Navigator.push(
-          context,
-          rightSlideTransition(page: const FoodPreferencePage()),
-        );
+        final navigationService = NavigationService();
+        navigationService.navigateToNextSetupStep(context, 'profile_setup');
       }
     } catch (error) {
       ScaffoldMessenger.of(

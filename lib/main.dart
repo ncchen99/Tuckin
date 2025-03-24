@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tuckin/utils/route_observer.dart'; // 導入路由觀察器
-import 'package:tuckin/utils/route_transitions.dart'; // 導入路由轉場效果
 import 'package:tuckin/components/components.dart'; // 導入共用組件
 import 'package:connectivity_plus/connectivity_plus.dart'; // 導入網絡狀態檢測
-import 'package:tuckin/utils/navigation_service.dart'; // 導入導航服務
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -38,12 +35,17 @@ void main() async {
   // 設置固定方向，防止方向改變導致佈局變化
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
+  // 這個標誌用於追蹤初始化是否成功
+  bool initSuccess = false;
+
   try {
     // 加載環境變數
     await dotenv.load(fileName: '.env');
     debugPrint('環境變數加載成功。變數數量: ${dotenv.env.length}');
+    initSuccess = true;
   } catch (e) {
     debugPrint('環境變數加載錯誤: $e');
+    // 繼續執行，但使用默認值
   }
 
   // 初始化 AuthService
@@ -51,15 +53,28 @@ void main() async {
     await AuthService().initialize();
   } catch (e) {
     debugPrint('AuthService 初始化錯誤: $e');
+    // 嘗試強制登出以重置狀態
+    try {
+      await AuthService().signOut();
+    } catch (signOutError) {
+      debugPrint('強制登出錯誤: $signOutError');
+    }
   }
 
-  // 使用導航服務確定初始路由
-  try {
-    initialRoute = await NavigationService().determineInitialRoute();
-    debugPrint('設置初始路由為: $initialRoute');
-  } catch (e) {
-    debugPrint('確定初始路由出錯: $e');
-    initialRoute = '/'; // 發生錯誤時，使用默認初始路由
+  // 只有在前面步驟成功的情況下才嘗試確定初始路由
+  if (initSuccess) {
+    try {
+      // 使用全局變量，而不是重新宣告
+      initialRoute = await NavigationService().determineInitialRoute();
+      debugPrint('設置初始路由為: $initialRoute');
+    } catch (e) {
+      debugPrint('確定初始路由出錯: $e');
+      // 出錯時使用默認初始路由，但不重新宣告變量
+      initialRoute = '/';
+    }
+  } else {
+    debugPrint('初始化未成功，使用默認路由: /');
+    initialRoute = '/';
   }
 
   runApp(const MyApp());
@@ -123,6 +138,8 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('MyApp: 構建主應用，初始路由為: $initialRoute');
+
     return MaterialApp(
       title: 'Tuckin',
       theme: ThemeData(
@@ -133,6 +150,7 @@ class _MyAppState extends State<MyApp> {
       builder: (context, child) {
         // 初始化 SizeConfig
         sizeConfig.init(context);
+        debugPrint('MyApp: SizeConfig 初始化完成');
 
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
@@ -142,7 +160,13 @@ class _MyAppState extends State<MyApp> {
           // 顯示離線狀態或正常內容
           child: Stack(
             children: [
-              SplashScreen(child: child!),
+              // 使用SplashScreen但設置短的超時時間以確保不會無限加載
+              SplashScreen(
+                child: child ?? const SizedBox(),
+                loadingDuration: 1200, // 縮短加載時間為1.2秒
+                fadeOutDuration: 300, // 縮短淡出時間為0.3秒
+                transitionDelay: 200, // 縮短過渡延遲時間為0.2秒
+              ),
               if (_isOffline)
                 Positioned(
                   bottom:

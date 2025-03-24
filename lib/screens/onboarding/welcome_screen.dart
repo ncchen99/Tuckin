@@ -2,17 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../components/components.dart';
 import '../../utils/index.dart'; // 導入自適應佈局工具
-import '../../services/auth_service.dart'; // 導入驗證服務
-import '../../services/database_service.dart'; // 導入資料庫服務
-import 'login_page.dart';
-import 'profile_setup_page.dart';
-import 'food_preference_page.dart';
-import 'personality_test_page.dart';
-import '../home_page.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:math' as math;
 import 'dart:math';
-import 'package:tuckin/utils/route_transitions.dart'; // 導入轉場動畫
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -27,10 +19,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   int _currentPage = 0;
   final int _totalPages = 3;
 
-  // 添加驗證服務和資料庫服務
-  final AuthService _authService = AuthService();
-  final DatabaseService _databaseService = DatabaseService();
-
   // 添加導航服務
   final NavigationService _navigationService = NavigationService();
 
@@ -40,11 +28,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // 添加動畫控制器
   late AnimationController _animationController;
-
-  // 添加品牌加載頁面控制器
-  bool _isLoading = true;
-  late AnimationController _loadingAnimController;
-  late Animation<double> _fadeAnimation;
 
   // 食物動畫相關變量
   final List<String> _dishPaths = [
@@ -111,16 +94,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   void initState() {
     super.initState();
 
-    // 初始化加載動畫控制器
-    _loadingAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _loadingAnimController, curve: Curves.easeOut),
-    );
-
     // 初始化影片播放器
     _videoController = VideoPlayerController.asset('assets/video/intro.mp4')
       ..initialize().then((_) {
@@ -162,13 +135,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     // 初始化人物動畫數據
     _initFigureAnimationData();
-
-    // 檢查是否需要導航到其他頁面
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _navigationService.navigateToUserStatusPage(context);
-      }
-    });
   }
 
   void _initDishAnimationData() {
@@ -335,7 +301,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _pageController.dispose();
     _videoController.dispose();
     _animationController.dispose();
-    _loadingAnimController.dispose();
     super.dispose();
   }
 
@@ -389,166 +354,106 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final squareSize = math.min(screenWidth, screenHeight * 0.6);
 
     return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/background/bg1.png'),
-                fit: BoxFit.cover,
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  // 主要內容區域 - 確保正方形
-                  AspectRatio(
-                    aspectRatio: 1.0, // 強制1:1的比例
-                    child: Padding(
-                      padding: EdgeInsets.all(25.r), // 使用自適應圓角
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          // 使用LayoutBuilder獲取實際可用空間
-                          final actualSize = math.max(
-                            constraints.maxWidth,
-                            constraints.maxHeight,
-                          );
-                          return SizedBox(
-                            width: actualSize,
-                            height: actualSize,
-                            child: PageView(
-                              controller: _pageController,
-                              onPageChanged: _onPageChanged,
-                              children: [
-                                // 第一頁：方形影片播放區域
-                                _buildVideoSquare(actualSize),
-                                // 第二頁：人物動畫
-                                _buildFiguresAnimation(actualSize),
-                                // 第三頁：食物動畫
-                                _buildFoodAnimation(actualSize),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-
-                  // 底部說明區域
-                  Expanded(
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 30.w,
-                      ), // 使用自適應寬度
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          // 說明文字
-                          Expanded(
-                            child: Center(
-                              child: Text(
-                                _introTexts[_currentPage],
-                                style: TextStyle(
-                                  fontSize: 20.sp, // 使用自適應字體大小
-                                  color: const Color(0xFF23456B),
-                                  fontFamily: 'OtsutomeFont',
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.4,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-
-                          // 下一步按鈕
-                          Padding(
-                            padding: EdgeInsets.only(bottom: 40.h), // 統一底部間距
-                            child: ImageButton(
-                              imagePath: 'assets/images/ui/button/red_m.png',
-                              text:
-                                  _currentPage < _totalPages - 1
-                                      ? '下一步'
-                                      : '開始使用',
-                              width: 160.w, // 使用自適應寬度
-                              height: 75.h, // 使用自適應高度
-                              textStyle: TextStyle(
-                                fontSize: 18, // 使用自適應字體大小
-                                color: const Color(0xFFD1D1D1),
-                                fontFamily: 'OtsutomeFont',
-                                fontWeight: FontWeight.bold,
-                              ),
-                              onPressed: _goToNextPage,
-                            ),
-                          ),
-
-                          // 分頁指示器
-                          Padding(
-                            padding: EdgeInsets.only(
-                              bottom: 20.h,
-                            ), // 與登入頁面統一底部間距
-                            child: ProgressDotsIndicator(
-                              totalSteps: _totalPages,
-                              currentStep: _currentPage + 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/background/bg1.png'),
+            fit: BoxFit.cover,
           ),
-
-          // 品牌加載覆蓋層
-          AnimatedBuilder(
-            animation: _fadeAnimation,
-            builder: (context, child) {
-              return Visibility(
-                visible: _isLoading || _fadeAnimation.value > 0.01,
-                child: Opacity(
-                  opacity: _fadeAnimation.value,
-                  child: Container(
-                    color: const Color(0xFFF5F5F5), // 淺灰色背景
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // 品牌標誌（添加陰影效果）
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // 底部陰影層
-                              Positioned(
-                                top: 3.h, // 陰影偏移
-                                child: Image.asset(
-                                  'assets/images/icon/tuckin_t_brand.png',
-                                  width: 200.w,
-                                  height: 200.w,
-                                  fit: BoxFit.contain,
-                                  color: Colors.black.withOpacity(0.4),
-                                  colorBlendMode: BlendMode.srcIn,
-                                ),
-                              ),
-                              // 主圖層
-                              Image.asset(
-                                'assets/images/icon/tuckin_t_brand.png',
-                                width: 200.w,
-                                height: 200.w,
-                                fit: BoxFit.contain,
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 30.h),
-                        ],
-                      ),
-                    ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 主要內容區域 - 確保正方形
+              AspectRatio(
+                aspectRatio: 1.0, // 強制1:1的比例
+                child: Padding(
+                  padding: EdgeInsets.all(25.r), // 使用自適應圓角
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // 使用LayoutBuilder獲取實際可用空間
+                      final actualSize = math.max(
+                        constraints.maxWidth,
+                        constraints.maxHeight,
+                      );
+                      return SizedBox(
+                        width: actualSize,
+                        height: actualSize,
+                        child: PageView(
+                          controller: _pageController,
+                          onPageChanged: _onPageChanged,
+                          children: [
+                            // 第一頁：方形影片播放區域
+                            _buildVideoSquare(actualSize),
+                            // 第二頁：人物動畫
+                            _buildFiguresAnimation(actualSize),
+                            // 第三頁：食物動畫
+                            _buildFoodAnimation(actualSize),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
-              );
-            },
+              ),
+
+              // 底部說明區域
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 30.w), // 使用自適應寬度
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // 說明文字
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            _introTexts[_currentPage],
+                            style: TextStyle(
+                              fontSize: 20.sp, // 使用自適應字體大小
+                              color: const Color(0xFF23456B),
+                              fontFamily: 'OtsutomeFont',
+                              fontWeight: FontWeight.bold,
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+
+                      // 下一步按鈕
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 40.h), // 統一底部間距
+                        child: ImageButton(
+                          imagePath: 'assets/images/ui/button/red_m.png',
+                          text: _currentPage < _totalPages - 1 ? '下一步' : '開始使用',
+                          width: 160.w, // 使用自適應寬度
+                          height: 75.h, // 使用自適應高度
+                          textStyle: TextStyle(
+                            fontSize: 18, // 使用自適應字體大小
+                            color: const Color(0xFFD1D1D1),
+                            fontFamily: 'OtsutomeFont',
+                            fontWeight: FontWeight.bold,
+                          ),
+                          onPressed: _goToNextPage,
+                        ),
+                      ),
+
+                      // 分頁指示器
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 20.h), // 與登入頁面統一底部間距
+                        child: ProgressDotsIndicator(
+                          totalSteps: _totalPages,
+                          currentStep: _currentPage + 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

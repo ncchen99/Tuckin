@@ -371,7 +371,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                   top: 70.h, // 調整位置，確保在HeaderBar下方
                   right: 20.w,
                   child: InfoTipBox(
-                    message: '嗨囉 $_username！\n 每次相遇都是生命中的美好！',
+                    message: '嗨囉 $_username！\n每次相遇都是生命中的美好！',
                     show: _showWelcomeTip,
                     onHide: () {
                       // 提示框完全隱藏後的回調

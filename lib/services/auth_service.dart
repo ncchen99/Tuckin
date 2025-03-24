@@ -20,9 +20,32 @@ class AuthService {
 
   // 初始化認證服務
   Future<void> initialize() async {
-    // 初始化 Supabase 服務
-    await _supabaseService.initialize();
-    debugPrint('AuthService 初始化完成');
+    try {
+      // 初始化 Supabase 服務
+      await _supabaseService.initialize();
+      debugPrint('AuthService 初始化完成');
+
+      // 檢查當前用戶是否有效
+      final currentUser = getCurrentUser();
+      if (currentUser != null) {
+        try {
+          // 驗證令牌是否有效
+          await _supabaseService.client.auth.refreshSession();
+          debugPrint('AuthService: 用戶令牌有效');
+        } catch (e) {
+          // 令牌無效或過期，執行登出操作
+          debugPrint('AuthService: 用戶令牌無效，執行登出 - $e');
+          await signOut();
+        }
+      }
+    } catch (e) {
+      debugPrint('AuthService 初始化錯誤: $e');
+      // 發生錯誤時，嘗試登出以避免狀態不一致
+      try {
+        await signOut();
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   // 使用 Google 登入
@@ -81,44 +104,21 @@ class AuthService {
     }
   }
 
-  // 使用電子郵件和密碼登入
-  Future<bool> signInWithEmailAndPassword(String email, String password) async {
-    try {
-      final response = await _supabaseService.client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-
-      return response.user != null;
-    } catch (error) {
-      debugPrint('郵箱密碼登入錯誤: $error');
-      return false;
-    }
-  }
-
-  // 使用電子郵件和密碼註冊
-  Future<bool> signUpWithEmailAndPassword(String email, String password) async {
-    try {
-      final response = await _supabaseService.client.auth.signUp(
-        email: email,
-        password: password,
-      );
-
-      return response.user != null;
-    } catch (error) {
-      debugPrint('郵箱密碼註冊錯誤: $error');
-      return false;
-    }
-  }
-
   // 登出
   Future<void> signOut() async {
-    await _supabaseService.client.auth.signOut();
+    try {
+      await _supabaseService.client.auth.signOut();
+      debugPrint('AuthService: 用戶已成功登出');
+    } catch (e) {
+      debugPrint('AuthService: 登出時發生錯誤 - $e');
+      rethrow;
+    }
   }
 
   // 檢查用戶是否已登錄
   bool isLoggedIn() {
-    return _supabaseService.client.auth.currentUser != null;
+    final currentUser = _supabaseService.client.auth.currentUser;
+    return currentUser != null;
   }
 
   // 獲取當前用戶

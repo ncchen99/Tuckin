@@ -80,7 +80,8 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
         curve: Curves.easeInOut,
       );
     } else {
-      Navigator.of(context).pop();
+      // 在第一頁時，導航回food_preference頁面
+      Navigator.of(context).pushReplacementNamed('/food_preference');
     }
   }
 
@@ -166,11 +167,11 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
           setState(() {
             _isLoading = false;
           });
-          // 導航到主頁，添加滑動動畫
-          Navigator.pushAndRemoveUntil(
+          // 使用NavigationService進行導航
+          final navigationService = NavigationService();
+          navigationService.navigateToNextSetupStep(
             context,
-            rightSlideTransition(page: const HomePage()),
-            (route) => false,
+            'personality_test',
           );
         })
         .catchError((error) {
@@ -187,7 +188,22 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        return true;
+        // 根據當前頁面決定行為
+        if (_currentPage > 0) {
+          // 如果不是第一頁，則返回上一頁
+          setState(() {
+            _currentPage--;
+          });
+          _pageController.previousPage(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+          return false; // 阻止默認返回行為
+        } else {
+          // 在第一頁時，導航回food_preference頁面
+          Navigator.of(context).pushReplacementNamed('/food_preference');
+          return false; // 阻止默認返回行為
+        }
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
