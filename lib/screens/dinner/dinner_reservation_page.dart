@@ -184,7 +184,6 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                     // 頂部導航欄
                     HeaderBar(
                       title: '聚餐預約',
-                      onNotificationTap: _handleNotificationTap,
                       onProfileTap: _handleUserProfileTap,
                     ),
 

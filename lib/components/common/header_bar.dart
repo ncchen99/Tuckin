@@ -2,23 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:tuckin/utils/index.dart';
 
 /// 通用頂部導航欄
-/// 包含通知鈴鐺圖標和用戶頭像圖標
+/// 包含用戶頭像圖標
 /// 顯示品牌標誌
-class HeaderBar extends StatelessWidget {
+class HeaderBar extends StatefulWidget {
   final String title; // 保留參數但不再使用
-  final VoidCallback? onNotificationTap;
   final VoidCallback? onProfileTap;
   final bool showBackButton;
   final VoidCallback? onBackPressed;
+  final VoidCallback? onBrandTap; // 新增品牌點擊事件
 
   const HeaderBar({
     super.key,
     this.title = '',
-    this.onNotificationTap,
     this.onProfileTap,
     this.showBackButton = false,
     this.onBackPressed,
+    this.onBrandTap,
   });
+
+  @override
+  State<HeaderBar> createState() => _HeaderBarState();
+}
+
+class _HeaderBarState extends State<HeaderBar> {
+  bool _isBrandPressed = false;
+  bool _isProfilePressed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -31,9 +39,10 @@ class HeaderBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // 左側：返回按鈕或品牌標誌
-          showBackButton
+          widget.showBackButton
               ? GestureDetector(
-                onTap: onBackPressed ?? () => Navigator.of(context).pop(),
+                onTap:
+                    widget.onBackPressed ?? () => Navigator.of(context).pop(),
                 child: Container(
                   padding: EdgeInsets.all(8.r),
                   decoration: BoxDecoration(
@@ -49,103 +58,103 @@ class HeaderBar extends StatelessWidget {
               )
               : _buildBrandLogo(adaptiveShadowOffset),
 
-          // 右側：通知與個人資料圖標
-          Row(
-            children: [
-              // 通知鈴鐺
-              _buildIconButton(
-                'assets/images/icon/notification.png',
-                onNotificationTap,
-                adaptiveShadowOffset,
-              ),
-              SizedBox(width: 15.w),
-              // 用戶頭像
-              _buildIconButton(
-                'assets/images/icon/user_profile.png',
-                onProfileTap,
-                adaptiveShadowOffset,
-              ),
-            ],
+          // 右側：個人資料圖標
+          _buildProfileButton(
+            'assets/images/icon/user_profile.png',
+            widget.onProfileTap,
+            adaptiveShadowOffset,
           ),
         ],
       ),
     );
   }
 
-  // 品牌標誌組件
+  // 品牌標誌組件 - 添加互動效果
   Widget _buildBrandLogo(double shadowOffset) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // 底部陰影層
-        Positioned(
-          top: shadowOffset,
-          child: Image.asset(
-            'assets/images/icon/tuckin_t_brand.png',
-            height: 34.h,
-            fit: BoxFit.contain,
-            color: Colors.black.withValues(alpha: .4),
-            colorBlendMode: BlendMode.srcIn,
-          ),
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isBrandPressed = true),
+      onTapUp: (_) {
+        setState(() => _isBrandPressed = false);
+        if (widget.onBrandTap != null) widget.onBrandTap!();
+      },
+      onTapCancel: () => setState(() => _isBrandPressed = false),
+      child: SizedBox(
+        height: 34.h,
+        width: 130.w,
+        child: Stack(
+          alignment: Alignment.topLeft,
+          clipBehavior: Clip.none,
+          children: [
+            // 底部陰影層
+            if (!_isBrandPressed)
+              Positioned(
+                top: shadowOffset,
+                left: 0,
+                child: Image.asset(
+                  'assets/images/icon/tuckin_t_brand.png',
+                  height: 34.h,
+                  fit: BoxFit.contain,
+                  color: Colors.black.withValues(alpha: .4),
+                  colorBlendMode: BlendMode.srcIn,
+                ),
+              ),
+            // 主圖層
+            Positioned(
+              top: _isBrandPressed ? shadowOffset : 0,
+              left: 0,
+              child: Image.asset(
+                'assets/images/icon/tuckin_t_brand.png',
+                height: 34.h,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
         ),
-        // 主圖層
-        Image.asset(
-          'assets/images/icon/tuckin_t_brand.png',
-          height: 34.h,
-          fit: BoxFit.contain,
-        ),
-      ],
+      ),
     );
   }
 
-  // 創建帶陰影的圖標按鈕 (無背景版本)
-  Widget _buildIconButton(
+  // 創建帶陰影的頭像按鈕
+  Widget _buildProfileButton(
     String iconPath,
     VoidCallback? onTap,
     double shadowOffset,
   ) {
-    // 使用StatefulBuilder以便實現按下效果
-    return StatefulBuilder(
-      builder: (context, setState) {
-        bool isPressed = false;
-
-        return GestureDetector(
-          onTapDown: (_) => setState(() => isPressed = true),
-          onTapUp: (_) {
-            setState(() => isPressed = false);
-            if (onTap != null) onTap();
-          },
-          onTapCancel: () => setState(() => isPressed = false),
-          child: SizedBox(
-            width: 40.w,
-            height: 40.h,
-            child: Stack(
-              clipBehavior: Clip.none, // 允許子元素超出父容器邊界，解決陰影被裁剪問題
-              children: [
-                // 底部陰影
-                if (!isPressed)
-                  Positioned(
-                    left: 0,
-                    top: shadowOffset,
-                    child: Image.asset(
-                      iconPath,
-                      width: 40.w,
-                      height: 40.h,
-                      color: Colors.black.withValues(alpha: .4),
-                      colorBlendMode: BlendMode.srcIn,
-                    ),
-                  ),
-                // 主圖像
-                Positioned(
-                  top: isPressed ? shadowOffset : 0,
-                  left: 0,
-                  child: Image.asset(iconPath, width: 40.w, height: 40.h),
-                ),
-              ],
-            ),
-          ),
-        );
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isProfilePressed = true),
+      onTapUp: (_) {
+        setState(() => _isProfilePressed = false);
+        if (onTap != null) onTap();
       },
+      onTapCancel: () => setState(() => _isProfilePressed = false),
+      child: SizedBox(
+        width: 40.w,
+        height: 40.h,
+        child: Stack(
+          clipBehavior: Clip.none, // 允許子元素超出父容器邊界，解決陰影被裁剪問題
+          children: [
+            // 底部陰影
+            if (!_isProfilePressed)
+              Positioned(
+                left: 0,
+                top: shadowOffset,
+                child: Image.asset(
+                  iconPath,
+                  width: 40.w,
+                  height: 40.h,
+                  color: Colors.black.withValues(alpha: .4),
+                  colorBlendMode: BlendMode.srcIn,
+                ),
+              ),
+            // 主圖像
+            Positioned(
+              top: _isProfilePressed ? shadowOffset : 0,
+              left: 0,
+              child: Image.asset(iconPath, width: 40.w, height: 40.h),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -187,11 +187,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
             child: Column(
               children: [
                 // 頂部導航欄
-                HeaderBar(
-                  title: '',
-                  onNotificationTap: _handleNotificationTap,
-                  onProfileTap: _handleProfileTap,
-                ),
+                HeaderBar(title: '', onProfileTap: _handleProfileTap),
 
                 Expanded(
                   child: Padding(

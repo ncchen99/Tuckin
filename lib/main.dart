@@ -9,6 +9,7 @@ import 'package:connectivity_plus/connectivity_plus.dart'; // 導入網絡狀態
 import 'package:tuckin/components/common/error_screen.dart'; // 導入錯誤畫面組件
 import 'package:tuckin/services/error_handler.dart';
 import 'package:tuckin/services/api_service.dart'; // 添加導入 API 服務
+import 'package:flutter_native_splash/flutter_native_splash.dart'; // 導入原生啟動畫面
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -34,7 +35,9 @@ final TuckinRouteObserver routeObserver = TuckinRouteObserver();
 String initialRoute = '/';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // 保留原生啟動畫面直到 Flutter 完全初始化
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   // 設置固定方向，防止方向改變導致佈局變化
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -109,6 +112,9 @@ void main() async {
   }
 
   runApp(MyApp(errorHandler: errorHandler));
+
+  // 移除原生啟動畫面
+  FlutterNativeSplash.remove();
 }
 
 class MyApp extends StatefulWidget {
@@ -269,9 +275,7 @@ class _MyAppState extends State<MyApp> {
               children: [
                 SplashScreen(
                   child: child ?? const SizedBox(),
-                  loadingDuration: 1200,
-                  fadeOutDuration: 300,
-                  transitionDelay: 200,
+                  statusCheckDelay: 300,
                 ),
                 // 利用 Overlay 來顯示錯誤畫面，確保完全覆蓋
                 if (_isOffline ||

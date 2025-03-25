@@ -3,45 +3,31 @@ import '../../utils/index.dart';
 import '../../services/auth_service.dart';
 import 'dart:async';
 
-/// 品牌加載頁面組件
+/// 原 SplashScreen 轉為 App 狀態轉換組件
 ///
-/// 在應用啟動時顯示品牌標誌，並在指定時間後淡出
-/// 同時檢查用戶狀態並導航到適當頁面
+/// 在應用加載完成後處理用戶狀態檢查並導航到適當頁面
+/// 原生啟動畫面由 flutter_native_splash 提供
 class SplashScreen extends StatefulWidget {
   /// 要顯示的子組件(通常是實際的應用內容)
   final Widget child;
 
-  /// 加載時間(毫秒)，默認為1500毫秒
-  final int loadingDuration;
-
-  /// 淡出動畫持續時間(毫秒)，默認為800毫秒
-  final int fadeOutDuration;
-
-  /// 額外的過渡延遲時間(毫秒)，默認為500毫秒
-  final int transitionDelay;
+  /// 檢查用戶狀態的延遲時間(毫秒)，默認為300毫秒
+  final int statusCheckDelay;
 
   const SplashScreen({
     super.key,
     required this.child,
-    this.loadingDuration = 1500,
-    this.fadeOutDuration = 400,
-    this.transitionDelay = 400,
+    this.statusCheckDelay = 300,
   });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  // 簡化狀態管理，只使用一個狀態變量
-  bool _showSplash = true;
-  late AnimationController _loadingAnimController;
-  late Animation<double> _fadeAnimation;
+class _SplashScreenState extends State<SplashScreen> {
   final NavigationService _navigationService = NavigationService();
   final AuthService _authService = AuthService();
-  Timer? _timeoutTimer; // 超時計時器
-  Timer? _forceShowContentTimer; // 強制顯示內容計時器
+  Timer? _statusCheckTimer; // 狀態檢查計時器
 
   // 確保檢查用戶狀態的邏輯只執行一次
   bool _hasCheckedUserStatus = false;
@@ -54,89 +40,15 @@ class _SplashScreenState extends State<SplashScreen>
       'SplashScreen: 初始化開始，頁面路徑: ${ModalRoute.of(context)?.settings.name ?? "unknown"}',
     );
 
-    // 初始化加載動畫控制器
-    _loadingAnimController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: widget.fadeOutDuration),
+    // 設置狀態檢查計時器
+    _statusCheckTimer = Timer(
+      Duration(milliseconds: widget.statusCheckDelay),
+      () {
+        if (mounted) {
+          _checkUserStatusIfNeeded();
+        }
+      },
     );
-
-    // 使用簡單的線性動畫
-    _fadeAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(_loadingAnimController);
-
-    // 設置兩級超時機制
-    // 1秒後強制開始淡出
-    Timer(const Duration(seconds: 2), () {
-      if (mounted && _showSplash) {
-        debugPrint('SplashScreen: 2秒超時，強制開始淡出');
-        _dismissSplash();
-      }
-    });
-
-    // 3秒後強制關閉啟動頁面（無論如何）
-    _timeoutTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted && _showSplash) {
-        debugPrint('SplashScreen: 5秒超時，強制結束啟動畫面');
-        _forceDismissSplash();
-      }
-    });
-
-    // 在正常情況下，啟動頁面會在預設時間後開始淡出
-    Future.delayed(Duration(milliseconds: widget.loadingDuration), () {
-      if (mounted && _showSplash) {
-        debugPrint('SplashScreen: 啟動頁面淡出開始');
-        _dismissSplash();
-      }
-    });
-  }
-
-  // 正常的淡出處理
-  void _dismissSplash() {
-    if (!mounted || !_showSplash) return;
-
-    debugPrint('SplashScreen: 執行淡出動畫');
-    _loadingAnimController
-        .forward()
-        .then((_) {
-          debugPrint('SplashScreen: 淡出動畫完成');
-          if (mounted) {
-            _onFadeOutComplete();
-          }
-        })
-        .catchError((e) {
-          debugPrint('SplashScreen: 淡出動畫失敗: $e');
-          if (mounted) {
-            _forceDismissSplash();
-          }
-        });
-  }
-
-  // 強制關閉啟動頁面，不依賴動畫
-  void _forceDismissSplash() {
-    if (!mounted || !_showSplash) return;
-
-    debugPrint('SplashScreen: 強制關閉啟動頁面');
-    setState(() {
-      _showSplash = false;
-    });
-    _checkUserStatusIfNeeded();
-  }
-
-  // 動畫完成後的處理
-  void _onFadeOutComplete() {
-    if (!mounted) return;
-
-    debugPrint('SplashScreen: 設置_showSplash=false，顯示主內容');
-    setState(() {
-      _showSplash = false;
-    });
-
-    // 延遲一個幀再檢查用戶狀態，確保UI已經更新
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkUserStatusIfNeeded();
-    });
   }
 
   // 檢查用戶狀態並進行導航（確保只執行一次）
@@ -198,61 +110,13 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void dispose() {
     debugPrint('SplashScreen: 組件銷毀');
-    _timeoutTimer?.cancel();
-    _forceShowContentTimer?.cancel();
-    _loadingAnimController.dispose();
+    _statusCheckTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // 主內容始終顯示在底層
-        widget.child,
-
-        // 品牌加載覆蓋層（只在需要時顯示）
-        if (_showSplash)
-          FadeTransition(
-            opacity: _fadeAnimation,
-            child: Container(
-              color: const Color.fromARGB(255, 203, 203, 203), // 淺灰色背景
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // 品牌標誌（添加陰影效果）
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // 底部陰影層
-                        Positioned(
-                          top: 3.h, // 陰影偏移
-                          child: Image.asset(
-                            'assets/images/icon/tuckin_t_brand.png',
-                            width: 200.w,
-                            height: 200.w,
-                            fit: BoxFit.contain,
-                            color: Colors.black.withValues(alpha: .4),
-                            colorBlendMode: BlendMode.srcIn,
-                          ),
-                        ),
-                        // 主圖層
-                        Image.asset(
-                          'assets/images/icon/tuckin_t_brand.png',
-                          width: 200.w,
-                          height: 200.w,
-                          fit: BoxFit.contain,
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 30.h),
-                  ],
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
+    // 直接顯示主內容，原生啟動畫面由 flutter_native_splash 處理
+    return widget.child;
   }
 }
