@@ -39,7 +39,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   // 使用導航服務處理選擇餐廳後的導航
   Future<void> _handleSelectRestaurant() async {
     try {
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         // 更新用戶狀態
         await _databaseService.updateUserStatus(

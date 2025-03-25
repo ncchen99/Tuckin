@@ -26,7 +26,7 @@ class _RatingPageState extends State<RatingPage> {
 
   Future<void> _checkUserStatus() async {
     try {
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         final userStatus = await _databaseService.getUserStatus(currentUser.id);
         setState(() {
@@ -50,7 +50,7 @@ class _RatingPageState extends State<RatingPage> {
   // 用戶提交評分
   Future<void> _handleSubmitRating() async {
     try {
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         // 儲存用戶評分
         // 註：需要在 DatabaseService 中實現相應方法
@@ -74,7 +74,7 @@ class _RatingPageState extends State<RatingPage> {
   // 用戶跳過評分
   Future<void> _handleSkipRating() async {
     try {
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         // 更新用戶狀態
         await _databaseService.updateUserStatus(currentUser.id, 'available');

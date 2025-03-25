@@ -37,8 +37,8 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   // 檢查當前用戶
-  void _checkCurrentUser() {
-    final currentUser = _authService.getCurrentUser();
+  Future<void> _checkCurrentUser() async {
+    final currentUser = await _authService.getCurrentUser();
     if (currentUser != null) {
       // 如果已經登入，使用NavigationService來導航，確保設置正確的導航流程
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -92,9 +92,11 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('登入成功: ${response.user?.email}');
       }
     } catch (error) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('登入失敗: $error')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('登入失敗: $error')));
+      }
     } finally {
       if (mounted) {
         setState(() {

@@ -41,9 +41,27 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
     try {
       // 獲取當前用戶
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
 
       if (currentUser == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('請先登入您的帳號'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          // 延遲一下再導航，讓用戶看到提示訊息
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/login',
+                (route) => false,
+              );
+            }
+          });
+        }
         return;
       }
 
@@ -123,12 +141,27 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
     try {
       // 獲取當前用戶
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
 
       if (currentUser == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('您尚未登入，請先登入')));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('請先登入您的帳號'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          // 延遲一下再導航，讓用戶看到提示訊息
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/login',
+                (route) => false,
+              );
+            }
+          });
+        }
         return;
       }
 
@@ -152,9 +185,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         navigationService.navigateToNextSetupStep(context, 'profile_setup');
       }
     } catch (error) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('儲存資料失敗: $error')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('儲存資料失敗: $error')));
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -170,9 +205,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       // 禁止使用系統返回按鈕
       onWillPop: () async {
         // 顯示提示訊息
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('請完成基本資料設定')));
+        _handleBack();
         // 返回 false 阻止返回操作
         return false;
       },

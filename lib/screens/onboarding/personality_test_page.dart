@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/screens/home_page.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
-import 'package:tuckin/utils/route_transitions.dart'; // 導入轉場動畫
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PersonalityTestPage extends StatefulWidget {
@@ -129,7 +127,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   }
 
   // 處理完成按鈕
-  void _handleComplete() {
+  Future<void> _handleComplete() async {
     // 確保第二個問題有選擇
     if (_questionTwoAnswer == null) {
       ScaffoldMessenger.of(
@@ -138,7 +136,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
       return;
     }
 
-    final currentUser = _authService.getCurrentUser();
+    final currentUser = await _authService.getCurrentUser();
     if (currentUser == null) {
       ScaffoldMessenger.of(
         context,

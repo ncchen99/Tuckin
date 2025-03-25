@@ -1,24 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'api_service.dart';
+import 'error_handler.dart';
 
 /// 基礎 Supabase 服務，負責初始化和提供 Supabase 客戶端實例
 class SupabaseService {
   // 單例模式
   static final SupabaseService _instance = SupabaseService._internal();
-
-  factory SupabaseService() {
-    return _instance;
-  }
-
+  factory SupabaseService() => _instance;
   SupabaseService._internal();
 
   // Supabase 客戶端實例
   late final SupabaseClient _supabaseClient;
+  final ApiService _apiService = ApiService();
+  final ErrorHandler _errorHandler = ErrorHandler();
 
   // 獲取 Supabase 客戶端
-  SupabaseClient get client => _supabaseClient;
+  SupabaseClient get client {
+    return _supabaseClient;
+  }
 
   // 初始化 Supabase
   Future<void> initialize() async {
@@ -35,8 +36,10 @@ class SupabaseService {
       debugPrint('Supabase Anon Key 長度: ${supabaseAnonKey.length}');
 
       if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-        throw Exception(
-          '警告: Supabase 配置缺失。請確保 .env 文件中有 SUPABASE_URL 和 SUPABASE_ANON_KEY',
+        throw ApiError(
+          message:
+              'Supabase 配置缺失。請確保 .env 文件中有 SUPABASE_URL 和 SUPABASE_ANON_KEY',
+          isServerError: false,
         );
       }
 
@@ -53,83 +56,72 @@ class SupabaseService {
 
       debugPrint('初始化 Supabase 使用 URL: $url');
 
-      await Supabase.initialize(url: url, anonKey: anonKey);
+      await _apiService.handleRequest(
+        request: () => Supabase.initialize(url: url, anonKey: anonKey),
+      );
+
       _supabaseClient = Supabase.instance.client;
       debugPrint('Supabase 初始化成功');
     } catch (error) {
       debugPrint('Supabase 初始化錯誤: $error');
+      _errorHandler.handleApiError(
+        ApiError(message: 'Supabase 初始化失敗: $error', isServerError: true),
+        () => initialize(),
+      );
       rethrow;
     }
-  }
-
-  // 使用 Google 登入
-  Future<AuthResponse?> signInWithGoogle(BuildContext context) async {
-    try {
-      // 從環境變量中獲取 Google 客戶端 ID
-      final androidClientId = dotenv.env['GOOGLE_CLIENT_ID_ANDROID'];
-      // Web 客戶端 ID，從 google-services.json 中獲取
-      final webClientId = dotenv.env['GOOGLE_CLIENT_ID_WEB'];
-
-      debugPrint('使用 Google 客戶端 ID: $androidClientId');
-      debugPrint('使用 Web 客戶端 ID: $webClientId');
-
-      // 使用谷歌登入
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
-        clientId: androidClientId,
-        serverClientId: webClientId, // 使用 Web 客戶端 ID 作為 serverClientId
-      );
-
-      // 啟動 Google 登入流程
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-
-      if (googleUser == null) {
-        // 用戶取消登入
-        return null;
-      }
-
-      // 獲取 Google 身份驗證
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // 創建 OAuthCredential
-      final accessToken = googleAuth.accessToken;
-      final idToken = googleAuth.idToken;
-
-      if (accessToken == null) {
-        throw Exception('無法獲取 Google 訪問令牌');
-      }
-
-      if (idToken == null) {
-        throw Exception('無法獲取 Google ID 令牌');
-      }
-
-      // 使用 OAuth 登入 Supabase
-      final response = await _supabaseClient.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-
-      return response;
-    } catch (error) {
-      debugPrint('Google 登入錯誤: $error');
-      rethrow;
-    }
-  }
-
-  // 登出
-  Future<void> signOut() async {
-    await _supabaseClient.auth.signOut();
-  }
-
-  // 檢查用戶是否已登錄
-  bool isLoggedIn() {
-    return _supabaseClient.auth.currentUser != null;
   }
 
   // 獲取當前用戶
-  User? getCurrentUser() {
-    return _supabaseClient.auth.currentUser;
+  Future<User?> getCurrentUser() async {
+    try {
+      return await _apiService.handleRequest(
+        request: () async => _supabaseClient.auth.currentUser,
+      );
+    } catch (error) {
+      debugPrint('獲取當前用戶錯誤: $error');
+      _errorHandler.handleApiError(
+        ApiError(message: '獲取當前用戶失敗: $error', isServerError: true),
+        () => getCurrentUser(),
+      );
+      return null;
+    }
+  }
+
+  // 獲取 auth 實例
+  GoTrueClient get auth {
+    return _supabaseClient.auth;
+  }
+
+  // 刷新會話
+  Future<void> refreshSession() async {
+    try {
+      await _apiService.handleRequest(
+        request: () => _supabaseClient.auth.refreshSession(),
+      );
+    } catch (error) {
+      debugPrint('刷新會話錯誤: $error');
+      _errorHandler.handleApiError(
+        ApiError(message: '刷新會話失敗: $error', isServerError: true),
+        () => refreshSession(),
+      );
+      rethrow;
+    }
+  }
+
+  // 檢查連接狀態
+  Future<bool> checkConnection() async {
+    try {
+      await _apiService.handleRequest(
+        request: () async {
+          final session = _supabaseClient.auth.currentSession;
+          return session != null;
+        },
+      );
+      return true;
+    } catch (error) {
+      debugPrint('檢查連接狀態錯誤: $error');
+      return false;
+    }
   }
 }

@@ -3,20 +3,20 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'supabase_service.dart';
+import 'api_service.dart';
+import 'error_handler.dart';
 
 /// 認證服務，處理用戶登入、登出等認證相關功能
 class AuthService {
   // 單例模式
   static final AuthService _instance = AuthService._internal();
-
-  factory AuthService() {
-    return _instance;
-  }
-
+  factory AuthService() => _instance;
   AuthService._internal();
 
   // 取得 Supabase 服務的實例
   final SupabaseService _supabaseService = SupabaseService();
+  final ApiService _apiService = ApiService();
+  final ErrorHandler _errorHandler = ErrorHandler();
 
   // 初始化認證服務
   Future<void> initialize() async {
@@ -30,7 +30,7 @@ class AuthService {
       if (currentUser != null) {
         try {
           // 驗證令牌是否有效
-          await _supabaseService.client.auth.refreshSession();
+          await _supabaseService.auth.refreshSession();
           debugPrint('AuthService: 用戶令牌有效');
         } catch (e) {
           // 令牌無效或過期，執行登出操作
@@ -40,11 +40,14 @@ class AuthService {
       }
     } catch (e) {
       debugPrint('AuthService 初始化錯誤: $e');
+      _errorHandler.handleApiError(
+        ApiError(message: '認證服務初始化失敗: $e', isServerError: true),
+        () => initialize(),
+      );
       // 發生錯誤時，嘗試登出以避免狀態不一致
       try {
         await signOut();
       } catch (_) {}
-      rethrow;
     }
   }
 
@@ -53,17 +56,20 @@ class AuthService {
     try {
       // 從環境變量中獲取 Google 客戶端 ID
       final androidClientId = dotenv.env['GOOGLE_CLIENT_ID_ANDROID'];
-      // Web 客戶端 ID，從 google-services.json 中獲取
       final webClientId = dotenv.env['GOOGLE_CLIENT_ID_WEB'];
 
       debugPrint('使用 Google 客戶端 ID: $androidClientId');
       debugPrint('使用 Web 客戶端 ID: $webClientId');
 
+      if (androidClientId == null || webClientId == null) {
+        throw ApiError(message: 'Google 客戶端 ID 配置缺失', isServerError: false);
+      }
+
       // 使用谷歌登入
       final GoogleSignIn googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
         clientId: androidClientId,
-        serverClientId: webClientId, // 使用 Web 客戶端 ID 作為 serverClientId
+        serverClientId: webClientId,
       );
 
       // 啟動 Google 登入流程
@@ -83,15 +89,15 @@ class AuthService {
       final idToken = googleAuth.idToken;
 
       if (accessToken == null) {
-        throw Exception('無法獲取 Google 訪問令牌');
+        throw ApiError(message: '無法獲取 Google 訪問令牌', isServerError: false);
       }
 
       if (idToken == null) {
-        throw Exception('無法獲取 Google ID 令牌');
+        throw ApiError(message: '無法獲取 Google ID 令牌', isServerError: false);
       }
 
       // 使用 OAuth 登入 Supabase
-      final response = await _supabaseService.client.auth.signInWithIdToken(
+      final response = await _supabaseService.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
         accessToken: accessToken,
@@ -100,6 +106,13 @@ class AuthService {
       return response;
     } catch (error) {
       debugPrint('Google 登入錯誤: $error');
+      _errorHandler.handleApiError(
+        ApiError(
+          message: 'Google 登入失敗: $error',
+          isServerError: error is ApiError ? error.isServerError : true,
+        ),
+        () => signInWithGoogle(context),
+      );
       rethrow;
     }
   }
@@ -107,23 +120,27 @@ class AuthService {
   // 登出
   Future<void> signOut() async {
     try {
-      await _supabaseService.client.auth.signOut();
+      await _supabaseService.auth.signOut();
       debugPrint('AuthService: 用戶已成功登出');
     } catch (e) {
       debugPrint('AuthService: 登出時發生錯誤 - $e');
+      _errorHandler.handleApiError(
+        ApiError(message: '登出失敗: $e', isServerError: true),
+        () => signOut(),
+      );
       rethrow;
     }
   }
 
   // 檢查用戶是否已登錄
-  bool isLoggedIn() {
-    final currentUser = _supabaseService.client.auth.currentUser;
-    return currentUser != null;
+  Future<bool> isLoggedIn() async {
+    final user = await _supabaseService.getCurrentUser();
+    return user != null;
   }
 
   // 獲取當前用戶
-  User? getCurrentUser() {
-    return _supabaseService.client.auth.currentUser;
+  Future<User?> getCurrentUser() async {
+    return await _supabaseService.getCurrentUser();
   }
 
   // 檢查是否為成大信箱

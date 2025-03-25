@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/components/common/header_bar.dart';
-import 'package:tuckin/components/common/loading_image.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
@@ -116,7 +114,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
 
       if (isNewUser) {
         // 獲取當前用戶
-        final currentUser = _authService.getCurrentUser();
+        final currentUser = await _authService.getCurrentUser();
         if (currentUser != null) {
           // 獲取用戶資料
           final userData = await _databaseService.getUserProfile(
@@ -308,7 +306,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
 
                                             try {
                                               final currentUser =
-                                                  _authService.getCurrentUser();
+                                                  await _authService
+                                                      .getCurrentUser();
                                               if (currentUser != null) {
                                                 // 更新用戶狀態為等待配對階段
                                                 await _databaseService
@@ -332,7 +331,14 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                                                   context,
                                                 ).showSnackBar(
                                                   SnackBar(
-                                                    content: Text('預約失敗: $e'),
+                                                    content: Text(
+                                                      '預約失敗: $e',
+                                                      style: TextStyle(
+                                                        fontSize: 15,
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                      ),
+                                                    ),
                                                   ),
                                                 );
                                               }

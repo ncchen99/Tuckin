@@ -21,12 +21,12 @@ class SplashScreen extends StatefulWidget {
   final int transitionDelay;
 
   const SplashScreen({
-    Key? key,
+    super.key,
     required this.child,
     this.loadingDuration = 1500,
     this.fadeOutDuration = 400,
     this.transitionDelay = 400,
-  }) : super(key: key);
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -164,7 +164,7 @@ class _SplashScreenState extends State<SplashScreen>
     debugPrint('SplashScreen: 執行用戶狀態檢查...');
 
     try {
-      final bool isLoggedIn = _authService.isLoggedIn();
+      final bool isLoggedIn = await _authService.isLoggedIn();
       debugPrint('SplashScreen: 用戶登入狀態: $isLoggedIn');
 
       if (isLoggedIn) {
@@ -216,7 +216,7 @@ class _SplashScreenState extends State<SplashScreen>
           FadeTransition(
             opacity: _fadeAnimation,
             child: Container(
-              color: const Color(0xFFF5F5F5), // 淺灰色背景
+              color: const Color.fromARGB(255, 203, 203, 203), // 淺灰色背景
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -233,7 +233,7 @@ class _SplashScreenState extends State<SplashScreen>
                             width: 200.w,
                             height: 200.w,
                             fit: BoxFit.contain,
-                            color: Colors.black.withOpacity(0.4),
+                            color: Colors.black.withValues(alpha: .4),
                             colorBlendMode: BlendMode.srcIn,
                           ),
                         ),

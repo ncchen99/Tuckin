@@ -28,7 +28,7 @@ class _AttendanceConfirmationPageState
 
   Future<void> _checkUserStatus() async {
     try {
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         final userStatus = await _databaseService.getUserStatus(currentUser.id);
         setState(() {
@@ -52,7 +52,7 @@ class _AttendanceConfirmationPageState
   // 用戶確認參加晚餐
   Future<void> _handleConfirmAttendance() async {
     try {
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         // 更新用戶狀態
         await _databaseService.updateUserStatus(
@@ -76,7 +76,7 @@ class _AttendanceConfirmationPageState
   // 用戶取消參加晚餐
   Future<void> _handleCancelAttendance() async {
     try {
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         // 更新用戶狀態
         await _databaseService.updateUserStatus(currentUser.id, 'booking');

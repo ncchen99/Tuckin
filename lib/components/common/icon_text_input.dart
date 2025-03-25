@@ -80,7 +80,7 @@ class IconTextInput extends StatelessWidget {
                     width: 30.w,
                     height: 30.h,
                     fit: BoxFit.contain,
-                    color: Colors.black.withOpacity(0.4),
+                    color: Colors.black.withValues(alpha: .4),
                     colorBlendMode: BlendMode.srcIn,
                   ),
                 ),

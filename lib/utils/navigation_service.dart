@@ -27,10 +27,10 @@ class NavigationService {
       debugPrint('NavigationService: 開始決定初始路由');
 
       // 檢查用戶是否已登入
-      if (_authService.isLoggedIn()) {
+      if (await _authService.isLoggedIn()) {
         debugPrint('NavigationService: 用戶已登入');
 
-        final currentUser = _authService.getCurrentUser();
+        final currentUser = await _authService.getCurrentUser();
         if (currentUser != null) {
           debugPrint('NavigationService: 取得用戶ID - ${currentUser.id}');
 
@@ -175,8 +175,9 @@ class NavigationService {
     }
 
     try {
-      if (!_authService.isLoggedIn()) {
+      if (!(await _authService.isLoggedIn())) {
         // 用戶未登入，導航到歡迎頁面
+        if (!context.mounted) return;
         final currentRoute = ModalRoute.of(context)?.settings.name;
         debugPrint('NavigationService: 用戶未登入，當前路由: $currentRoute');
 
@@ -190,7 +191,7 @@ class NavigationService {
         return;
       }
 
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser == null) {
         // 無法獲取用戶資訊，導航到歡迎頁面
         debugPrint('NavigationService: 無法獲取用戶資訊，導航到歡迎頁面');
@@ -241,6 +242,7 @@ class NavigationService {
       }
 
       // 獲取當前路由
+      if (!context.mounted) return;
       final currentRoute = ModalRoute.of(context)?.settings.name;
       debugPrint('NavigationService: 當前路由: $currentRoute, 目標路由: $targetRoute');
 

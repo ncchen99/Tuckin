@@ -18,7 +18,6 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
   final NavigationService _navigationService = NavigationService();
   bool _isLoading = true;
   bool _isCancelling = false; // 追蹤取消預約操作的狀態
-  String _status = 'waiting_matching'; // 初始狀態：等待配對
   String _userStatus = 'waiting_matching'; // 預設為等待配對狀態
   bool _isPageMounted = false; // 追蹤頁面是否完全掛載
 
@@ -45,7 +44,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
 
   Future<void> _loadUserStatus() async {
     try {
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         final status = await _databaseService.getUserStatus(currentUser.id);
         // 只有當狀態是 waiting_matching 或 matching_failed 時才更新狀態
@@ -106,7 +105,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
         _isCancelling = true; // 開始取消操作，顯示loading
       });
 
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         // 更新用戶狀態為預約階段
         await _databaseService.updateUserStatus(currentUser.id, 'booking');
@@ -124,9 +123,14 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
       });
       // 顯示錯誤訊息
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('取消預約失敗: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '取消失敗: $e',
+              style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
       }
     }
   }
@@ -144,7 +148,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
   @override
   Widget build(BuildContext context) {
     // 計算適當的陰影偏移量
-    final adaptiveShadowOffset = 3.h;
+    final adaptiveShadowOffset = 4.h;
 
     if (_isLoading) {
       return WillPopScope(

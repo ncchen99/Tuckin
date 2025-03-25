@@ -63,22 +63,23 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
     if (_selectedFoods.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('請至少選擇一種食物類型')));
+      ).showSnackBar(SnackBar(content: Text('請至少選擇一種食物類型')));
       return;
     }
-
     setState(() {
       _isLoading = true;
     });
 
     try {
       // 獲取當前用戶
-      final currentUser = _authService.getCurrentUser();
+      final currentUser = await _authService.getCurrentUser();
 
       if (currentUser == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('您尚未登入，請先登入')));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('您尚未登入，請先登入')));
+        }
         return;
       }
 
@@ -97,9 +98,11 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
         navigationService.navigateToNextSetupStep(context, 'food_preference');
       }
     } catch (error) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('儲存資料失敗: $error')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('儲存資料失敗: $error')));
+      }
     } finally {
       if (mounted) {
         setState(() {
