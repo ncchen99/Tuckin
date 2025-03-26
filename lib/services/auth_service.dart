@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'supabase_service.dart';
 import 'api_service.dart';
 import 'error_handler.dart';
+import 'notification_service.dart';
 
 /// 認證服務，處理用戶登入、登出等認證相關功能
 class AuthService {
@@ -102,6 +103,11 @@ class AuthService {
         idToken: idToken,
         accessToken: accessToken,
       );
+
+      // 登入成功後，保存FCM token
+      final notificationService = NotificationService();
+      await notificationService.saveTokenToSupabase();
+      notificationService.debugTokenStatus();
 
       return response;
     } catch (error) {

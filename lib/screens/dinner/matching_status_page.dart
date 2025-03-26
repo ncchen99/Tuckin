@@ -211,7 +211,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                           ),
                         ),
 
-                        SizedBox(height: 20.h),
+                        SizedBox(height: 25.h),
 
                         // 圖示 - 根據用戶狀態顯示不同的圖示
                         Center(
@@ -228,7 +228,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                                   child: Image.asset(
                                     _userStatus == 'matching_failed'
                                         ? 'assets/images/icon/sorry.png'
-                                        : 'assets/images/icon/match.png',
+                                        : 'assets/images/icon/notification.png',
                                     width: 150.w,
                                     height: 150.h,
                                     color: Colors.black.withOpacity(0.4),
@@ -239,7 +239,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                                 Image.asset(
                                   _userStatus == 'matching_failed'
                                       ? 'assets/images/icon/sorry.png'
-                                      : 'assets/images/icon/match.png',
+                                      : 'assets/images/icon/notification.png',
                                   width: 150.w,
                                   height: 150.h,
                                 ),
@@ -248,7 +248,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                           ),
                         ),
 
-                        SizedBox(height: 30.h),
+                        SizedBox(height: 35.h),
 
                         // 提示文字 - 根據用戶狀態顯示不同的文字
                         Center(

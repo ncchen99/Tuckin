@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/screens/onboarding/food_preference_page.dart';
-import 'package:tuckin/screens/home_page.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
-import 'package:tuckin/utils/route_transitions.dart'; // 確保導入轉場動畫
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileSetupPage extends StatefulWidget {
   const ProfileSetupPage({super.key});
@@ -72,11 +70,17 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
       // 如果已完成設定，直接導航到主頁
       if (hasCompleted && mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          rightSlideTransition(page: const HomePage()),
-          (route) => false,
-        );
+        try {
+          await _databaseService.updateUserStatus(currentUser.id, 'booking');
+
+          // 設置一個標誌表示是新用戶第一次使用
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('is_new_user', true);
+        } catch (error) {
+          debugPrint('更新用戶狀態出錯: $error');
+        }
+        final navigationService = NavigationService();
+        navigationService.navigateToDinnerReservation(context);
       }
     } catch (error) {
       // 錯誤處理

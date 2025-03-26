@@ -10,6 +10,8 @@ import 'package:tuckin/components/common/error_screen.dart'; // 導入錯誤畫�
 import 'package:tuckin/services/error_handler.dart';
 import 'package:tuckin/services/api_service.dart'; // 添加導入 API 服務
 import 'package:flutter_native_splash/flutter_native_splash.dart'; // 導入原生啟動畫面
+// 添加導入通知服務
+import 'package:tuckin/services/notification_service.dart';
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -30,6 +32,9 @@ import 'utils/index.dart'; // 導入工具類
 
 // 創建路由觀察器實例
 final TuckinRouteObserver routeObserver = TuckinRouteObserver();
+
+// 創建全局導航鍵，用於通知點擊時導航
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // 全局變數，存儲初始路由
 String initialRoute = '/';
@@ -101,6 +106,15 @@ void main() async {
       // 使用全局變量，而不是重新宣告
       initialRoute = await NavigationService().determineInitialRoute();
       debugPrint('設置初始路由為: $initialRoute');
+
+      // 初始化通知服務
+      try {
+        await NotificationService().initialize(navigatorKey);
+        debugPrint('通知服務初始化成功');
+      } catch (e) {
+        debugPrint('通知服務初始化錯誤: $e');
+        // 通知服務初始化失敗不阻止應用程序啟動
+      }
     } catch (e) {
       debugPrint('確定初始路由出錯: $e');
       // 出錯時使用默認初始路由，但不重新宣告變量
@@ -258,6 +272,7 @@ class _MyAppState extends State<MyApp> {
     return ErrorHandlerProvider(
       errorHandler: _errorHandler,
       child: MaterialApp(
+        navigatorKey: navigatorKey, // 添加全局導航鍵
         title: 'Tuckin',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),

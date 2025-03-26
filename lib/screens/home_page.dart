@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
+import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
 
 class HomePage extends StatefulWidget {
@@ -77,13 +78,13 @@ class _HomePageState extends State<HomePage> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Padding(
-                          padding: EdgeInsets.only(top: 50.h, bottom: 50.h),
+                          padding: EdgeInsets.only(top: 25.h, bottom: 50.h),
                           child: Image.asset(
                             'assets/images/icon/tuckin_t_brand.png',
-                            width: 150.w,
+                            width: 140.w,
                           ),
                         ),
-
+                        SizedBox(height: 150.h),
                         // 歡迎訊息
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 20.w),
@@ -124,7 +125,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
 
-                        SizedBox(height: 100.h),
+                        Expanded(child: Container()),
 
                         // 主循環核心功能按鈕
                         Column(
@@ -133,8 +134,17 @@ class _HomePageState extends State<HomePage> {
                               text: '預約',
                               imagePath: 'assets/images/ui/button/red_l.png',
                               width: 180.w,
-                              height: 85.h,
-                              onPressed: () {
+                              height: 75.h,
+                              onPressed: () async {
+                                final currentUser =
+                                    await _authService.getCurrentUser();
+                                if (currentUser != null) {
+                                  final _databaseService = DatabaseService();
+                                  await _databaseService.updateUserStatus(
+                                    currentUser.id,
+                                    'booking',
+                                  );
+                                }
                                 Navigator.of(
                                   context,
                                 ).pushNamed('/dinner_reservation');
@@ -142,28 +152,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ],
                         ),
-
-                        Expanded(child: Container()),
-
-                        // 登出按鈕
-                        Padding(
-                          padding: EdgeInsets.only(bottom: 30.h),
-                          child: ImageButton(
-                            text: '登出',
-                            imagePath: 'assets/images/ui/button/blue_m.png',
-                            width: 120.w,
-                            height: 60.h,
-                            onPressed: () async {
-                              await _authService.signOut();
-                              if (mounted) {
-                                // 使用導航服務處理登出後的導航
-                                _navigationService.navigateAfterSignOut(
-                                  context,
-                                );
-                              }
-                            },
-                          ),
-                        ),
+                        SizedBox(height: 60.h),
                       ],
                     ),
                   ),

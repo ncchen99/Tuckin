@@ -157,7 +157,7 @@ class NavigationService {
         return '/personality_test';
       } else {
         // 所有設置已完成
-        return '/home';
+        return '/dinner_reservation';
       }
     } catch (e) {
       debugPrint('獲取用戶設置狀態錯誤: $e');
@@ -285,9 +285,11 @@ class NavigationService {
     }
   }
 
-  /// 在用戶完成設置後導航到主頁
-  void navigateToHomeAfterSetup(BuildContext context) {
-    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+  /// 在用戶完成設置後導航到晚餐預約頁面
+  void navigateToDinnerReservationAfterSetup(BuildContext context) {
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil('/dinner_reservation', (route) => false);
   }
 
   /// 處理設置流程頁面之間的導航
@@ -302,7 +304,7 @@ class NavigationService {
         Navigator.of(context).pushNamed('/personality_test');
         break;
       case 'personality_test':
-        navigateToHomeAfterSetup(context);
+        navigateToDinnerReservationAfterSetup(context);
         break;
       default:
         break;

@@ -15,6 +15,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // 啟用 desugaring
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -42,10 +44,13 @@ android {
 }
 
 dependencies {
+    // 添加 desugaring 依賴
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     // 添加Firebase和Google服務SDK
     implementation(platform("com.google.firebase:firebase-bom:32.7.1"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.google.gms:google-services:4.3.15")
 }
 
 flutter {
