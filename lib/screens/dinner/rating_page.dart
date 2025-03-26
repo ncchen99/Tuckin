@@ -16,7 +16,7 @@ class _RatingPageState extends State<RatingPage> {
   final DatabaseService _databaseService = DatabaseService();
   final NavigationService _navigationService = NavigationService();
   bool _isLoading = true;
-  double _rating = 0;
+  final double _rating = 0;
 
   @override
   void initState() {

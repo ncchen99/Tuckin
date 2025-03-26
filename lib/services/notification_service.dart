@@ -26,26 +26,48 @@ class NotificationService {
   Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
     _navigatorKey = navigatorKey;
 
-    // 初始化 Firebase
-    await Firebase.initializeApp();
+    try {
+      // 檢查 Firebase 是否已初始化
+      if (Firebase.apps.isEmpty) {
+        debugPrint('NotificationService: Firebase 尚未初始化，正在初始化...');
+        await Firebase.initializeApp();
+      } else {
+        debugPrint('NotificationService: Firebase 已經初始化');
+      }
 
-    // 請求通知權限
-    await _requestPermission();
+      // 請求通知權限
+      await _requestPermission();
 
-    // 初始化本地通知
-    await _initializeLocalNotifications();
+      // 初始化本地通知
+      await _initializeLocalNotifications();
 
-    // 處理後台消息
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      // 設置 token 刷新監聽
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+        debugPrint('FCM Token 已更新: $newToken');
+        saveTokenToSupabase();
+      });
 
-    // 處理前台消息
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      // 處理後台消息
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
 
-    // 處理通知點擊
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationClick);
+      // 處理前台消息
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
-    // 保存 FCM token 到 Supabase
-    await _saveFcmToken();
+      // 處理通知點擊
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationClick);
+
+      // 檢查當前用戶，如果已登入則保存 token
+      final currentUser = _supabaseService.auth.currentUser;
+      if (currentUser != null) {
+        await saveTokenToSupabase();
+      }
+    } catch (e) {
+      debugPrint('通知服務初始化錯誤: $e');
+      // 記錄詳細堆疊跟踪
+      debugPrintStack(label: '通知服務初始化錯誤堆疊');
+    }
   }
 
   // 請求通知權限
@@ -89,27 +111,33 @@ class NotificationService {
   }
 
   // 保存 FCM token 到 Supabase
-  Future<void> _saveFcmToken() async {
-    final token = await _firebaseMessaging.getToken();
-    if (token != null) {
-      debugPrint('FCM Token: $token');
+  Future<bool> saveTokenToSupabase() async {
+    try {
+      final token = await _firebaseMessaging.getToken();
+      if (token == null) {
+        debugPrint('無法獲取FCM Token');
+        return false;
+      }
 
       // 獲取當前用戶
       final currentUser = _supabaseService.auth.currentUser;
-      if (currentUser != null) {
-        // 保存 token 到 Supabase（需要先在 Supabase 中創建表）
-        try {
-          await _supabaseService.client.from('user_device_tokens').upsert({
-            'user_id': currentUser.id,
-            'token': token,
-            'updated_at': DateTime.now().toIso8601String(),
-          });
-
-          debugPrint('FCM Token 已保存到 Supabase');
-        } catch (e) {
-          debugPrint('保存 FCM Token 錯誤: $e');
-        }
+      if (currentUser == null) {
+        debugPrint('用戶未登入，無法保存FCM Token');
+        return false;
       }
+
+      // 保存token到Supabase（使用新的API方式）
+      await _supabaseService.client.from('user_device_tokens').upsert({
+        'user_id': currentUser.id,
+        'token': token,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
+      debugPrint('FCM Token已成功保存到Supabase');
+      return true;
+    } catch (e) {
+      debugPrint('保存FCM Token發生異常: $e');
+      return false;
     }
   }
 
@@ -169,75 +197,6 @@ class NotificationService {
         payload: message.data.toString(),
       );
     }
-  }
-
-  // 公開方法，可在用戶登入後調用
-  Future<bool> saveTokenToSupabase() async {
-    final token = await _firebaseMessaging.getToken();
-    if (token == null) {
-      debugPrint('無法獲取FCM Token');
-      return false;
-    }
-
-    debugPrint('FCM Token: $token');
-
-    // 獲取當前用戶
-    final currentUser = _supabaseService.auth.currentUser;
-    if (currentUser == null) {
-      debugPrint('用戶未登入，無法保存FCM Token');
-      return false;
-    }
-
-    // 保存token到Supabase
-    try {
-      final result = await _supabaseService.client
-          .from('user_device_tokens')
-          .upsert({
-            'user_id': currentUser.id,
-            'token': token,
-            'updated_at': DateTime.now().toIso8601String(),
-          });
-
-      debugPrint('FCM Token保存結果: ${result.error == null ? "成功" : "失敗"}');
-      if (result.error != null) {
-        debugPrint('保存FCM Token錯誤: ${result.error!.message}');
-        return false;
-      }
-
-      debugPrint('FCM Token已成功保存到Supabase');
-      return true;
-    } catch (e) {
-      debugPrint('保存FCM Token發生異常: $e');
-      return false;
-    }
-  }
-
-  Future<void> debugTokenStatus() async {
-    final token = await _firebaseMessaging.getToken();
-    final currentUser = _supabaseService.auth.currentUser;
-
-    print('====== FCM TOKEN DEBUG ======');
-    print('FCM Token: ${token ?? "NULL"}');
-    print('當前用戶: ${currentUser?.id ?? "未登入"}');
-
-    if (token != null && currentUser != null) {
-      print('正在檢查數據庫中是否存在此token...');
-      try {
-        final result = await _supabaseService.client
-            .from('user_device_tokens')
-            .select()
-            .eq('user_id', currentUser.id)
-            .eq('token', token);
-
-        print('查詢結果: ${result.length ?? 0}條記錄');
-        if (result.isNotEmpty) {
-          print('記錄詳情: $result');
-        }
-      } catch (e) {
-        print('查詢錯誤: $e');
-      }
-    }
-    print('===========================');
   }
 }
 

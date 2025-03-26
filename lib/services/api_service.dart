@@ -54,9 +54,9 @@ class ApiService {
       debugPrint('Supabase認證錯誤: ${e.message}');
       // 檢查錯誤信息中是否包含網絡相關的錯誤
       final bool isNetworkRelated =
-          e.message?.contains('SocketException') == true ||
-          e.message?.contains('Connection') == true ||
-          e.message?.contains('timed out') == true;
+          e.message.contains('SocketException') == true ||
+          e.message.contains('Connection') == true ||
+          e.message.contains('timed out') == true;
       throw ApiError(
         message: isNetworkRelated ? '網絡連接錯誤，請檢查您的網絡設置' : '認證錯誤: ${e.message}',
         isServerError: !isNetworkRelated,

@@ -3,13 +3,18 @@ from typing import List, Dict, Any, Optional
 from supabase import Client, create_client
 
 from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
-from utils.firebase import send_notification_to_device, send_notification_to_devices
+from utils.firebase import send_notification_to_device, send_notification_to_devices, initialize_firebase
 
 class NotificationService:
     def __init__(self, use_service_role=False):
         # 使用服務角色金鑰以獲得更高權限
         key = SUPABASE_SERVICE_KEY if use_service_role else SUPABASE_KEY
         self.supabase = create_client(SUPABASE_URL, key)
+        
+        # 確保 Firebase 已初始化
+        import firebase_admin
+        if not firebase_admin._apps:
+            initialize_firebase()
     
     async def send_notification(self, user_id: str, title: str, body: str, data: Optional[Dict[str, Any]] = None) -> Dict:
         """

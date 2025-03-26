@@ -43,7 +43,7 @@ class InfoTipBox extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // 信息圖標，使用圖片並添加陰影
-            Container(
+            SizedBox(
               width: 22.w, // 給定更大的容器尺寸來容納陰影
               height: 22.h,
               child: Stack(

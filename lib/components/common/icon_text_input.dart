@@ -64,7 +64,7 @@ class IconTextInput extends StatelessWidget {
           ),
           SizedBox(width: 5.w), // 增加圖標與文字的間距
           // 帶陰影的圖標
-          Container(
+          SizedBox(
             width: 32.w, // 給定更大的容器尺寸來容納陰影
             height: 32.h,
             child: Stack(

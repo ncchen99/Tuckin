@@ -3,8 +3,8 @@ import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
-import 'package:tuckin/utils/route_transitions.dart'; // 導入轉場動畫
-import 'personality_test_page.dart'; // 下一個頁面
+// 導入轉場動畫
+// 下一個頁面
 
 class FoodPreferencePage extends StatefulWidget {
   const FoodPreferencePage({super.key});

@@ -49,18 +49,23 @@ async def send_notification_to_devices(
     if not tokens:
         return {"success": 0, "failure": 0}
     
-    try:
-        multicast_message = messaging.MulticastMessage(
-            notification=messaging.Notification(
-                title=title,
-                body=body
-            ),
-            data=data,
-            tokens=tokens
-        )
-        
-        response = messaging.send_multicast(multicast_message)
-        return {"success": response.success_count, "failure": response.failure_count}
-    except Exception as e:
-        print(f"發送批量通知失敗: {e}")
-        return {"success": 0, "failure": len(tokens)} 
+    success_count = 0
+    failure_count = 0
+    
+    # 改為逐個發送
+    for token in tokens:
+        try:
+            # 確保每次調用前都檢查初始化狀態
+            if not firebase_admin._apps:
+                initialize_firebase()
+                
+            result = await send_notification_to_device(token, title, body, data)
+            if result:
+                success_count += 1
+            else:
+                failure_count += 1
+        except Exception as e:
+            print(f"單一設備通知發送失敗 (token: {token[:20]}...): {e}")
+            failure_count += 1
+    
+    return {"success": success_count, "failure": failure_count}

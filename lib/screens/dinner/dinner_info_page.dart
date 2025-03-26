@@ -26,18 +26,16 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   Future<void> _checkUserStatus() async {
     try {
       final currentUser = _authService.getCurrentUser();
-      if (currentUser != null) {
-        // final userStatus = await _databaseService.getUserStatus(currentUser.id);
-        // setState(() {
-        //   _isLoading = false;
-        // });
+      // final userStatus = await _databaseService.getUserStatus(currentUser.id);
+      // setState(() {
+      //   _isLoading = false;
+      // });
 
-        // if (userStatus != 'waiting_dinner') {
-        //   if (mounted) {
-        //     _navigationService.navigateToUserStatusPage(context);
-        //   }
-        // }
-      }
+      // if (userStatus != 'waiting_dinner') {
+      //   if (mounted) {
+      //     _navigationService.navigateToUserStatusPage(context);
+      //   }
+      // }
     } catch (e) {
       debugPrint('檢查用戶狀態時出錯: $e');
       setState(() {
@@ -50,14 +48,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   Future<void> _handleFinishDinner() async {
     try {
       final currentUser = _authService.getCurrentUser();
-      if (currentUser != null) {
-        // // 更新用戶狀態
-        // await _databaseService.updateUserStatus(currentUser.id, 'rating');
+      // // 更新用戶狀態
+      // await _databaseService.updateUserStatus(currentUser.id, 'rating');
 
-        // if (mounted) {
-        //   _navigationService.navigateToDinnerRating(context);
-        // }
-      }
+      // if (mounted) {
+      //   _navigationService.navigateToDinnerRating(context);
+      // }
     } catch (e) {
       debugPrint('完成晚餐時出錯: $e');
     }

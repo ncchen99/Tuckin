@@ -139,8 +139,8 @@ class _HomePageState extends State<HomePage> {
                                 final currentUser =
                                     await _authService.getCurrentUser();
                                 if (currentUser != null) {
-                                  final _databaseService = DatabaseService();
-                                  await _databaseService.updateUserStatus(
+                                  final databaseService = DatabaseService();
+                                  await databaseService.updateUserStatus(
                                     currentUser.id,
                                     'booking',
                                   );

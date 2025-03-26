@@ -174,7 +174,7 @@ class DatabaseService {
 
         // 從關聯表中提取食物偏好ID列表
         List<int> foodIds = [];
-        if (foodPreferences != null && foodPreferences.isNotEmpty) {
+        if (foodPreferences.isNotEmpty) {
           foodIds =
               foodPreferences
                   .map<int>((item) => item['preference_id'] as int)
@@ -226,7 +226,7 @@ class DatabaseService {
             .select()
             .eq('user_id', userId);
 
-        if (foodPreferences == null || foodPreferences.isEmpty) {
+        if (foodPreferences.isEmpty) {
           return false;
         }
 

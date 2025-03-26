@@ -28,16 +28,14 @@ class AuthService {
 
       // 檢查當前用戶是否有效
       final currentUser = getCurrentUser();
-      if (currentUser != null) {
-        try {
-          // 驗證令牌是否有效
-          await _supabaseService.auth.refreshSession();
-          debugPrint('AuthService: 用戶令牌有效');
-        } catch (e) {
-          // 令牌無效或過期，執行登出操作
-          debugPrint('AuthService: 用戶令牌無效，執行登出 - $e');
-          await signOut();
-        }
+      try {
+        // 驗證令牌是否有效
+        await _supabaseService.auth.refreshSession();
+        debugPrint('AuthService: 用戶令牌有效');
+      } catch (e) {
+        // 令牌無效或過期，執行登出操作
+        debugPrint('AuthService: 用戶令牌無效，執行登出 - $e');
+        await signOut();
       }
     } catch (e) {
       debugPrint('AuthService 初始化錯誤: $e');
@@ -107,7 +105,6 @@ class AuthService {
       // 登入成功後，保存FCM token
       final notificationService = NotificationService();
       await notificationService.saveTokenToSupabase();
-      notificationService.debugTokenStatus();
 
       return response;
     } catch (error) {

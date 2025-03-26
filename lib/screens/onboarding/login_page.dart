@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tuckin/services/auth_service.dart';
 import '../../components/components.dart';
 import '../../../utils/index.dart'; // 導入自適應佈局工具和NavigationService
-import 'profile_setup_page.dart'; // 導入基本資料填寫頁面
+// 導入基本資料填寫頁面
 import '../../../services/database_service.dart';
 
 class LoginPage extends StatefulWidget {

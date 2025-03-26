@@ -12,6 +12,7 @@ import 'package:tuckin/services/api_service.dart'; // 添加導入 API 服務
 import 'package:flutter_native_splash/flutter_native_splash.dart'; // 導入原生啟動畫面
 // 添加導入通知服務
 import 'package:tuckin/services/notification_service.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -40,7 +41,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 String initialRoute = '/';
 
 void main() async {
-  // 保留原生啟動畫面直到 Flutter 完全初始化
+  // 保留原生啟動畫面
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
@@ -98,6 +99,15 @@ void main() async {
     } catch (signOutError) {
       debugPrint('強制登出錯誤: $signOutError');
     }
+  }
+
+  // 初始化 Firebase
+  try {
+    await Firebase.initializeApp();
+    debugPrint('Firebase 初始化成功');
+  } catch (e) {
+    debugPrint('Firebase 初始化錯誤: $e');
+    // 繼續執行，因為部分功能可能仍然可用
   }
 
   // 只有在前面步驟成功的情況下才嘗試確定初始路由
@@ -289,8 +299,8 @@ class _MyAppState extends State<MyApp> {
             child: Stack(
               children: [
                 SplashScreen(
-                  child: child ?? const SizedBox(),
                   statusCheckDelay: 300,
+                  child: child ?? const SizedBox(),
                 ),
                 // 利用 Overlay 來顯示錯誤畫面，確保完全覆蓋
                 if (_isOffline ||
