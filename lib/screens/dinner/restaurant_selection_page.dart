@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/restaurant_service.dart';
 import 'package:tuckin/utils/index.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 class RestaurantSelectionPage extends StatefulWidget {
   const RestaurantSelectionPage({super.key});
@@ -16,45 +20,595 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   final NavigationService _navigationService = NavigationService();
+  final RestaurantService _restaurantService = RestaurantService();
+
   bool _isLoading = true;
+  bool _isSubmitting = false;
+  int? _selectedRestaurantId;
+  final TextEditingController _mapLinkController = TextEditingController();
+  final FocusNode _mapLinkFocusNode = FocusNode();
+  bool _isSubmittingLink = false;
+  bool _isValidLink = false;
+
+  // 範例餐廳資料
+  List<Map<String, dynamic>> _restaurantList = [];
+
+  // 用戶自定義的推薦餐廳
+  Map<String, dynamic>? _userRecommendedRestaurant;
 
   @override
   void initState() {
     super.initState();
-    // TODO: 載入餐廳推薦資料
-    _loadRestaurantData();
+    _loadData();
   }
 
-  Future<void> _loadRestaurantData() async {
+  @override
+  void dispose() {
+    _mapLinkFocusNode.dispose();
+    _mapLinkController.dispose();
+    super.dispose();
+  }
+
+  // 載入資料
+  Future<void> _loadData() async {
     setState(() {
-      _isLoading = false;
+      _isLoading = true;
+    });
+
+    try {
+      // 從服務中獲取推薦餐廳列表
+      final restaurants = await _restaurantService.getRecommendedRestaurants();
+
+      setState(() {
+        _restaurantList = restaurants;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('載入餐廳資料出錯: $e');
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('載入餐廳資料失敗: $e')));
+      }
+    }
+  }
+
+  // 處理餐廳卡片點擊
+  void _handleRestaurantTap(int restaurantId) {
+    // 檢查是否點擊的是用戶推薦的餐廳
+    if (_userRecommendedRestaurant != null && 
+        _userRecommendedRestaurant!['id'] == restaurantId) {
+      // 如果是用戶推薦的餐廳，則打開編輯對話框
+      _handleEditRecommendation();
+      return;
+    }
+    
+    setState(() {
+      if (_selectedRestaurantId == restaurantId) {
+        _selectedRestaurantId = null; // 取消選擇
+      } else {
+        _selectedRestaurantId = restaurantId; // 選擇餐廳
+      }
     });
   }
 
-  // 使用導航服務處理返回
-  void _handleBack() {
-    Navigator.of(context).pop();
+  // 處理編輯用戶的推薦餐廳
+  void _handleEditRecommendation() {
+    if (_userRecommendedRestaurant == null) return;
+    
+    // 預填現有的地圖連結
+    _mapLinkController.text = _userRecommendedRestaurant!['mapUrl'] ?? '';
+    _isValidLink = _isGoogleMapLink(_mapLinkController.text);
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: EdgeInsets.symmetric(horizontal: 20.w),
+              child: Container(
+                width: 320.w,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(15.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: Offset(0, 5.h),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 20.h),
+                    // 標題
+                    Text(
+                      '編輯餐廳推薦',
+                      style: TextStyle(
+                        fontSize: 24.sp,
+                        fontFamily: 'OtsutomeFont',
+                        color: const Color(0xFF23456B),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 20.h),
+
+                    // 改進的地圖連結輸入框
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 15.w),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(
+                            color: const Color(0xFF23456B),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // 具有陰影效果的圖標
+                            SizedBox(
+                              width: 32.w,
+                              height: 32.h,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                alignment: Alignment.center,
+                                children: [
+                                  // 底部陰影圖片
+                                  Positioned(
+                                    left: 0,
+                                    top: 4.h,
+                                    child: Image.asset(
+                                      'assets/images/icon/link.png',
+                                      width: 24.w,
+                                      height: 24.h,
+                                      color: Colors.black.withOpacity(0.4),
+                                      colorBlendMode: BlendMode.srcIn,
+                                    ),
+                                  ),
+                                  // 主圖標
+                                  Positioned(
+                                    left: 0,
+                                    top: 0,
+                                    child: Image.asset(
+                                      'assets/images/icon/link.png',
+                                      width: 24.w,
+                                      height: 24.h,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: 10.w),
+                            // 輸入框
+                            Expanded(
+                              child: TextField(
+                                controller: _mapLinkController,
+                                focusNode: _mapLinkFocusNode,
+                                style: TextStyle(
+                                  fontFamily: 'OtsutomeFont',
+                                  fontSize: 16.sp,
+                                  color: const Color(0xFF23456B),
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: '輸入Google地圖連結',
+                                  hintStyle: TextStyle(
+                                    fontSize: 16.sp,
+                                    color: Colors.grey,
+                                    fontFamily: 'OtsutomeFont',
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: 15.h,
+                                  ),
+                                ),
+                                keyboardType: TextInputType.url,
+                                textInputAction: TextInputAction.done,
+                                onChanged: (value) {
+                                  final bool isValid = _isGoogleMapLink(value);
+                                  if (isValid != _isValidLink) {
+                                    setModalState(() {
+                                      _isValidLink = isValid;
+                                    });
+
+                                    // 如果輸入有效，自動處理連結
+                                    if (isValid && !_isSubmittingLink) {
+                                      _mapLinkFocusNode.unfocus();
+                                      setModalState(() {
+                                        _isSubmittingLink = true;
+                                      });
+
+                                      _processMapLink(value)
+                                          .then((_) {
+                                            Navigator.pop(context);
+                                          })
+                                          .catchError((e) {
+                                            setModalState(() {
+                                              _isSubmittingLink = false;
+                                            });
+                                          });
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // 提示文字
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20.w,
+                        vertical: 10.h,
+                      ),
+                      child: Text(
+                        '請輸入新的Google地圖連結',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: 20.h),
+
+                    // 加載進度指示器或按鈕
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10.h),
+                      child:
+                          _isSubmittingLink
+                              ? const LoadingImage(
+                                width: 60,
+                                height: 60,
+                                color: Color(0xFF23456B),
+                              )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    // 取消按鈕
+                                    ImageButton(
+                                      text: '取消',
+                                      imagePath: 'assets/images/ui/button/blue_s.png',
+                                      width: 100.w,
+                                      height: 50.h,
+                                      onPressed: () {
+                                        _mapLinkFocusNode.unfocus();
+                                        Navigator.pop(context);
+                                      },
+                                    ),
+                                    SizedBox(width: 20.w),
+                                    // 如果連結有效，顯示確認按鈕
+                                    if (_isValidLink)
+                                      ImageButton(
+                                        text: '確認',
+                                        imagePath: 'assets/images/ui/button/red_s.png',
+                                        width: 100.w,
+                                        height: 50.h,
+                                        onPressed: () {
+                                          _mapLinkFocusNode.unfocus();
+                                          setModalState(() {
+                                            _isSubmittingLink = true;
+                                          });
+                                          _processMapLink(_mapLinkController.text)
+                                              .then((_) {
+                                                Navigator.pop(context);
+                                              })
+                                              .catchError((e) {
+                                                setModalState(() {
+                                                  _isSubmittingLink = false;
+                                                });
+                                              });
+                                        },
+                                      ),
+                                  ],
+                                ),
+                    ),
+
+                    SizedBox(height: 20.h),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
-  // 使用導航服務處理選擇餐廳後的導航
-  Future<void> _handleSelectRestaurant() async {
-    try {
-      final currentUser = await _authService.getCurrentUser();
-      if (currentUser != null) {
-        // 更新用戶狀態
-        await _databaseService.updateUserStatus(
-          currentUser.id,
-          'waiting_dinner',
-        );
+  // 檢查是否為有效的Google地圖連結
+  bool _isGoogleMapLink(String link) {
+    if (link.isEmpty) return false;
 
-        if (mounted) {
-          // 使用導航服務導航到晚餐信息頁面
-          _navigationService.navigateToUserStatusPage(context);
-        }
+    // 檢查是否為Google Map連結（短網址或完整網址）
+    final bool isGoogleMapsLink =
+        link.contains('maps.google.com') ||
+        link.contains('goo.gl/maps') ||
+        link.contains('maps.app.goo.gl');
+
+    return isGoogleMapsLink;
+  }
+
+  // 處理推薦餐廳按鈕點擊
+  void _handleRecommendRestaurant() {
+    _mapLinkController.clear();
+    _isValidLink = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: EdgeInsets.symmetric(horizontal: 20.w),
+              child: Container(
+                width: 320.w,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(15.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: Offset(0, 5.h),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 20.h),
+                    // 標題
+                    Text(
+                      '推薦餐廳',
+                      style: TextStyle(
+                        fontSize: 24.sp,
+                        fontFamily: 'OtsutomeFont',
+                        color: const Color(0xFF23456B),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 20.h),
+
+                    // 改進的地圖連結輸入框
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 15.w),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(
+                            color: const Color(0xFF23456B),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // 具有陰影效果的圖標
+                            SizedBox(
+                              width: 32.w,
+                              height: 32.h,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                alignment: Alignment.center,
+                                children: [
+                                  // 底部陰影圖片
+                                  Positioned(
+                                    left: 0,
+                                    top: 4.h,
+                                    child: Image.asset(
+                                      'assets/images/icon/link.png',
+                                      width: 24.w,
+                                      height: 24.h,
+                                      color: Colors.black.withOpacity(0.4),
+                                      colorBlendMode: BlendMode.srcIn,
+                                    ),
+                                  ),
+                                  // 主圖標
+                                  Positioned(
+                                    left: 0,
+                                    top: 0,
+                                    child: Image.asset(
+                                      'assets/images/icon/link.png',
+                                      width: 24.w,
+                                      height: 24.h,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: 10.w),
+                            // 輸入框
+                            Expanded(
+                              child: TextField(
+                                controller: _mapLinkController,
+                                focusNode: _mapLinkFocusNode,
+                                style: TextStyle(
+                                  fontFamily: 'OtsutomeFont',
+                                  fontSize: 16.sp,
+                                  color: const Color(0xFF23456B),
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: '輸入Google地圖連結',
+                                  hintStyle: TextStyle(
+                                    fontSize: 16.sp,
+                                    color: Colors.grey,
+                                    fontFamily: 'OtsutomeFont',
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: 15.h,
+                                  ),
+                                ),
+                                keyboardType: TextInputType.url,
+                                textInputAction: TextInputAction.done,
+                                onChanged: (value) {
+                                  final bool isValid = _isGoogleMapLink(value);
+                                  if (isValid != _isValidLink) {
+                                    setModalState(() {
+                                      _isValidLink = isValid;
+                                    });
+
+                                    // 如果輸入有效，自動處理連結
+                                    if (isValid && !_isSubmittingLink) {
+                                      _mapLinkFocusNode.unfocus();
+                                      setModalState(() {
+                                        _isSubmittingLink = true;
+                                      });
+
+                                      _processMapLink(value)
+                                          .then((_) {
+                                            Navigator.pop(context);
+                                          })
+                                          .catchError((e) {
+                                            setModalState(() {
+                                              _isSubmittingLink = false;
+                                            });
+                                          });
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // 提示文字
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20.w,
+                        vertical: 10.h,
+                      ),
+                      child: Text(
+                        '請輸入Google地圖上餐廳的分享連結',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: 10.h),
+
+                    // 加載進度指示器或取消按鈕
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10.h),
+                      child:
+                          _isSubmittingLink
+                              ? const LoadingImage(
+                                width: 60,
+                                height: 60,
+                                color: Color(0xFF23456B),
+                              )
+                              : ImageButton(
+                                text: '取消',
+                                imagePath: 'assets/images/ui/button/blue_m.png',
+                                width: 120.w,
+                                height: 60.h,
+                                onPressed: () {
+                                  _mapLinkFocusNode.unfocus();
+                                  Navigator.pop(context);
+                                },
+                              ),
+                    ),
+
+                    SizedBox(height: 10.h),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 處理Google地圖連結
+  Future<void> _processMapLink(String mapLink) async {
+    try {
+      // 使用餐廳服務處理地圖連結
+      final restaurantData = await _restaurantService.processMapLink(mapLink);
+
+      // 更新推薦餐廳並選中
+      setState(() {
+        _userRecommendedRestaurant = restaurantData;
+        _selectedRestaurantId = restaurantData['id'];
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已成功添加您推薦的餐廳')));
+    } catch (e) {
+      debugPrint('處理地圖連結出錯: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('無法處理地圖連結: $e')));
+      }
+      rethrow; // 重新拋出異常讓調用者處理
+    }
+  }
+
+  // 處理提交按鈕
+  Future<void> _handleSubmit() async {
+    if (_selectedRestaurantId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('請選擇一家餐廳')));
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      // 使用餐廳服務提交選擇的餐廳
+      final success = await _restaurantService.submitSelectedRestaurant(
+        _selectedRestaurantId!,
+      );
+
+      if (success && mounted) {
+        // 導航到晚餐資訊頁面
+        _navigationService.navigateToDinnerInfo(context);
       }
     } catch (e) {
-      debugPrint('選擇餐廳時出錯: $e');
+      debugPrint('提交餐廳選擇出錯: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('提交失敗: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
+  }
+
+  // 在用戶設置圖標點擊處理函數中使用導航服務
+  void _handleProfileTap() {
+    _navigationService.navigateToUserSettings(context);
   }
 
   @override
@@ -81,39 +635,110 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                     )
                     : Column(
                       children: [
-                        // 頁面標題
-                        Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20.h),
-                          child: Row(
-                            children: [
-                              BackIconButton(onPressed: _handleBack),
-                              Expanded(
-                                child: Center(
+                        // 頂部導航欄
+                        HeaderBar(
+                          title: '餐廳選擇',
+                          onProfileTap: _handleProfileTap,
+                        ),
+
+                        Expanded(
+                          child: SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(height: 20.h),
+
+                                // 提示文字
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 20.w,
+                                  ),
                                   child: Text(
-                                    '餐廳選擇',
+                                    '請選擇一家餐廳：',
                                     style: TextStyle(
-                                      fontSize: 24.sp,
+                                      fontSize: 20.sp,
                                       fontFamily: 'OtsutomeFont',
                                       color: const Color(0xFF23456B),
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
-                              ),
-                              SizedBox(width: 55.w), // 平衡左側的返回按鈕
-                            ],
-                          ),
-                        ),
 
-                        Expanded(
-                          child: Center(
-                            child: Text(
-                              '餐廳選擇頁面開發中...',
-                              style: TextStyle(
-                                fontSize: 20.sp,
-                                fontFamily: 'OtsutomeFont',
-                                color: const Color(0xFF23456B),
-                              ),
+                                SizedBox(height: 15.h),
+
+                                // 餐廳列表
+                                ..._restaurantList.map(
+                                  (restaurant) => RestaurantCard(
+                                    name: restaurant['name'],
+                                    imageUrl: restaurant['imageUrl'],
+                                    category: restaurant['category'],
+                                    address: restaurant['address'],
+                                    isSelected:
+                                        _selectedRestaurantId ==
+                                        restaurant['id'],
+                                    onTap:
+                                        () => _handleRestaurantTap(
+                                          restaurant['id'],
+                                        ),
+                                    mapUrl: restaurant['mapUrl'],
+                                  ),
+                                ),
+
+                                if (_userRecommendedRestaurant == null)
+                                  SizedBox(height: 10.h),
+
+                                // 用戶推薦的餐廳（如果有）
+                                if (_userRecommendedRestaurant != null)
+                                  RestaurantCard(
+                                    name: _userRecommendedRestaurant!['name'],
+                                    imageUrl:
+                                        _userRecommendedRestaurant!['imageUrl'],
+                                    category:
+                                        _userRecommendedRestaurant!['category'],
+                                    address:
+                                        _userRecommendedRestaurant!['address'],
+                                    isSelected:
+                                        _selectedRestaurantId ==
+                                        _userRecommendedRestaurant!['id'],
+                                    onTap:
+                                        () => _handleRestaurantTap(
+                                          _userRecommendedRestaurant!['id'],
+                                        ),
+                                    mapUrl:
+                                        _userRecommendedRestaurant!['mapUrl'],
+                                  )
+                                else
+                                  // 推薦餐廳卡片
+                                  RecommendRestaurantCard(
+                                    onTap: _handleRecommendRestaurant,
+                                  ),
+
+                                SizedBox(height: 60.h),
+
+                                // 提交按鈕
+                                Center(
+                                  child:
+                                      _isSubmitting
+                                          ? LoadingImage(
+                                            width: 60.w,
+                                            height: 60.h,
+                                            color: const Color(0xFF23456B),
+                                          )
+                                          : ImageButton(
+                                            text: '送出選擇',
+                                            imagePath:
+                                                'assets/images/ui/button/red_l.png',
+                                            width: 180.w,
+                                            height: 75.h,
+                                            onPressed: _handleSubmit,
+                                            isEnabled:
+                                                _selectedRestaurantId != null,
+                                          ),
+                                ),
+
+                                SizedBox(height: 30.h),
+                              ],
                             ),
                           ),
                         ),

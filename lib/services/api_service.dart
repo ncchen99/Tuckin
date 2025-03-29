@@ -28,6 +28,15 @@ class ApiService {
   // 默認超時時間為10秒
   static const Duration defaultTimeout = Duration(seconds: 10);
 
+  // 後端API基礎URL
+  final String baseUrl = 'https://tuckin-backend.example.com';
+
+  // 通用請求頭
+  Map<String, String> get headers => {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
   /// 包裝 API 請求並處理錯誤
   Future<T> handleRequest<T>({
     required Future<T> Function() request,
