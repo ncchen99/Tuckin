@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/restaurant_service.dart';
 import 'package:tuckin/utils/index.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
 class RestaurantSelectionPage extends StatefulWidget {
   const RestaurantSelectionPage({super.key});
@@ -17,8 +12,6 @@ class RestaurantSelectionPage extends StatefulWidget {
 }
 
 class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
-  final AuthService _authService = AuthService();
-  final DatabaseService _databaseService = DatabaseService();
   final NavigationService _navigationService = NavigationService();
   final RestaurantService _restaurantService = RestaurantService();
 

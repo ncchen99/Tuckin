@@ -108,6 +108,7 @@ flutter:
     - assets/images/background/
     - assets/images/icon/
     - assets/images/avatar/no_bg/
+    - assets/images/avatar/profile/
     - assets/images/dish/
     - assets/images/illustrate/
     - assets/fonts/

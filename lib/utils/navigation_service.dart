@@ -121,7 +121,8 @@ class NavigationService {
         return '/attendance_confirmation';
       case 'waiting_restaurant':
         return '/restaurant_selection';
-      case 'waiting_dinner':
+      case 'waiting_other_users':
+      case 'waiting_attendance':
         return '/dinner_info';
       case 'rating':
         return '/dinner_rating';

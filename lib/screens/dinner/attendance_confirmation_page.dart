@@ -133,7 +133,8 @@ class _AttendanceConfirmationPageState
       _navigationService.navigateToUserStatusPage(context);
     } else if (status == 'waiting_restaurant') {
       _navigationService.navigateToRestaurantSelection(context);
-    } else if (status == 'waiting_dinner') {
+    } else if (status == 'waiting_other_users' ||
+        status == 'waiting_attendance') {
       _navigationService.navigateToDinnerInfo(context);
     } else if (status == 'rating') {
       _navigationService.navigateToDinnerRating(context);
@@ -159,9 +160,6 @@ class _AttendanceConfirmationPageState
 
       // 添加足夠長的延遲以便觀察到loading效果
       await Future.delayed(const Duration(milliseconds: 500));
-
-      // 在這裡處理實際的確認邏輯
-      // ...
 
       // 確保頁面仍然掛載
       if (mounted) {
