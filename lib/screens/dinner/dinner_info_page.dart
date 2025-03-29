@@ -55,9 +55,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         final status = await _databaseService.getUserStatus(currentUser.id);
 
         // 檢查用戶狀態是否是有效的狀態
-        if (status != 'waiting_dinner' &&
-            status != 'waiting_other_users' &&
-            status != 'waiting_attendance') {
+        if (status != 'waiting_other_users' && status != 'waiting_attendance') {
           debugPrint('用戶狀態不是晚餐信息相關狀態: $status，導向到適當頁面');
           if (mounted) {
             _navigationService.navigateToUserStatusPage(context);
@@ -326,7 +324,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                     left: 0,
                     top: adaptiveShadowOffset,
                     child: Image.asset(
-                      'assets/images/icon/restaurant.png',
+                      'assets/images/icon/notification.png',
                       width: 150.w,
                       height: 150.h,
                       color: Colors.black.withOpacity(0.4),
@@ -335,7 +333,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                   ),
                   // 主圖像
                   Image.asset(
-                    'assets/images/icon/restaurant.png',
+                    'assets/images/icon/notification.png',
                     width: 150.w,
                     height: 150.h,
                   ),
