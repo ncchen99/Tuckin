@@ -150,26 +150,83 @@ class _AttendanceConfirmationPageState
     }
 
     try {
+      // 先更新狀態以顯示loading
       setState(() {
-        _isConfirming = true; // 開始確認操作，顯示loading
+        _isConfirming = true;
       });
 
-      // 操作完成後跳轉到餐廳選擇頁面
+      debugPrint('開始確認出席操作，顯示loading');
+
+      // 添加足夠長的延遲以便觀察到loading效果
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // 在這裡處理實際的確認邏輯
+      // ...
+
+      // 確保頁面仍然掛載
       if (mounted) {
         debugPrint('用戶已確認出席，導向到餐廳選擇頁面');
+        // 導航前再延遲一下，確保loading效果可見
+        await Future.delayed(const Duration(milliseconds: 200));
         _navigationService.navigateToRestaurantSelection(context);
       }
     } catch (e) {
       debugPrint('確認出席時出錯: $e');
-      setState(() {
-        _isConfirming = false; // 出錯時恢復按鈕狀態
-      });
-      // 顯示錯誤訊息
+      // 確保頁面仍然掛載
       if (mounted) {
+        setState(() {
+          _isConfirming = false; // 出錯時恢復按鈕狀態
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               '確認失敗: $e',
+              style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleCancelAttendance() async {
+    // 防誤觸邏輯：確保頁面已完全載入
+    if (!_isPageMounted || _isLoading) {
+      debugPrint('防止誤觸：頁面未完全掛載或載入中，取消操作被忽略');
+      return;
+    }
+
+    try {
+      // 先更新狀態以顯示loading
+      setState(() {
+        _isConfirming = true;
+      });
+
+      debugPrint('開始取消出席操作，顯示loading');
+
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser != null) {
+        await _databaseService.updateUserStatus(currentUser.id, 'booking');
+      }
+
+      // 確保頁面仍然掛載
+      if (mounted) {
+        debugPrint('用戶已取消出席，導向到首頁');
+        // 導航前再延遲一下，確保loading效果可見
+        await Future.delayed(const Duration(milliseconds: 200));
+        _navigationService.navigateToHome(context);
+      }
+    } catch (e) {
+      debugPrint('取消出席時出錯: $e');
+      // 確保頁面仍然掛載
+      if (mounted) {
+        setState(() {
+          _isConfirming = false; // 出錯時恢復按鈕狀態
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '取消失敗: $e',
               style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
             ),
           ),
@@ -239,7 +296,7 @@ class _AttendanceConfirmationPageState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: 80.h),
+                        SizedBox(height: 60.h),
 
                         // 提示文字
                         Center(
@@ -334,40 +391,75 @@ class _AttendanceConfirmationPageState
                         ),
 
                         // 將剩餘空間推到底部
-                        SizedBox(height: 100.h),
+                        SizedBox(height: 70.h),
 
-                        // 確認按鈕或加載動畫
+                        // 確認出席和無法出席按鈕
                         Center(
                           child:
                               _isConfirming
-                                  ? LoadingImage(
-                                    width: 60.w,
-                                    height: 60.h,
-                                    color: const Color(0xFF23456B),
-                                  )
-                                  : ImageButtonWithCountdown(
-                                    text: '確認出席',
-                                    countdownText: _formatRemainingHours(),
-                                    imagePath:
-                                        'assets/images/ui/button/blue_l.png',
+                                  ? Container(
                                     width: 180.w,
                                     height: 85.h,
-                                    countdownTextStyle: TextStyle(
-                                      fontSize: 14.sp,
-                                      color: const Color(0xFFFFD9B3),
-                                      fontFamily: 'OtsutomeFont',
-                                      fontWeight: FontWeight.bold,
+                                    alignment: Alignment.center,
+                                    child: LoadingImage(
+                                      width: 60.w,
+                                      height: 60.h,
                                     ),
-                                    onPressed: () {
-                                      // 防止頁面載入期間被點擊
-                                      if (_isPageMounted && !_isLoading) {
-                                        _handleConfirmAttendance();
-                                      } else {
-                                        debugPrint('頁面未完全掛載或載入中，忽略點擊事件');
-                                      }
-                                    },
+                                  )
+                                  : Column(
+                                    children: [
+                                      // 確認出席按鈕
+                                      ImageButtonWithCountdown(
+                                        text: '確認出席',
+                                        countdownText: _formatRemainingHours(),
+                                        imagePath:
+                                            'assets/images/ui/button/red_l.png',
+                                        width: 180.w,
+                                        height: 85.h,
+                                        countdownTextStyle: TextStyle(
+                                          fontSize: 14.sp,
+                                          color: const Color(0xFFFFD9B3),
+                                          fontFamily: 'OtsutomeFont',
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        onPressed: () {
+                                          // 防止頁面載入期間被點擊
+                                          if (_isPageMounted && !_isLoading) {
+                                            _handleConfirmAttendance();
+                                          } else {
+                                            debugPrint('頁面未完全掛載或載入中，忽略點擊事件');
+                                          }
+                                        },
+                                      ),
+
+                                      SizedBox(height: 15.h),
+
+                                      // 無法出席按鈕
+                                      ImageButton(
+                                        text: '無法出席',
+                                        imagePath:
+                                            'assets/images/ui/button/blue_m.png',
+                                        width: 180.w,
+                                        height: 70.h,
+                                        textStyle: TextStyle(
+                                          fontSize: 18.sp,
+                                          color: const Color(0xFFD1D1D1),
+                                          fontFamily: 'OtsutomeFont',
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        onPressed: () {
+                                          // 防止頁面載入期間被點擊
+                                          if (_isPageMounted && !_isLoading) {
+                                            _handleCancelAttendance();
+                                          } else {
+                                            debugPrint('頁面未完全掛載或載入中，忽略點擊事件');
+                                          }
+                                        },
+                                      ),
+                                    ],
                                   ),
                         ),
+
                         const Spacer(),
 
                         SizedBox(height: 30.h),

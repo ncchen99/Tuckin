@@ -32,7 +32,7 @@ class ImageButtonWithCountdown extends StatefulWidget {
     ),
     this.countdownTextStyle = const TextStyle(
       fontSize: 15,
-      color: Color(0xFFFFD9B3), // 輕微橙色
+      color: Color(0xFFD1D1D1),
       fontFamily: 'OtsutomeFont',
       fontWeight: FontWeight.bold,
     ),
@@ -161,7 +161,7 @@ class ImageButtonWithCountdownState extends State<ImageButtonWithCountdown> {
                                 ? widget.textStyle.fontSize ?? 18
                                 : widget.textStyle.fontSize ?? 20,
                       ),
-                      strokeColor: const Color(0xFF23456B),
+                      strokeColor: const Color.fromARGB(255, 154, 67, 24),
                       strokeWidth: (isSmallButton ? 3.r : 4.r),
                       textAlign: TextAlign.center,
                     ),
@@ -211,7 +211,7 @@ class ImageButtonWithCountdownState extends State<ImageButtonWithCountdown> {
                                 ? widget.countdownTextStyle.fontSize ?? 14
                                 : widget.countdownTextStyle.fontSize ?? 15,
                       ),
-                      strokeColor: const Color(0xFF23456B),
+                      strokeColor: const Color.fromARGB(255, 154, 67, 24),
                       strokeWidth: (isSmallButton ? 2.r : 3.r),
                       textAlign: TextAlign.center,
                     ),
@@ -295,7 +295,7 @@ class ImageButtonWithCountdownState extends State<ImageButtonWithCountdown> {
                     ),
                     strokeColor:
                         isRedButton
-                            ? const Color(0xFF23456B)
+                            ? const Color.fromARGB(255, 86, 0, 0)
                             : const Color.fromARGB(255, 77, 74, 71),
                     strokeWidth: (isSmallButton ? 3.r : 4.r),
                     textAlign: TextAlign.center,
@@ -327,7 +327,7 @@ class ImageButtonWithCountdownState extends State<ImageButtonWithCountdown> {
                     ),
                     strokeColor:
                         isRedButton
-                            ? const Color(0xFF23456B)
+                            ? const Color.fromARGB(255, 86, 0, 0)
                             : const Color.fromARGB(255, 77, 74, 71),
                     strokeWidth: (isSmallButton ? 2.r : 3.r),
                     textAlign: TextAlign.center,
