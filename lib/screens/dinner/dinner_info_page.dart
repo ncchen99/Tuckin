@@ -74,12 +74,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         setState(() {
           _userStatus = status;
           _dinnerTime = dinnerTime;
-          _restaurantName = "好吃餐廳";
+          _restaurantName = "Serendipity 不經意的美好 10199";
           _restaurantAddress = "台北市信義區松仁路 100 號 1F 之 1";
           _restaurantImageUrl =
               "https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=2070"; // Unsplash 餐廳圖片
-          _restaurantCategory = "未分類";
-          _restaurantMapUrl = "https://maps.google.com/?q=台北市信義區松仁路100號";
+          _restaurantCategory = "日式料理";
+          _restaurantMapUrl = "https://maps.google.com/?q=台北市信義區松仁路100號1F之1";
           _isLoading = false;
         });
       } else {
@@ -110,6 +110,43 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         return '聚餐資訊';
       default:
         return '';
+    }
+  }
+
+  // 打開地圖的共用函數
+  Future<void> _openMap(String? mapUrl) async {
+    try {
+      if (mapUrl != null) {
+        final Uri url = Uri.parse(mapUrl);
+        debugPrint('嘗試打開地圖URL: $url');
+        if (await launchUrl(url, mode: LaunchMode.externalApplication)) {
+          debugPrint('地圖已成功打開');
+        } else {
+          debugPrint('無法打開URL: $url');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  '無法開啟地圖',
+                  style: TextStyle(fontFamily: 'OtsutomeFont'),
+                ),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('打開地圖時出錯: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '打開地圖時出錯: $e',
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -358,12 +395,47 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                             SizedBox(height: 10.h),
                             // 餐廳地址 - 可點擊
                             GestureDetector(
-                              onTap: () async {
+                              onTap: () {
+                                debugPrint('點擊了地址，嘗試打開地圖: $_restaurantMapUrl');
                                 if (_restaurantMapUrl != null) {
                                   final Uri url = Uri.parse(_restaurantMapUrl!);
-                                  if (await canLaunchUrl(url)) {
-                                    await launchUrl(url);
-                                  }
+                                  launchUrl(
+                                        url,
+                                        mode: LaunchMode.externalApplication,
+                                      )
+                                      .then((success) {
+                                        if (!success && mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                '無法開啟地圖',
+                                                style: TextStyle(
+                                                  fontFamily: 'OtsutomeFont',
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      })
+                                      .catchError((error) {
+                                        debugPrint('打開地圖出錯: $error');
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                '打開地圖出錯: $error',
+                                                style: TextStyle(
+                                                  fontFamily: 'OtsutomeFont',
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      });
                                 }
                               },
                               child: Row(
@@ -414,7 +486,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                           children: [
                             // 時間圖標 - 使用指定的圖標並添加陰影效果
                             Padding(
-                              padding: EdgeInsets.only(left: 5.w, bottom: 5.h),
+                              padding: EdgeInsets.only(left: 0.w, bottom: 5.h),
                               child: SizedBox(
                                 width: 35.w,
                                 height: 35.h,
@@ -487,12 +559,47 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                       SizedBox(
                         width: cardWidth * 0.4,
                         child: InkWell(
-                          onTap: () async {
+                          onTap: () {
+                            debugPrint('點擊了導航按鈕，嘗試打開地圖: $_restaurantMapUrl');
                             if (_restaurantMapUrl != null) {
                               final Uri url = Uri.parse(_restaurantMapUrl!);
-                              if (await canLaunchUrl(url)) {
-                                await launchUrl(url);
-                              }
+                              launchUrl(
+                                    url,
+                                    mode: LaunchMode.externalApplication,
+                                  )
+                                  .then((success) {
+                                    if (!success && mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            '無法開啟地圖',
+                                            style: TextStyle(
+                                              fontFamily: 'OtsutomeFont',
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  })
+                                  .catchError((error) {
+                                    debugPrint('打開地圖出錯: $error');
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '打開地圖出錯: $error',
+                                            style: TextStyle(
+                                              fontFamily: 'OtsutomeFont',
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  });
                             }
                           },
                           child: Row(
@@ -621,20 +728,49 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             ),
           ),
           child: SafeArea(
-            child: Column(
+            child: Stack(
               children: [
-                // 頂部導航欄
-                HeaderBar(
-                  title: _getStatusText(),
-                  onProfileTap: _handleProfileTap,
+                // 右下角背景圖片
+                Positioned(
+                  right: -7.w, // 負值使圖片右側超出螢幕
+                  bottom: -45.h, // 負值使圖片底部超出螢幕
+                  child: Opacity(
+                    opacity: 0.65, // 降低透明度，使圖片更加融入背景
+                    child: ColorFiltered(
+                      // 降低彩度的矩陣
+                      colorFilter: const ColorFilter.matrix(<double>[
+                        0.6, 0.1, 0.1, 0, 0, // R影響
+                        0.1, 0.6, 0.1, 0, 0, // G影響
+                        0.1, 0.1, 0.6, 0, 0, // B影響
+                        0, 0, 0, 1, 0, // A影響
+                      ]),
+                      child: Image.asset(
+                        'assets/images/illustrate/p3.png',
+                        width: 220.w, // 增大尺寸
+                        height: 220.h, // 增大尺寸
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
                 ),
 
                 // 主要內容
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: content,
-                  ),
+                Column(
+                  children: [
+                    // 頂部導航欄
+                    HeaderBar(
+                      title: _getStatusText(),
+                      onProfileTap: _handleProfileTap,
+                    ),
+
+                    // 主要內容
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: content,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
