@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/restaurant_service.dart';
 import 'package:tuckin/utils/index.dart';
+import 'package:tuckin/screens/restaurant/restaurant_reservation_page.dart';
 
 class RestaurantSelectionPage extends StatefulWidget {
   const RestaurantSelectionPage({super.key});
@@ -306,16 +307,26 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
         _selectedRestaurantId = restaurantData['id'];
       });
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已成功添加您推薦的餐廳')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '已成功添加您推薦的餐廳',
+            style: TextStyle(fontFamily: 'OtsutomeFont'),
+          ),
+        ),
+      );
     } catch (e) {
       debugPrint('處理地圖連結出錯: $e');
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('無法處理地圖連結: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '無法處理地圖連結: $e',
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
       }
       rethrow; // 重新拋出異常讓調用者處理
     }
@@ -341,8 +352,12 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
       );
 
       if (success && mounted) {
-        // 導航到晚餐資訊頁面
-        _navigationService.navigateToDinnerInfo(context);
+        // TODO: 實際流程會根據後端回應決定導航到哪個頁面
+        // 使用導航服務導航到餐廳預訂頁面
+        _navigationService.navigateToRestaurantReservation(context);
+
+        // 原始邏輯 - 導航到晚餐資訊頁面
+        // _navigationService.navigateToDinnerInfo(context);
       }
     } catch (e) {
       debugPrint('提交餐廳選擇出錯: $e');

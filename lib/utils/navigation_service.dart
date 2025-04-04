@@ -367,6 +367,11 @@ class NavigationService {
     Navigator.of(context).pushReplacementNamed('/dinner_info');
   }
 
+  /// 導航到餐廳預訂頁面
+  void navigateToRestaurantReservation(BuildContext context) {
+    Navigator.of(context).pushNamed('/restaurant_reservation');
+  }
+
   /// 導航到通知頁面
   void navigateToNotifications(BuildContext context) {
     Navigator.of(context).pushNamed('/notifications');

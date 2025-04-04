@@ -286,23 +286,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
       content = Column(
         children: [
-          SizedBox(height: 30.h),
-
-          // 提示文字
-          Center(
-            child: Text(
-              '聚餐資訊',
-              style: TextStyle(
-                fontSize: 22.sp,
-                fontFamily: 'OtsutomeFont',
-                color: const Color(0xFF23456B),
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-
-          SizedBox(height: 20.h),
+          SizedBox(height: 10.h),
 
           // 聚餐資訊卡片（結合餐廳資訊和時間）
           Container(
@@ -321,139 +305,159 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             ),
             child: Column(
               children: [
-                // 餐廳資訊部分
-                Padding(
-                  padding: EdgeInsets.all(12.h),
-                  child: Row(
-                    children: [
-                      // 餐廳縮圖
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10.r),
-                        child:
-                            _restaurantImageUrl != null
-                                ? Image.network(
-                                  _restaurantImageUrl!,
-                                  width: 85.w,
-                                  height: 85.h,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      width: 70.w,
-                                      height: 70.h,
-                                      color: Colors.grey[300],
-                                      child: Icon(
-                                        Icons.restaurant,
-                                        color: Colors.grey[600],
-                                        size: 30.sp,
+                // 餐廳資訊部分 - 使用與預訂頁面相同的樣式
+                ClipRRect(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(15.r),
+                    topRight: Radius.circular(15.r),
+                  ),
+                  child: GestureDetector(
+                    onTap: () {
+                      debugPrint('點擊了圖片，嘗試打開地圖: $_restaurantMapUrl');
+                      if (_restaurantMapUrl != null) {
+                        final Uri url = Uri.parse(_restaurantMapUrl!);
+                        launchUrl(url, mode: LaunchMode.externalApplication)
+                            .then((success) {
+                              if (!success && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      '無法開啟地圖',
+                                      style: TextStyle(
+                                        fontFamily: 'OtsutomeFont',
                                       ),
-                                    );
-                                  },
-                                )
-                                : Container(
-                                  width: 70.w,
-                                  height: 70.h,
+                                    ),
+                                  ),
+                                );
+                              }
+                            })
+                            .catchError((error) {
+                              debugPrint('打開地圖出錯: $error');
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '$error',
+                                      style: const TextStyle(
+                                        fontFamily: 'OtsutomeFont',
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                            });
+                      }
+                    },
+                    child:
+                        _restaurantImageUrl != null
+                            ? Image.network(
+                              _restaurantImageUrl!,
+                              width: double.infinity,
+                              height: 150.h,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  width: double.infinity,
+                                  height: 150.h,
                                   color: Colors.grey[300],
                                   child: Icon(
                                     Icons.restaurant,
                                     color: Colors.grey[600],
-                                    size: 30.sp,
+                                    size: 50.sp,
                                   ),
-                                ),
+                                );
+                              },
+                            )
+                            : Container(
+                              width: double.infinity,
+                              height: 150.h,
+                              color: Colors.grey[300],
+                              child: Icon(
+                                Icons.restaurant,
+                                color: Colors.grey[600],
+                                size: 50.sp,
+                              ),
+                            ),
+                  ),
+                ),
+
+                // 餐廳詳細資訊
+                Padding(
+                  padding: EdgeInsets.all(15.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 餐廳名稱
+                      Text(
+                        _restaurantName ?? '未指定餐廳',
+                        style: TextStyle(
+                          fontSize: 20.sp,
+                          fontFamily: 'OtsutomeFont',
+                          color: const Color(0xFF23456B),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
 
-                      SizedBox(width: 15.w),
+                      SizedBox(height: 5.h),
+                      // 餐廳類別
+                      Text(
+                        _restaurantCategory ?? '未分類',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontFamily: 'OtsutomeFont',
+                          color: const Color(0xFF666666),
+                        ),
+                      ),
 
-                      // 餐廳資訊
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // 餐廳名稱
-                            Text(
-                              _restaurantName ?? '未指定餐廳',
-                              style: TextStyle(
-                                fontSize: 18.sp,
-                                fontFamily: 'OtsutomeFont',
-                                color: const Color(0xFF23456B),
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-
-                            SizedBox(height: 4.h),
-                            // 餐廳類別
-                            Text(
-                              _restaurantCategory ?? '未分類',
-                              style: TextStyle(
-                                fontSize: 14.sp,
-                                fontFamily: 'OtsutomeFont',
-                                color: const Color(0xFF666666),
-                              ),
-                            ),
-
-                            SizedBox(height: 10.h),
-                            // 餐廳地址 - 可點擊
-                            GestureDetector(
-                              onTap: () {
-                                debugPrint('點擊了地址，嘗試打開地圖: $_restaurantMapUrl');
-                                if (_restaurantMapUrl != null) {
-                                  final Uri url = Uri.parse(_restaurantMapUrl!);
-                                  launchUrl(
-                                        url,
-                                        mode: LaunchMode.externalApplication,
-                                      )
-                                      .then((success) {
-                                        if (!success && mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                '無法開啟地圖',
-                                                style: TextStyle(
-                                                  fontFamily: 'OtsutomeFont',
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      })
-                                      .catchError((error) {
-                                        debugPrint('打開地圖出錯: $error');
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                '打開地圖出錯: $error',
-                                                style: TextStyle(
-                                                  fontFamily: 'OtsutomeFont',
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      });
-                                }
-                              },
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      _restaurantAddress ?? '地址未提供',
-                                      style: TextStyle(
-                                        fontSize: 14.sp,
-                                        fontFamily: 'OtsutomeFont',
-                                        color: const Color(0xFF23456B),
-                                        decoration: TextDecoration.none,
+                      SizedBox(height: 10.h),
+                      // 餐廳地址 - 可點擊
+                      GestureDetector(
+                        onTap: () {
+                          debugPrint('點擊了地址，嘗試打開地圖: $_restaurantMapUrl');
+                          if (_restaurantMapUrl != null) {
+                            final Uri url = Uri.parse(_restaurantMapUrl!);
+                            launchUrl(url, mode: LaunchMode.externalApplication)
+                                .then((success) {
+                                  if (!success && mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          '無法開啟地圖',
+                                          style: TextStyle(
+                                            fontFamily: 'OtsutomeFont',
+                                          ),
+                                        ),
                                       ),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                    ),
-                                  ),
-                                ],
+                                    );
+                                  }
+                                })
+                                .catchError((error) {
+                                  debugPrint('打開地圖出錯: $error');
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '$error',
+                                          style: const TextStyle(
+                                            fontFamily: 'OtsutomeFont',
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                });
+                          }
+                        },
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _restaurantAddress ?? '地址未提供',
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  fontFamily: 'OtsutomeFont',
+                                  color: const Color(0xFF23456B),
+                                ),
                               ),
                             ),
                           ],
@@ -532,7 +536,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(height: 4.h),
+                                  SizedBox(height: 2.h),
                                   Text(
                                     dinnerTimeFormatted,
                                     style: TextStyle(
@@ -648,6 +652,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                       color: const Color(0xFF23456B),
                                     ),
                                   ),
+                                  SizedBox(height: 2.h),
                                   Text(
                                     'Google Map',
                                     style: TextStyle(

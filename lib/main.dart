@@ -25,7 +25,8 @@ import 'screens/home_page.dart';
 import 'screens/dinner/dinner_reservation_page.dart';
 import 'screens/dinner/matching_status_page.dart';
 import 'screens/dinner/attendance_confirmation_page.dart';
-import 'screens/dinner/restaurant_selection_page.dart';
+import 'screens/restaurant/restaurant_selection_page.dart';
+import 'screens/restaurant/restaurant_reservation_page.dart';
 import 'screens/dinner/dinner_info_page.dart';
 import 'screens/dinner/rating_page.dart';
 
@@ -381,6 +382,8 @@ class _MyAppState extends State<MyApp> {
           '/attendance_confirmation':
               (context) => const AttendanceConfirmationPage(),
           '/restaurant_selection': (context) => const RestaurantSelectionPage(),
+          '/restaurant_reservation':
+              (context) => const RestaurantReservationPage(),
           '/dinner_info': (context) => const DinnerInfoPage(),
           '/dinner_rating': (context) => const RatingPage(),
 
