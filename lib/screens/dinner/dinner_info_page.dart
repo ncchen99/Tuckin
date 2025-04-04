@@ -3,6 +3,7 @@ import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DinnerInfoPage extends StatefulWidget {
   const DinnerInfoPage({super.key});
@@ -18,13 +19,15 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   bool _isLoading = true;
   bool _isPageMounted = false; // 追蹤頁面是否完全掛載
   String _userStatus = ''; // 用戶當前狀態
-  bool _isFinishing = false; // 追蹤完成晚餐操作的狀態
 
   // 聚餐相關資訊
   Map<String, dynamic> _dinnerInfo = {};
   DateTime? _dinnerTime;
   String? _restaurantName;
   String? _restaurantAddress;
+  String? _restaurantImageUrl;
+  String? _restaurantCategory;
+  String? _restaurantMapUrl;
 
   @override
   void initState() {
@@ -72,7 +75,11 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           _userStatus = status;
           _dinnerTime = dinnerTime;
           _restaurantName = "好吃餐廳";
-          _restaurantAddress = "台北市信義區松仁路 100 號";
+          _restaurantAddress = "台北市信義區松仁路 100 號 1F 之 1";
+          _restaurantImageUrl =
+              "https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=2070"; // Unsplash 餐廳圖片
+          _restaurantCategory = "未分類";
+          _restaurantMapUrl = "https://maps.google.com/?q=台北市信義區松仁路100號";
           _isLoading = false;
         });
       } else {
@@ -86,57 +93,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         _isLoading = false;
       });
     }
-  }
-
-  // 用戶完成晚餐
-  Future<void> _handleFinishDinner() async {
-    // 防誤觸邏輯：確保頁面已完全載入
-    if (!_isPageMounted || _isLoading) {
-      debugPrint('防止誤觸：頁面未完全掛載或載入中，操作被忽略');
-      return;
-    }
-
-    try {
-      // 更新狀態顯示 loading
-      setState(() {
-        _isFinishing = true;
-      });
-
-      final currentUser = await _authService.getCurrentUser();
-      if (currentUser != null) {
-        // 更新用戶狀態
-        await _databaseService.updateUserStatus(currentUser.id, 'rating');
-
-        // 確保頁面仍然掛載
-        if (mounted) {
-          debugPrint('用戶已完成晚餐，導向到評分頁面');
-          // 導航前延遲一下，確保 loading 效果可見
-          await Future.delayed(const Duration(milliseconds: 200));
-          _navigationService.navigateToDinnerRating(context);
-        }
-      }
-    } catch (e) {
-      debugPrint('完成晚餐時出錯: $e');
-      // 確保頁面仍然掛載
-      if (mounted) {
-        setState(() {
-          _isFinishing = false; // 出錯時恢復按鈕狀態
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '操作失敗: $e',
-              style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  // 在通知圖標點擊處理函數中使用導航服務
-  void _handleNotificationTap() {
-    _navigationService.navigateToNotifications(context);
   }
 
   // 在用戶設置圖標點擊處理函數中使用導航服務
@@ -159,9 +115,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 計算適當的陰影偏移量
-    final adaptiveShadowOffset = 4.h;
-
     // 根據狀態決定顯示內容
     Widget content;
 
@@ -189,7 +142,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     // 格式化聚餐時間
     final dinnerTimeFormatted =
         _dinnerTime != null
-            ? '${_dinnerTime!.year}年${_dinnerTime!.month}月${_dinnerTime!.day}日 ${_dinnerTime!.hour}:${_dinnerTime!.minute.toString().padLeft(2, '0')}'
+            ? '${_dinnerTime!.month}月${_dinnerTime!.day}日 ${_dinnerTime!.hour}:${_dinnerTime!.minute.toString().padLeft(2, '0')}'
             : '時間待定';
 
     // 構建等待其他用戶確認的UI
@@ -291,16 +244,19 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     }
     // 構建等待出席/聚餐資訊的UI
     else {
+      // 定義卡片寬度，確保一致性
+      final cardWidth = MediaQuery.of(context).size.width - 48.w;
+
       content = Column(
         children: [
-          SizedBox(height: 60.h),
+          SizedBox(height: 30.h),
 
           // 提示文字
           Center(
             child: Text(
-              '聚餐資訊確認',
+              '聚餐資訊',
               style: TextStyle(
-                fontSize: 24.sp,
+                fontSize: 22.sp,
                 fontFamily: 'OtsutomeFont',
                 color: const Color(0xFF23456B),
                 fontWeight: FontWeight.bold,
@@ -309,166 +265,345 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             ),
           ),
 
-          SizedBox(height: 25.h),
+          SizedBox(height: 20.h),
 
-          // 圖示 - 使用餐廳圖標
-          Center(
-            child: SizedBox(
-              width: 150.w,
-              height: 150.h,
-              child: Stack(
-                clipBehavior: Clip.none, // 允許陰影超出容器範圍
-                children: [
-                  // 底部陰影
-                  Positioned(
-                    left: 0,
-                    top: adaptiveShadowOffset,
-                    child: Image.asset(
-                      'assets/images/icon/notification.png',
-                      width: 150.w,
-                      height: 150.h,
-                      color: Colors.black.withOpacity(0.4),
-                      colorBlendMode: BlendMode.srcIn,
-                    ),
+          // 聚餐資訊卡片（結合餐廳資訊和時間）
+          Container(
+            width: cardWidth,
+            margin: EdgeInsets.symmetric(vertical: 8.h),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(15.r),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 5,
+                  offset: Offset(0, 2.h),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // 餐廳資訊部分
+                Padding(
+                  padding: EdgeInsets.all(12.h),
+                  child: Row(
+                    children: [
+                      // 餐廳縮圖
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10.r),
+                        child:
+                            _restaurantImageUrl != null
+                                ? Image.network(
+                                  _restaurantImageUrl!,
+                                  width: 85.w,
+                                  height: 85.h,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      width: 70.w,
+                                      height: 70.h,
+                                      color: Colors.grey[300],
+                                      child: Icon(
+                                        Icons.restaurant,
+                                        color: Colors.grey[600],
+                                        size: 30.sp,
+                                      ),
+                                    );
+                                  },
+                                )
+                                : Container(
+                                  width: 70.w,
+                                  height: 70.h,
+                                  color: Colors.grey[300],
+                                  child: Icon(
+                                    Icons.restaurant,
+                                    color: Colors.grey[600],
+                                    size: 30.sp,
+                                  ),
+                                ),
+                      ),
+
+                      SizedBox(width: 15.w),
+
+                      // 餐廳資訊
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // 餐廳名稱
+                            Text(
+                              _restaurantName ?? '未指定餐廳',
+                              style: TextStyle(
+                                fontSize: 18.sp,
+                                fontFamily: 'OtsutomeFont',
+                                color: const Color(0xFF23456B),
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+
+                            SizedBox(height: 4.h),
+                            // 餐廳類別
+                            Text(
+                              _restaurantCategory ?? '未分類',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontFamily: 'OtsutomeFont',
+                                color: const Color(0xFF666666),
+                              ),
+                            ),
+
+                            SizedBox(height: 10.h),
+                            // 餐廳地址 - 可點擊
+                            GestureDetector(
+                              onTap: () async {
+                                if (_restaurantMapUrl != null) {
+                                  final Uri url = Uri.parse(_restaurantMapUrl!);
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url);
+                                  }
+                                }
+                              },
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _restaurantAddress ?? '地址未提供',
+                                      style: TextStyle(
+                                        fontSize: 14.sp,
+                                        fontFamily: 'OtsutomeFont',
+                                        color: const Color(0xFF23456B),
+                                        decoration: TextDecoration.none,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  // 主圖像
-                  Image.asset(
-                    'assets/images/icon/notification.png',
-                    width: 150.w,
-                    height: 150.h,
+                ),
+
+                // 分隔線
+                Container(
+                  height: 1,
+                  color: Colors.grey[300],
+                  margin: EdgeInsets.symmetric(horizontal: 12.w),
+                ),
+
+                // 聚餐時間部分
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 15.h,
+                    vertical: 15.h,
                   ),
-                ],
-              ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // 左側時間信息
+                      SizedBox(
+                        width: cardWidth * 0.4,
+                        child: Row(
+                          children: [
+                            // 時間圖標 - 使用指定的圖標並添加陰影效果
+                            Padding(
+                              padding: EdgeInsets.only(left: 5.w, bottom: 5.h),
+                              child: SizedBox(
+                                width: 35.w,
+                                height: 35.h,
+                                child: Stack(
+                                  clipBehavior: Clip.none, // 允許陰影超出容器範圍
+                                  children: [
+                                    // 底部陰影
+                                    Positioned(
+                                      left: 0,
+                                      top: 2.h,
+                                      child: Image.asset(
+                                        'assets/images/icon/clock.png',
+                                        width: 35.w,
+                                        height: 35.h,
+                                        color: Colors.black.withOpacity(0.4),
+                                        colorBlendMode: BlendMode.srcIn,
+                                      ),
+                                    ),
+                                    // 主圖標
+                                    Image.asset(
+                                      'assets/images/icon/clock.png',
+                                      width: 35.w,
+                                      height: 35.h,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(width: 10.w),
+
+                            // 時間信息文字
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '聚餐時間',
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4.h),
+                                  Text(
+                                    dinnerTimeFormatted,
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF666666),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 垂直分隔線
+                      Container(
+                        height: 45.h,
+                        width: 1.w,
+                        color: Colors.grey[300],
+                      ),
+
+                      // 右側導航部分
+                      SizedBox(
+                        width: cardWidth * 0.4,
+                        child: InkWell(
+                          onTap: () async {
+                            if (_restaurantMapUrl != null) {
+                              final Uri url = Uri.parse(_restaurantMapUrl!);
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(url);
+                              }
+                            }
+                          },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // 導航圖標
+                              Padding(
+                                padding: EdgeInsets.only(bottom: 5.h),
+                                child: SizedBox(
+                                  width: 35.w,
+                                  height: 35.h,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      // 底部陰影
+                                      Positioned(
+                                        left: 0,
+                                        top: 2.h,
+                                        child: Image.asset(
+                                          'assets/images/icon/navigation.png',
+                                          width: 35.w,
+                                          height: 35.h,
+                                          color: Colors.black.withOpacity(0.4),
+                                          colorBlendMode: BlendMode.srcIn,
+                                        ),
+                                      ),
+                                      // 主圖標
+                                      Image.asset(
+                                        'assets/images/icon/navigation.png',
+                                        width: 35.w,
+                                        height: 35.h,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 10.w),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '導航',
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                    ),
+                                  ),
+                                  Text(
+                                    'Google Map',
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF666666),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 
-          SizedBox(height: 35.h),
+          SizedBox(height: 20.h),
 
-          // 聚餐時間顯示
-          Center(
-            child: Container(
-              width: 300.w,
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 15.h),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(15.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 5,
-                    offset: Offset(0, 2.h),
+          // 提示文字卡片 - 確保寬度一致
+          Container(
+            width: cardWidth,
+            margin: EdgeInsets.symmetric(vertical: 8.h),
+            padding: EdgeInsets.all(15.h),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(15.r),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 5,
+                  offset: Offset(0, 2.h),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Text(
+                  '提示',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontFamily: 'OtsutomeFont',
+                    color: const Color(0xFF23456B),
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '聚餐時間',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
-                      fontWeight: FontWeight.bold,
-                    ),
+                ),
+                SizedBox(height: 10.h),
+                Text(
+                  '請在指定時間抵達餐廳。\n如有任何變動，系統將會發送通知。',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontFamily: 'OtsutomeFont',
+                    color: const Color(0xFF666666),
                   ),
-                  SizedBox(height: 10.h),
-                  Text(
-                    dinnerTimeFormatted,
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
-                    ),
-                  ),
-                ],
-              ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
-
-          SizedBox(height: 15.h),
-
-          // 餐廳資訊
-          Center(
-            child: Container(
-              width: 300.w,
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 15.h),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(15.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 5,
-                    offset: Offset(0, 2.h),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '餐廳資訊',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 10.h),
-                  Text(
-                    _restaurantName ?? '未指定',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 5.h),
-                  Text(
-                    _restaurantAddress ?? '地址未提供',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 將Spacer替換為固定高度的SizedBox
-          SizedBox(height: 50.h),
-
-          // 完成晚餐按鈕
-          Center(
-            child:
-                _isFinishing
-                    ? Container(
-                      width: 180.w,
-                      height: 85.h,
-                      alignment: Alignment.center,
-                      child: LoadingImage(width: 60.w, height: 60.h),
-                    )
-                    : ImageButton(
-                      text: '完成晚餐',
-                      imagePath: 'assets/images/ui/button/red_l.png',
-                      width: 180.w,
-                      height: 85.h,
-                      onPressed: () {
-                        if (_isPageMounted && !_isLoading) {
-                          _handleFinishDinner();
-                        } else {
-                          debugPrint('頁面未完全掛載或載入中，忽略點擊事件');
-                        }
-                      },
-                    ),
-          ),
-
-          // 底部間距
-          SizedBox(height: 30.h),
         ],
       );
     }
@@ -497,10 +632,8 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 // 主要內容
                 Expanded(
                   child: SingleChildScrollView(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24.w),
-                      child: content,
-                    ),
+                    physics: const BouncingScrollPhysics(),
+                    child: content,
                   ),
                 ),
               ],
