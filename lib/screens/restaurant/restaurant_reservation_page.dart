@@ -22,7 +22,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage> {
   bool _isConfirming = false;
 
   // 餐廳相關資訊
-  Map<String, dynamic> _restaurantInfo = {};
+  final Map<String, dynamic> _restaurantInfo = {};
   String? _restaurantName;
   String? _restaurantAddress;
   String? _restaurantImageUrl;

@@ -21,7 +21,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   String _userStatus = ''; // 用戶當前狀態
 
   // 聚餐相關資訊
-  Map<String, dynamic> _dinnerInfo = {};
+  final Map<String, dynamic> _dinnerInfo = {};
   DateTime? _dinnerTime;
   String? _restaurantName;
   String? _restaurantAddress;
@@ -206,7 +206,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
           // 圖示 - 使用頭像和圓形遮罩
           Center(
-            child: Container(
+            child: SizedBox(
               width: 150.w,
               height: 150.w, // 使用相同的寬度單位確保是正方形
               child: Stack(

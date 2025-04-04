@@ -57,11 +57,32 @@ class SupabaseService {
       debugPrint('初始化 Supabase 使用 URL: $url');
 
       await _apiService.handleRequest(
-        request: () => Supabase.initialize(url: url, anonKey: anonKey),
+        request:
+            () => Supabase.initialize(
+              url: url,
+              anonKey: anonKey,
+              // 確保啟用實時功能
+              realtimeClientOptions: const RealtimeClientOptions(
+                eventsPerSecond: 10,
+              ),
+            ),
       );
 
       _supabaseClient = Supabase.instance.client;
-      debugPrint('Supabase 初始化成功');
+
+      // 確認實時功能已啟用
+      final realtimeEnabled = _supabaseClient.realtime != null;
+      debugPrint('Supabase 初始化成功，實時功能: ${realtimeEnabled ? "已啟用" : "未啟用"}');
+
+      // 測試一下實時連接是否正常
+      try {
+        final channel = _supabaseClient.channel('test_connection');
+        await channel.subscribe();
+        debugPrint('Supabase 實時連接測試成功，可以訂閱資料變更');
+        await channel.unsubscribe();
+      } catch (e) {
+        debugPrint('Supabase 實時連接測試失敗: $e');
+      }
     } catch (error) {
       debugPrint('Supabase 初始化錯誤: $error');
       _errorHandler.handleApiError(

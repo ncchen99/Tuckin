@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/restaurant_service.dart';
 import 'package:tuckin/utils/index.dart';
-import 'package:tuckin/screens/restaurant/restaurant_reservation_page.dart';
 
 class RestaurantSelectionPage extends StatefulWidget {
   const RestaurantSelectionPage({super.key});

@@ -12,6 +12,7 @@ import 'package:tuckin/services/api_service.dart'; // 添加導入 API 服務
 import 'package:flutter_native_splash/flutter_native_splash.dart'; // 導入原生啟動畫面
 // 添加導入通知服務
 import 'package:tuckin/services/notification_service.dart';
+import 'package:tuckin/services/realtime_service.dart'; // 導入實時服務
 import 'package:firebase_core/firebase_core.dart';
 
 // 導入頁面
@@ -68,6 +69,15 @@ void main() async {
   // 初始化 AuthService
   try {
     await AuthService().initialize();
+
+    // 在 AuthService 初始化成功後初始化 RealtimeService
+    debugPrint('正在初始化 RealtimeService...');
+    try {
+      await RealtimeService().initialize(navigatorKey);
+    } catch (e) {
+      debugPrint('RealtimeService 初始化錯誤: $e');
+      // 這裡不會阻止應用繼續啟動
+    }
   } catch (e) {
     debugPrint('AuthService 初始化錯誤: $e');
 
@@ -170,6 +180,8 @@ class _MyAppState extends State<MyApp> {
   void dispose() {
     _errorSubscription?.cancel();
     _errorHandler.dispose();
+    // 在應用關閉時銷毀 RealtimeService
+    RealtimeService().dispose();
     super.dispose();
   }
 

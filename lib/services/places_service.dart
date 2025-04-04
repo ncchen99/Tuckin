@@ -77,7 +77,7 @@ class PlacesService {
       'imageUrl':
           'https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=500',
       'category': '日式料理',
-      'address': '台北市大安區信義路四段${id}號',
+      'address': '台北市大安區信義路四段$id號',
       'mapUrl': mapLink ?? 'https://maps.app.goo.gl/example',
       'rating': 4.5,
       'openingHours': '09:00 - 21:00',
