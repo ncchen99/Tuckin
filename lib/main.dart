@@ -14,6 +14,8 @@ import 'package:flutter_native_splash/flutter_native_splash.dart'; // 導入原�
 import 'package:tuckin/services/notification_service.dart';
 import 'package:tuckin/services/realtime_service.dart'; // 導入實時服務
 import 'package:firebase_core/firebase_core.dart';
+import 'dart:io'; // 添加導入IO庫用於網絡請求
+import 'package:http/http.dart' as http; // 添加HTTP包用於網絡請求
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -42,6 +44,95 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 // 全局變數，存儲初始路由
 String initialRoute = '/';
 
+// 測試網絡連接的函數
+Future<bool> _testNetworkConnection() async {
+  try {
+    // 嘗試連接Google的DNS伺服器
+    final result = await http
+        .get(Uri.parse('https://8.8.8.8'))
+        .timeout(const Duration(seconds: 5));
+    return result.statusCode == 200;
+  } catch (e) {
+    return false;
+  }
+}
+
+// 初始化服務的函數
+Future<bool> _initializeServices(ErrorHandler errorHandler) async {
+  try {
+    // 初始化 AuthService
+    await AuthService().initialize();
+    debugPrint('AuthService 初始化成功');
+
+    // 初始化 RealtimeService
+    try {
+      await RealtimeService().initialize(navigatorKey);
+      debugPrint('RealtimeService 初始化成功');
+    } catch (e) {
+      debugPrint('RealtimeService 初始化錯誤: $e');
+      // 這裡不會阻止應用繼續啟動
+    }
+    return true;
+  } catch (e) {
+    debugPrint('服務初始化錯誤: $e');
+
+    // 處理錯誤
+    if (e is ApiError) {
+      errorHandler.handleApiError(e, () async {
+        try {
+          await _initializeServices(errorHandler);
+        } catch (retryError) {
+          debugPrint('重試初始化服務錯誤: $retryError');
+        }
+      });
+    } else {
+      errorHandler.showError(
+        message: '網絡連接錯誤，請檢查您的網絡設置',
+        isServerError: false,
+        isNetworkError: true,
+        onRetry: () async {
+          try {
+            await _initializeServices(errorHandler);
+          } catch (retryError) {
+            debugPrint('重試初始化服務錯誤: $retryError');
+          }
+        },
+      );
+    }
+
+    // 嘗試強制登出以重置狀態
+    try {
+      await AuthService().signOut();
+    } catch (signOutError) {
+      debugPrint('強制登出錯誤: $signOutError');
+    }
+    return false;
+  }
+}
+
+// 確定初始路由的函數
+Future<String> _determineInitialRoute() async {
+  try {
+    String route = await NavigationService().determineInitialRoute();
+    debugPrint('設置初始路由為: $route');
+    return route;
+  } catch (e) {
+    debugPrint('確定初始路由出錯: $e');
+    return '/';
+  }
+}
+
+// 初始化通知服務的函數
+Future<void> _initializeNotificationService() async {
+  try {
+    await NotificationService().initialize(navigatorKey);
+    debugPrint('通知服務初始化成功');
+  } catch (e) {
+    debugPrint('通知服務初始化錯誤: $e');
+    // 通知服務初始化失敗不阻止應用程序啟動
+  }
+}
+
 void main() async {
   // 保留原生啟動畫面
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -66,50 +157,57 @@ void main() async {
     // 繼續執行，但使用默認值
   }
 
-  // 初始化 AuthService
+  // 檢查網絡連接是否可用
+  bool isNetworkConnected = false;
   try {
-    await AuthService().initialize();
+    debugPrint('正在測試網絡連接...');
+    isNetworkConnected = await _testNetworkConnection();
+    debugPrint('網絡連接測試結果: ${isNetworkConnected ? '成功' : '失敗'}');
 
-    // 在 AuthService 初始化成功後初始化 RealtimeService
-    debugPrint('正在初始化 RealtimeService...');
-    try {
-      await RealtimeService().initialize(navigatorKey);
-    } catch (e) {
-      debugPrint('RealtimeService 初始化錯誤: $e');
-      // 這裡不會阻止應用繼續啟動
-    }
-  } catch (e) {
-    debugPrint('AuthService 初始化錯誤: $e');
-
-    // 使用 ErrorHandler 顯示錯誤訊息
-    if (e is ApiError) {
-      errorHandler.handleApiError(e, () async {
-        try {
-          await AuthService().initialize();
-        } catch (retryError) {
-          debugPrint('重試初始化 AuthService 錯誤: $retryError');
-        }
-      });
-    } else {
+    if (!isNetworkConnected) {
+      debugPrint('網絡連接測試失敗，顯示錯誤訊息');
       errorHandler.showError(
         message: '網絡連接錯誤，請檢查您的網絡設置',
         isServerError: false,
+        isNetworkError: true,
         onRetry: () async {
-          try {
-            await AuthService().initialize();
-          } catch (retryError) {
-            debugPrint('重試初始化 AuthService 錯誤: $retryError');
+          // 重新測試網絡連接
+          debugPrint('用戶點擊重試按鈕，重新測試網絡連接...');
+          bool retryNetworkConnected = await _testNetworkConnection();
+
+          if (retryNetworkConnected) {
+            // 如果網絡連接恢復，清除錯誤並繼續應用流程
+            debugPrint('網絡連接已恢復，繼續應用流程');
+            errorHandler.clearError();
+
+            // 初始化服務
+            bool servicesInitialized = await _initializeServices(errorHandler);
+
+            if (servicesInitialized) {
+              // 繼續加載應用
+              initialRoute = await _determineInitialRoute();
+
+              // 初始化通知服務
+              await _initializeNotificationService();
+
+              // 重新加載主應用
+              runApp(MyApp(errorHandler: errorHandler));
+            }
+          } else {
+            // 如果網絡仍然不可用，保持錯誤狀態
+            debugPrint('網絡連接仍然不可用');
           }
         },
       );
     }
+  } catch (e) {
+    debugPrint('網絡連接測試出錯: $e');
+    isNetworkConnected = false;
+  }
 
-    // 嘗試強制登出以重置狀態
-    try {
-      await AuthService().signOut();
-    } catch (signOutError) {
-      debugPrint('強制登出錯誤: $signOutError');
-    }
+  // 只有在網絡連接可用時才初始化服務
+  if (isNetworkConnected) {
+    await _initializeServices(errorHandler);
   }
 
   // 初始化 Firebase
@@ -123,24 +221,8 @@ void main() async {
 
   // 只有在前面步驟成功的情況下才嘗試確定初始路由
   if (initSuccess) {
-    try {
-      // 使用全局變量，而不是重新宣告
-      initialRoute = await NavigationService().determineInitialRoute();
-      debugPrint('設置初始路由為: $initialRoute');
-
-      // 初始化通知服務
-      try {
-        await NotificationService().initialize(navigatorKey);
-        debugPrint('通知服務初始化成功');
-      } catch (e) {
-        debugPrint('通知服務初始化錯誤: $e');
-        // 通知服務初始化失敗不阻止應用程序啟動
-      }
-    } catch (e) {
-      debugPrint('確定初始路由出錯: $e');
-      // 出錯時使用默認初始路由，但不重新宣告變量
-      initialRoute = '/';
-    }
+    initialRoute = await _determineInitialRoute();
+    await _initializeNotificationService();
   } else {
     debugPrint('初始化未成功，使用默認路由: /');
     initialRoute = '/';
@@ -166,6 +248,8 @@ class _MyAppState extends State<MyApp> {
   final Connectivity _connectivity = Connectivity();
   late final ErrorHandler _errorHandler;
   StreamSubscription<bool>? _errorSubscription;
+  // 添加狀態標記，表示正在測試網絡
+  bool _isTestingNetwork = false;
 
   @override
   void initState() {
@@ -288,6 +372,126 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  // 測試網絡連接並處理UI更新
+  Future<void> _handleNetworkRetry(BuildContext context) async {
+    // 防止重複點擊
+    if (_isTestingNetwork) {
+      debugPrint('正在測試網絡中，忽略重複點擊');
+      return;
+    }
+
+    setState(() {
+      _isTestingNetwork = true;
+    });
+
+    try {
+      // 顯示測試中提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('正在測試網絡連接...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+
+      debugPrint('嘗試重新測試網絡連接...');
+      bool networkConnected = await _testNetworkConnection();
+      debugPrint('網絡重新測試結果: ${networkConnected ? '成功' : '失敗'}');
+
+      if (!networkConnected) {
+        // 網絡仍然不可用
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('網絡仍然不可用，請檢查您的網絡設置'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        setState(() {
+          _isTestingNetwork = false;
+        });
+        return;
+      }
+
+      // 再進行實際連接測試
+      debugPrint('進行實際連接測試...');
+      bool realConnectionWorks = await _testRealConnection();
+      debugPrint('實際網絡測試結果: ${realConnectionWorks ? '成功' : '失敗'}');
+
+      if (!realConnectionWorks) {
+        // 網絡測試通過但實際連接測試失敗
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('網絡連接不穩定，請稍後再試'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        setState(() {
+          _isTestingNetwork = false;
+        });
+        return;
+      }
+
+      // 網絡恢復，初始化服務
+      debugPrint('開始初始化服務...');
+      try {
+        bool success = await _initializeServices(_errorHandler);
+
+        if (success) {
+          // 只有在服務初始化成功時才更新UI
+          debugPrint('服務初始化成功，更新UI狀態');
+
+          if (_errorHandler.hasError) {
+            _errorHandler.clearError();
+          }
+
+          setState(() {
+            _isOffline = false;
+            _isTestingNetwork = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('網絡已恢復連接'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          debugPrint('服務初始化返回失敗');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('服務初始化失敗，請稍後再試'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          setState(() {
+            _isTestingNetwork = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('服務初始化出現異常: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('初始化服務時出錯: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        setState(() {
+          _isTestingNetwork = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('網絡測試過程中出現異常: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('測試網絡時發生錯誤: $e'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      setState(() {
+        _isTestingNetwork = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint('MyApp: 構建主應用，初始路由為: $initialRoute');
@@ -331,21 +535,12 @@ class _MyAppState extends State<MyApp> {
                           _isOffline
                               ? '請檢查您的網路連線並重試'
                               : (_errorHandler.errorMessage ?? '網絡連接錯誤'),
-                      onRetry: () async {
-                        if (_isOffline) {
-                          await _checkConnectivity();
-                          if (!_isOffline) {
-                            // 避免使用 Navigator，而是通過狀態更新來隱藏錯誤畫面
-                            setState(() {});
-                          }
-                        } else {
-                          _errorHandler.clearError();
-                          // 避免使用 Navigator，而是通過狀態更新來隱藏錯誤畫面
-                          setState(() {});
-                        }
+                      onRetry: () {
+                        // 使用新的處理函數處理網絡重試邏輯
+                        _handleNetworkRetry(context);
                       },
                       isServerError: false,
-                      showButton: !_isOffline, // 離線狀態下不顯示按鈕
+                      showButton: true, // 始終顯示按鈕，以便用戶可以點擊重試
                     ),
                   ),
                 // 顯示其他錯誤

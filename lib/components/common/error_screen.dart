@@ -120,7 +120,12 @@ class ErrorScreen extends StatelessWidget {
                         fontFamily: 'OtsutomeFont',
                         fontWeight: FontWeight.bold,
                       ),
-                      onPressed: onRetry, // 使用傳入的回調函數，現在已修改為不使用 Navigator
+                      onPressed: () {
+                        // 只執行回調，不進行任何額外的動作來關閉螢幕
+                        // 防止按鈕點擊直接關閉錯誤畫面
+                        debugPrint('ErrorScreen: 按鈕被點擊，執行回調');
+                        onRetry();
+                      },
                     ),
                   ],
 
