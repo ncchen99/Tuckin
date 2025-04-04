@@ -243,6 +243,23 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage> {
     }
   }
 
+  Future<void> _handleCannotReserve() async {
+    // 這裡應該處理無法預訂的邏輯
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '已標記為無法預訂',
+            style: TextStyle(fontFamily: 'OtsutomeFont'),
+          ),
+        ),
+      );
+
+      // 導航回上一頁或其他相應操作
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -633,7 +650,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage> {
                           ),
                         ),
 
-                        SizedBox(height: 40.h),
+                        SizedBox(height: 60.h),
 
                         // 確認按鈕
                         Center(
@@ -644,13 +661,29 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage> {
                                     height: 60.h,
                                     color: const Color(0xFF23456B),
                                   )
-                                  : ImageButton(
-                                    text: '確認',
-                                    imagePath:
-                                        'assets/images/ui/button/red_l.png',
-                                    width: 180.w,
-                                    height: 75.h,
-                                    onPressed: _handleReservationConfirm,
+                                  : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      // 左側藍色按鈕 - 這間無法
+                                      ImageButton(
+                                        text: '這間無法',
+                                        imagePath:
+                                            'assets/images/ui/button/blue_l.png',
+                                        width: 140.w,
+                                        height: 75.h,
+                                        onPressed: _handleCannotReserve,
+                                      ),
+                                      SizedBox(width: 20.w),
+                                      // 右側橘色按鈕 - 已確認
+                                      ImageButton(
+                                        text: '已確認',
+                                        imagePath:
+                                            'assets/images/ui/button/red_m.png',
+                                        width: 140.w,
+                                        height: 75.h,
+                                        onPressed: _handleReservationConfirm,
+                                      ),
+                                    ],
                                   ),
                         ),
 

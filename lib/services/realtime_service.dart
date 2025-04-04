@@ -210,6 +210,15 @@ class RealtimeService with WidgetsBindingObserver {
 
     final navigator = _navigatorKey!.currentState!;
 
+    // 獲取當前路由名稱
+    String? currentRoute;
+    navigator.popUntil((route) {
+      currentRoute = route.settings.name;
+      return true;
+    });
+
+    debugPrint('RealtimeService: 當前路由: $currentRoute, 用戶狀態: $status');
+
     switch (status) {
       case 'initial':
         // 初始狀態，應該在首頁
@@ -228,7 +237,13 @@ class RealtimeService with WidgetsBindingObserver {
 
       case 'waiting_confirmation':
         // 等待確認階段，應該在等待確認頁面
-        _navigateIfNotCurrent(navigator, '/attendance_confirmation');
+        // 如果用戶已經在餐廳選擇頁面，則不需要導航
+        if (currentRoute == '/restaurant_selection' ||
+            currentRoute == '/restaurant_reservation') {
+          debugPrint('RealtimeService: 用戶已在餐廳選擇頁面，不需要重新導航');
+        } else {
+          _navigateIfNotCurrent(navigator, '/attendance_confirmation');
+        }
         break;
 
       case 'waiting_other_users':
