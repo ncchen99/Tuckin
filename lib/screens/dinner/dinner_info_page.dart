@@ -439,7 +439,8 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             ),
           ),
 
-          const Spacer(),
+          // 將Spacer替換為固定高度的SizedBox
+          SizedBox(height: 50.h),
 
           // 完成晚餐按鈕
           Center(
@@ -466,6 +467,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                     ),
           ),
 
+          // 底部間距
           SizedBox(height: 30.h),
         ],
       );
