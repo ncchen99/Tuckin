@@ -49,11 +49,19 @@ Future<bool> _testNetworkConnection() async {
   try {
     // 嘗試連接Google的DNS伺服器
     final result = await http
-        .get(Uri.parse('https://8.8.8.8'))
+        .get(Uri.parse('https://g.co'))
         .timeout(const Duration(seconds: 5));
     return result.statusCode == 200;
   } catch (e) {
-    return false;
+    try {
+      // 嘗試連接Google的伺服器
+      final result = await http
+          .get(Uri.parse('https://www.google.com'))
+          .timeout(const Duration(seconds: 5));
+      return result.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
   }
 }
 

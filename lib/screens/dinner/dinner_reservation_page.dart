@@ -228,60 +228,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                                 DateFormat('MM/dd').format(_nextDinnerDate),
                               ),
 
-                              SizedBox(height: 25.h),
-
-                              // 成大限定選項 - 對齊標題邊界
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 15.w,
-                                  vertical: 12.h,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(10.r),
-                                  border: Border.all(
-                                    color: const Color(0xFF23456B),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    // 勾選框
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 2.h,
-                                      ),
-                                      child: CustomCheckbox(
-                                        value: _onlyNckuStudents,
-                                        onChanged: (value) {
-                                          if (value != null) {
-                                            setState(() {
-                                              _onlyNckuStudents = value;
-                                            });
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                    SizedBox(width: 10.w),
-                                    // 文字說明
-                                    Expanded(
-                                      child: Text(
-                                        '想與校內同學聚餐',
-                                        style: TextStyle(
-                                          fontSize: 16.sp,
-                                          fontFamily: 'OtsutomeFont',
-                                          color: const Color(0xFF23456B),
-                                          fontWeight: FontWeight.bold,
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              SizedBox(height: 45.h),
+                              SizedBox(height: 60.h),
 
                               // 預約按鈕
                               Center(
@@ -408,11 +355,17 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 24.h),
+      padding: EdgeInsets.only(top: 24.h),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: const Color(0xFF23456B), width: 1.5),
+        borderRadius: BorderRadius.circular(15.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 5,
+            offset: Offset(0, 2.h),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -470,6 +423,56 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
               fontSize: 18.sp,
               fontFamily: 'OtsutomeFont',
               color: const Color(0xFF23456B),
+            ),
+          ),
+
+          SizedBox(height: 20.h),
+
+          // 分隔線
+          Container(
+            height: 1,
+            color: Colors.grey[300],
+            margin: EdgeInsets.symmetric(horizontal: 15.w),
+          ),
+
+          // 整合成大限定選項到卡片中 - 置中排列
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _onlyNckuStudents = !_onlyNckuStudents;
+              });
+            },
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 15.h),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // 勾選框
+                  CustomCheckbox(
+                    value: _onlyNckuStudents,
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _onlyNckuStudents = value;
+                        });
+                      }
+                    },
+                  ),
+                  SizedBox(width: 10.w),
+                  // 文字說明 - 移除Expanded讓文字自然寬度，並調整與checkbox的對齊方式
+                  Text(
+                    '想與校內同學聚餐',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontFamily: 'OtsutomeFont',
+                      color: const Color(0xFF23456B),
+                      fontWeight: FontWeight.bold,
+                      height: 2,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
