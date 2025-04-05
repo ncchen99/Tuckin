@@ -669,8 +669,8 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage> {
                                         text: '這間無法',
                                         imagePath:
                                             'assets/images/ui/button/blue_l.png',
-                                        width: 140.w,
-                                        height: 75.h,
+                                        width: 150.w,
+                                        height: 70.h,
                                         onPressed: _handleCannotReserve,
                                       ),
                                       SizedBox(width: 20.w),
@@ -679,8 +679,8 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage> {
                                         text: '已確認',
                                         imagePath:
                                             'assets/images/ui/button/red_m.png',
-                                        width: 140.w,
-                                        height: 75.h,
+                                        width: 150.w,
+                                        height: 70.h,
                                         onPressed: _handleReservationConfirm,
                                       ),
                                     ],

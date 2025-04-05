@@ -133,8 +133,8 @@ class _HomePageState extends State<HomePage> {
                             ImageButton(
                               text: '預約',
                               imagePath: 'assets/images/ui/button/red_l.png',
-                              width: 180.w,
-                              height: 75.h,
+                              width: 160.w,
+                              height: 70.h,
                               onPressed: () async {
                                 final currentUser =
                                     await _authService.getCurrentUser();

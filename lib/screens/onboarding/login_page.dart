@@ -284,6 +284,8 @@ class _LoginPageState extends State<LoginPage> {
                                   : GoogleSignInButton(
                                     onPressed: _handleGoogleSignIn,
                                     enabled: _agreeToTerms, // 根據條款勾選狀態決定按鈕是否可用
+                                    width: 160.w,
+                                    height: 73.h,
                                   ),
                         ),
 

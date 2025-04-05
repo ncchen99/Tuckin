@@ -384,7 +384,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                                   imagePath:
                                       'assets/images/ui/button/red_l.png',
                                   width: 150.w,
-                                  height: 75.h,
+                                  height: 70.h,
                                   onPressed: _handleNext,
                                   isEnabled: _questionOneAnswer != null,
                                 ),
@@ -491,7 +491,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                                           imagePath:
                                               'assets/images/ui/button/red_l.png',
                                           width: 150.w,
-                                          height: 75.h,
+                                          height: 70.h,
                                           onPressed: _handleComplete,
                                           isEnabled: _questionTwoAnswer != null,
                                         ),

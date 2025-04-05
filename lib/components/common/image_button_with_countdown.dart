@@ -31,7 +31,7 @@ class ImageButtonWithCountdown extends StatefulWidget {
       fontWeight: FontWeight.bold,
     ),
     this.countdownTextStyle = const TextStyle(
-      fontSize: 15,
+      fontSize: 13,
       color: Color(0xFFD1D1D1),
       fontFamily: 'OtsutomeFont',
       fontWeight: FontWeight.bold,
@@ -63,8 +63,8 @@ class ImageButtonWithCountdownState extends State<ImageButtonWithCountdown> {
     final buttonHeight = widget.height;
     final totalHeight = buttonHeight + adaptiveBottomSpace;
     final textSpacing = 5.h; // 兩行文字之間的間距
-    final mainTextHeight = 25.h; // 估計主要文字高度
-    final countdownTextHeight = 18.h; // 估計倒數文字高度
+    final mainTextHeight = 20.h; // 估計主要文字高度
+    final countdownTextHeight = 15.h; // 估計倒數文字高度
     final totalTextHeight = mainTextHeight + textSpacing + countdownTextHeight;
 
     // 計算頂部空間使文字整體垂直居中
@@ -158,8 +158,8 @@ class ImageButtonWithCountdownState extends State<ImageButtonWithCountdown> {
                         height: 1.2,
                         fontSize:
                             isSmallButton
-                                ? widget.textStyle.fontSize ?? 18
-                                : widget.textStyle.fontSize ?? 20,
+                                ? (widget.textStyle.fontSize ?? 18).sp
+                                : (widget.textStyle.fontSize ?? 20).sp,
                       ),
                       strokeColor: const Color.fromARGB(255, 154, 67, 24),
                       strokeWidth: (isSmallButton ? 3.r : 4.r),
@@ -208,8 +208,8 @@ class ImageButtonWithCountdownState extends State<ImageButtonWithCountdown> {
                         height: 1.2,
                         fontSize:
                             isSmallButton
-                                ? widget.countdownTextStyle.fontSize ?? 14
-                                : widget.countdownTextStyle.fontSize ?? 15,
+                                ? (widget.countdownTextStyle.fontSize ?? 14).sp
+                                : (widget.countdownTextStyle.fontSize ?? 15).sp,
                       ),
                       strokeColor: const Color.fromARGB(255, 154, 67, 24),
                       strokeWidth: (isSmallButton ? 2.r : 3.r),
@@ -290,8 +290,8 @@ class ImageButtonWithCountdownState extends State<ImageButtonWithCountdown> {
                       height: 1.2,
                       fontSize:
                           isSmallButton
-                              ? widget.textStyle.fontSize ?? 18
-                              : widget.textStyle.fontSize ?? 20,
+                              ? (widget.textStyle.fontSize ?? 18).sp
+                              : (widget.textStyle.fontSize ?? 20).sp,
                     ),
                     strokeColor:
                         isRedButton
@@ -322,8 +322,8 @@ class ImageButtonWithCountdownState extends State<ImageButtonWithCountdown> {
                       height: 1.2,
                       fontSize:
                           isSmallButton
-                              ? widget.countdownTextStyle.fontSize ?? 14
-                              : widget.countdownTextStyle.fontSize ?? 15,
+                              ? (widget.countdownTextStyle.fontSize ?? 14).sp
+                              : (widget.countdownTextStyle.fontSize ?? 15).sp,
                     ),
                     strokeColor:
                         isRedButton

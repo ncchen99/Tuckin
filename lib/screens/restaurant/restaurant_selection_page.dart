@@ -497,8 +497,8 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                             text: '送出選擇',
                                             imagePath:
                                                 'assets/images/ui/button/red_l.png',
-                                            width: 180.w,
-                                            height: 75.h,
+                                            width: 160.w,
+                                            height: 70.h,
                                             onPressed: _handleSubmit,
                                             isEnabled:
                                                 _selectedRestaurantId != null,

@@ -551,7 +551,7 @@ class _RatingPageState extends State<RatingPage> {
                                     text: '送出評分',
                                     imagePath:
                                         'assets/images/ui/button/red_m.png',
-                                    width: 200.w,
+                                    width: 160.w,
                                     height: 70.h,
                                     onPressed: _handleSubmitRating,
                                   ),

@@ -286,7 +286,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                                     imagePath:
                                         'assets/images/ui/button/blue_l.png',
                                     width: 160.w,
-                                    height: 68.h,
+                                    height: 70.h,
                                     onPressed: () {
                                       // 防止頁面載入期間被點擊
                                       if (_isPageMounted && !_isLoading) {

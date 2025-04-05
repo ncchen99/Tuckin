@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../common/image_button.dart';
+import '../../utils/index.dart';
 
 /// 自定義 Google 登入按鈕組件
 ///
@@ -30,8 +31,8 @@ class GoogleSignInButton extends StatelessWidget {
   const GoogleSignInButton({
     super.key,
     required this.onPressed,
-    this.width = 250,
-    this.height = 80,
+    this.width = 160,
+    this.height = 70,
     this.enabled = true,
   });
 
@@ -44,12 +45,6 @@ class GoogleSignInButton extends StatelessWidget {
       width: width,
       height: height,
       onPressed: onPressed,
-      textStyle: TextStyle(
-        fontSize: 20,
-        color: const Color(0xFFD1D1D1),
-        fontFamily: 'OtsutomeFont',
-        fontWeight: FontWeight.bold,
-      ),
       // 使用新的 isEnabled 參數，完全禁止點擊
       isEnabled: enabled,
     );

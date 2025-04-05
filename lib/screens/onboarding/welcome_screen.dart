@@ -428,13 +428,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           imagePath: 'assets/images/ui/button/red_m.png',
                           text: _currentPage < _totalPages - 1 ? '下一步' : '開始使用',
                           width: 160.w, // 使用自適應寬度
-                          height: 75.h, // 使用自適應高度
-                          textStyle: TextStyle(
-                            fontSize: 18, // 使用自適應字體大小
-                            color: const Color(0xFFD1D1D1),
-                            fontFamily: 'OtsutomeFont',
-                            fontWeight: FontWeight.bold,
-                          ),
+                          height: 70.h, // 使用自適應高度
                           onPressed: _goToNextPage,
                         ),
                       ),

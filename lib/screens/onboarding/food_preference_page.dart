@@ -312,7 +312,7 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
                                 text: '下一步',
                                 imagePath: 'assets/images/ui/button/red_l.png',
                                 width: 150.w,
-                                height: 75.h,
+                                height: 70.h,
                                 onPressed: _handleNextStep,
                                 isEnabled: _isFormValid(), // 根據選擇狀態決定按鈕是否啟用
                               ),

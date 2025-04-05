@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/common/image_button.dart'; // 導入圖片按鈕元件
+import '../../utils/index.dart';
 
 class ErrorScreen extends StatelessWidget {
   final String message;
@@ -112,14 +113,8 @@ class ErrorScreen extends StatelessWidget {
                       text: 'OK',
                       imagePath:
                           'assets/images/ui/button/red_m.png', // 使用橘紅色中等大小按鈕
-                      width: 125, // 設置合適的寬度
-                      height: 60, // 設置合適的高度
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        color: Colors.white,
-                        fontFamily: 'OtsutomeFont',
-                        fontWeight: FontWeight.bold,
-                      ),
+                      width: 125.w, // 設置合適的寬度
+                      height: 70.h, // 設置合適的高度
                       onPressed: () {
                         // 只執行回調，不進行任何額外的動作來關閉螢幕
                         // 防止按鈕點擊直接關閉錯誤畫面

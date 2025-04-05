@@ -396,16 +396,42 @@ class _AttendanceConfirmationPageState
                           child:
                               _isConfirming
                                   ? Container(
-                                    width: 180.w,
-                                    height: 85.h,
+                                    width: 160.w,
+                                    height: 75.h,
                                     alignment: Alignment.center,
                                     child: LoadingImage(
                                       width: 60.w,
                                       height: 60.h,
                                     ),
                                   )
-                                  : Column(
+                                  : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
+                                      // 無法出席按鈕
+                                      ImageButton(
+                                        text: '無法出席',
+                                        imagePath:
+                                            'assets/images/ui/button/blue_m.png',
+                                        width: 150.w,
+                                        height: 72.h,
+                                        textStyle: TextStyle(
+                                          fontSize: 18.sp,
+                                          color: const Color(0xFFD1D1D1),
+                                          fontFamily: 'OtsutomeFont',
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        onPressed: () {
+                                          // 防止頁面載入期間被點擊
+                                          if (_isPageMounted && !_isLoading) {
+                                            _handleCancelAttendance();
+                                          } else {
+                                            debugPrint('頁面未完全掛載或載入中，忽略點擊事件');
+                                          }
+                                        },
+                                      ),
+
+                                      SizedBox(width: 15.w),
+
                                       // 確認出席按鈕
                                       ImageButtonWithCountdown(
                                         text: '確認出席',
@@ -418,10 +444,10 @@ class _AttendanceConfirmationPageState
                                         countdownText: _formatRemainingHours(),
                                         imagePath:
                                             'assets/images/ui/button/red_l.png',
-                                        width: 180.w,
-                                        height: 85.h,
+                                        width: 150.w,
+                                        height: 70.h,
                                         countdownTextStyle: TextStyle(
-                                          fontSize: 14.sp,
+                                          fontSize: 11.sp,
                                           color: const Color(0xFFFFD9B3),
                                           fontFamily: 'OtsutomeFont',
                                           fontWeight: FontWeight.bold,
@@ -430,31 +456,6 @@ class _AttendanceConfirmationPageState
                                           // 防止頁面載入期間被點擊
                                           if (_isPageMounted && !_isLoading) {
                                             _handleConfirmAttendance();
-                                          } else {
-                                            debugPrint('頁面未完全掛載或載入中，忽略點擊事件');
-                                          }
-                                        },
-                                      ),
-
-                                      SizedBox(height: 15.h),
-
-                                      // 無法出席按鈕
-                                      ImageButton(
-                                        text: '無法出席',
-                                        imagePath:
-                                            'assets/images/ui/button/blue_m.png',
-                                        width: 180.w,
-                                        height: 70.h,
-                                        textStyle: TextStyle(
-                                          fontSize: 18.sp,
-                                          color: const Color(0xFFD1D1D1),
-                                          fontFamily: 'OtsutomeFont',
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        onPressed: () {
-                                          // 防止頁面載入期間被點擊
-                                          if (_isPageMounted && !_isLoading) {
-                                            _handleCancelAttendance();
                                           } else {
                                             debugPrint('頁面未完全掛載或載入中，忽略點擊事件');
                                           }

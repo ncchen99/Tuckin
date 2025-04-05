@@ -244,7 +244,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                                           imagePath:
                                               'assets/images/ui/button/red_l.png',
                                           width: 160.w,
-                                          height: 68.h,
+                                          height: 70.h,
                                           onPressed: () async {
                                             setState(() {
                                               _isReserving = true;
