@@ -65,7 +65,6 @@ uvicorn main:app --reload
 
 - **群組 API**: `/api/group/*`
 - **餐廳 API**: `/api/restaurant/*`
-- **通知 API**: `/api/notification/*`
 - **用戶 API**: `/api/user/*`
 - **工具 API**: `/api/utils/*`
 

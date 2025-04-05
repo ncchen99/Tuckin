@@ -45,6 +45,8 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- 添加通知權限（Android 13 及以上需要） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 添加查詢所有包的權限（用於URL_LAUNCHER） -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     
     
     <!-- Required to query activities that can process text, see:
@@ -60,5 +62,23 @@
         <!-- 添加 Google 服務查詢支持 -->
         <package android:name="com.google.android.gms"/>
         <package android:name="com.android.vending"/>
+        
+        <!-- 添加 URL_LAUNCHER 所需的查詢支持 -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
     </queries>
 </manifest>

@@ -540,7 +540,7 @@ class _MyAppState extends State<MyApp> {
                         _handleNetworkRetry(context);
                       },
                       isServerError: false,
-                      showButton: true, // 始終顯示按鈕，以便用戶可以點擊重試
+                      showButton: false, // 不顯示按鈕
                     ),
                   ),
                 // 顯示其他錯誤

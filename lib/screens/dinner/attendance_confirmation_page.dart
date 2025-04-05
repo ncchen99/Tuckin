@@ -409,6 +409,12 @@ class _AttendanceConfirmationPageState
                                       // 確認出席按鈕
                                       ImageButtonWithCountdown(
                                         text: '確認出席',
+                                        textStyle: TextStyle(
+                                          fontSize: 18.sp,
+                                          color: const Color(0xFFD1D1D1),
+                                          fontFamily: 'OtsutomeFont',
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                         countdownText: _formatRemainingHours(),
                                         imagePath:
                                             'assets/images/ui/button/red_l.png',
