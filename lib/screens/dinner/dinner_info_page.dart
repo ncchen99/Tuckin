@@ -680,7 +680,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           Container(
             width: cardWidth,
             margin: EdgeInsets.symmetric(vertical: 8.h),
-            padding: EdgeInsets.all(15.h),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.9),
               borderRadius: BorderRadius.circular(15.r),
@@ -692,28 +691,54 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 ),
               ],
             ),
-            child: Column(
-              children: [
-                Text(
-                  '提示',
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF23456B),
-                    fontWeight: FontWeight.bold,
-                  ),
+            child: Material(
+              color: Colors.transparent,
+              child: Padding(
+                padding: EdgeInsets.all(15.h),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 提示圖標置中 (帶陰影)
+                    SizedBox(
+                      width: 30.w,
+                      height: 30.h,
+                      child: Stack(
+                        children: [
+                          // 底部陰影
+                          Positioned(
+                            left: 0.w,
+                            top: 1.h,
+                            child: Image.asset(
+                              'assets/images/icon/info.png',
+                              width: 28.w,
+                              height: 28.h,
+                              color: Colors.black.withOpacity(0.3),
+                              colorBlendMode: BlendMode.srcIn,
+                            ),
+                          ),
+                          // 主圖標
+                          Image.asset(
+                            'assets/images/icon/info.png',
+                            width: 28.w,
+                            height: 28.h,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    // 提示內容
+                    Text(
+                      '請在指定時間抵達餐廳。\n如有任何變動，系統將會發送通知。',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontFamily: 'OtsutomeFont',
+                        color: const Color(0xFF666666),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-                SizedBox(height: 10.h),
-                Text(
-                  '請在指定時間抵達餐廳。\n如有任何變動，系統將會發送通知。',
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF666666),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+              ),
             ),
           ),
         ],
