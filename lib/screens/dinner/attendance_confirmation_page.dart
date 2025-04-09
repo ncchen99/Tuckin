@@ -299,7 +299,7 @@ class _AttendanceConfirmationPageState
                         // 提示文字
                         Center(
                           child: Text(
-                            '聚餐配對成功！',
+                            '找到了！',
                             style: TextStyle(
                               fontSize: 24.sp,
                               fontFamily: 'OtsutomeFont',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
@@ -144,116 +145,125 @@ class _ProfilePageState extends State<ProfilePage> {
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: EdgeInsets.symmetric(horizontal: 20.w),
-          child: Container(
-            width: 320.w,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
-              borderRadius: BorderRadius.circular(20.r),
-              border: Border.all(color: const Color(0xFF23456B), width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: Offset(0, 5.h),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: 30.h),
-                // 圖標
-                SizedBox(
-                  width: 60.w,
-                  height: 60.h,
-                  child: Stack(
-                    clipBehavior: Clip.none,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(
+              width: 320.w,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(20.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: 1,
+                    offset: Offset(0, 8.h),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 30.h),
+                  // 圖標
+                  SizedBox(
+                    width: 60.w,
+                    height: 60.h,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // 底部陰影
+                        Positioned(
+                          left: 0,
+                          top: 3.h,
+                          child: Image.asset(
+                            'assets/images/icon/logout.png',
+                            width: 60.w,
+                            height: 60.h,
+                            color: Colors.black.withOpacity(0.4),
+                            colorBlendMode: BlendMode.srcIn,
+                          ),
+                        ),
+                        // 主圖像
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          child: Image.asset(
+                            'assets/images/icon/logout.png',
+                            width: 60.w,
+                            height: 60.h,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 15.h),
+                  // 內容
+                  Container(
+                    width: double.infinity,
+                    margin: EdgeInsets.symmetric(horizontal: 20.w),
+                    padding: EdgeInsets.symmetric(
+                      vertical: 10.h,
+                      horizontal: 10.w,
+                    ),
+
+                    child: Text(
+                      '確定要登出嗎？您將需要重新登入才能使用所有功能。',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontFamily: 'OtsutomeFont',
+                        color: const Color(0xFF23456B),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 20.h),
+                  // 按鈕
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // 底部陰影
-                      Positioned(
-                        left: 0,
-                        top: 3.h,
-                        child: Image.asset(
-                          'assets/images/icon/logout.png',
-                          width: 60.w,
-                          height: 60.h,
-                          color: Colors.black.withOpacity(0.4),
-                          colorBlendMode: BlendMode.srcIn,
+                      ImageButton(
+                        text: '取消',
+                        imagePath: 'assets/images/ui/button/blue_m.png',
+                        width: 110.w,
+                        height: 55.h,
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        textStyle: TextStyle(
+                          fontSize: 16.sp,
+                          color: Colors.white,
+                          fontFamily: 'OtsutomeFont',
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      // 主圖像
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        child: Image.asset(
-                          'assets/images/icon/logout.png',
-                          width: 60.w,
-                          height: 60.h,
+                      SizedBox(width: 20.w),
+                      ImageButton(
+                        text: '確定',
+                        imagePath: 'assets/images/ui/button/red_m.png',
+                        width: 110.w,
+                        height: 55.h,
+                        onPressed: () async {
+                          await _authService.signOut();
+                          if (mounted) {
+                            Navigator.of(context).pop(); // 關閉對話框
+                            final navigationService = NavigationService();
+                            navigationService.navigateAfterSignOut(context);
+                          }
+                        },
+                        textStyle: TextStyle(
+                          fontSize: 16.sp,
+                          color: Colors.white,
+                          fontFamily: 'OtsutomeFont',
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                SizedBox(height: 15.h),
-                // 內容
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20.w),
-                  child: Text(
-                    '確定要登出嗎？您將需要重新登入才能使用所有功能。',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 20.h),
-                // 按鈕
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ImageButton(
-                      text: '取消',
-                      imagePath: 'assets/images/ui/button/blue_m.png',
-                      width: 110.w,
-                      height: 55.h,
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      textStyle: TextStyle(
-                        fontSize: 16.sp,
-                        color: Colors.white,
-                        fontFamily: 'OtsutomeFont',
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(width: 20.w),
-                    ImageButton(
-                      text: '確定',
-                      imagePath: 'assets/images/ui/button/red_m.png',
-                      width: 110.w,
-                      height: 55.h,
-                      onPressed: () async {
-                        await _authService.signOut();
-                        if (mounted) {
-                          Navigator.of(context).pop(); // 關閉對話框
-                          final navigationService = NavigationService();
-                          navigationService.navigateAfterSignOut(context);
-                        }
-                      },
-                      textStyle: TextStyle(
-                        fontSize: 16.sp,
-                        color: Colors.white,
-                        fontFamily: 'OtsutomeFont',
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 30.h),
-              ],
+                  SizedBox(height: 30.h),
+                ],
+              ),
             ),
           ),
         );
@@ -270,121 +280,129 @@ class _ProfilePageState extends State<ProfilePage> {
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: EdgeInsets.symmetric(horizontal: 20.w),
-          child: Container(
-            width: 320.w,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
-              borderRadius: BorderRadius.circular(20.r),
-              border: Border.all(color: const Color(0xFF23456B), width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: Offset(0, 5.h),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: 30.h),
-                // 圖標
-                SizedBox(
-                  width: 60.w,
-                  height: 60.h,
-                  child: Stack(
-                    clipBehavior: Clip.none,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(
+              width: 320.w,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(20.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 15,
+                    spreadRadius: 1,
+                    offset: Offset(0, 8.h),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 30.h),
+                  // 圖標
+                  SizedBox(
+                    width: 60.w,
+                    height: 60.h,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // 底部陰影
+                        Positioned(
+                          left: 0,
+                          top: 3.h,
+                          child: Image.asset(
+                            'assets/images/icon/delete.png',
+                            width: 60.w,
+                            height: 60.h,
+                            color: Colors.black.withOpacity(0.4),
+                            colorBlendMode: BlendMode.srcIn,
+                          ),
+                        ),
+                        // 主圖像
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          child: Image.asset(
+                            'assets/images/icon/delete.png',
+                            width: 60.w,
+                            height: 60.h,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 15.h),
+                  // 內容
+                  Container(
+                    width: double.infinity,
+                    margin: EdgeInsets.symmetric(horizontal: 20.w),
+                    padding: EdgeInsets.symmetric(
+                      vertical: 10.h,
+                      horizontal: 10.w,
+                    ),
+                    child: Text(
+                      '確定要刪除您的帳號嗎？\n此操作無法撤銷，您的所有資料將被永久刪除。',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontFamily: 'OtsutomeFont',
+                        color: const Color(0xFF23456B),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 20.h),
+                  // 按鈕
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // 底部陰影
-                      Positioned(
-                        left: 0,
-                        top: 3.h,
-                        child: Image.asset(
-                          'assets/images/icon/delete.png',
-                          width: 60.w,
-                          height: 60.h,
-                          color: Colors.black.withOpacity(0.4),
-                          colorBlendMode: BlendMode.srcIn,
+                      ImageButton(
+                        text: '取消',
+                        imagePath: 'assets/images/ui/button/blue_m.png',
+                        width: 110.w,
+                        height: 55.h,
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        textStyle: TextStyle(
+                          fontSize: 16.sp,
+                          color: Colors.white,
+                          fontFamily: 'OtsutomeFont',
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      // 主圖像
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        child: Image.asset(
-                          'assets/images/icon/delete.png',
-                          width: 60.w,
-                          height: 60.h,
+                      SizedBox(width: 20.w),
+                      ImageButton(
+                        text: '確定',
+                        imagePath: 'assets/images/ui/button/red_m.png',
+                        width: 110.w,
+                        height: 55.h,
+                        onPressed: () async {
+                          try {
+                            // 未實現刪除帳號的功能，先登出
+                            await _authService.signOut();
+                            if (mounted) {
+                              Navigator.of(context).pop(); // 關閉對話框
+                              final navigationService = NavigationService();
+                              navigationService.navigateAfterSignOut(context);
+                            }
+                          } catch (e) {
+                            debugPrint('刪除帳號錯誤: $e');
+                          }
+                        },
+                        textStyle: TextStyle(
+                          fontSize: 16.sp,
+                          color: Colors.white,
+                          fontFamily: 'OtsutomeFont',
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                SizedBox(height: 15.h),
-                // 內容
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20.w),
-                  child: Text(
-                    '確定要刪除您的帳號嗎？\n此操作無法撤銷，您的所有資料將被永久刪除。',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 20.h),
-                // 按鈕
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ImageButton(
-                      text: '取消',
-                      imagePath: 'assets/images/ui/button/blue_m.png',
-                      width: 110.w,
-                      height: 55.h,
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      textStyle: TextStyle(
-                        fontSize: 16.sp,
-                        color: Colors.white,
-                        fontFamily: 'OtsutomeFont',
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(width: 20.w),
-                    ImageButton(
-                      text: '確定',
-                      imagePath: 'assets/images/ui/button/red_m.png',
-                      width: 110.w,
-                      height: 55.h,
-                      onPressed: () async {
-                        try {
-                          // 未實現刪除帳號的功能，先登出
-                          await _authService.signOut();
-                          if (mounted) {
-                            Navigator.of(context).pop(); // 關閉對話框
-                            final navigationService = NavigationService();
-                            navigationService.navigateAfterSignOut(context);
-                          }
-                        } catch (e) {
-                          debugPrint('刪除帳號錯誤: $e');
-                        }
-                      },
-                      textStyle: TextStyle(
-                        fontSize: 16.sp,
-                        color: Colors.white,
-                        fontFamily: 'OtsutomeFont',
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 30.h),
-              ],
+                  SizedBox(height: 30.h),
+                ],
+              ),
             ),
           ),
         );
