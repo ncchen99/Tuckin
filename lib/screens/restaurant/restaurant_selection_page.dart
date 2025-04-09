@@ -262,8 +262,9 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                           vertical: 10.h,
                         ),
                         child: Text(
-                          '請輸入Google地圖上餐廳的分享連結',
+                          '請輸入 Google 地圖上餐廳的分享連結',
                           style: TextStyle(
+                            fontFamily: 'OtsutomeFont',
                             fontSize: 14.sp,
                             color: Colors.grey[600],
                           ),
