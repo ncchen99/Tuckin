@@ -485,7 +485,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     Center(
                       child: SizedBox(
                         height: 35.h,
-                        width: 140.w,
+                        width: 155.w,
                         child: Stack(
                           alignment: Alignment.center,
                           clipBehavior: Clip.none,
