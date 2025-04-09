@@ -499,7 +499,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           );
                         },
                       ),
-                      SizedBox(height: 12.h),
+                      SizedBox(height: 15.h),
 
                       // 更改飲食偏好
                       _buildSettingItem(
@@ -516,7 +516,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           );
                         },
                       ),
-                      SizedBox(height: 12.h),
+                      SizedBox(height: 15.h),
 
                       // 重新進行個性測驗
                       _buildSettingItem(
@@ -533,7 +533,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           );
                         },
                       ),
-                      SizedBox(height: 12.h),
+                      SizedBox(height: 15.h),
 
                       // 聚餐歷史記錄
                       _buildSettingItem(
@@ -551,7 +551,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           );
                         },
                       ),
-                      SizedBox(height: 12.h),
+                      SizedBox(height: 15.h),
 
                       // 隱私與條款
                       _buildSettingItem(
@@ -559,7 +559,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         title: '隱私與條款',
                         onTap: _showPrivacyPolicyDialog,
                       ),
-                      SizedBox(height: 12.h),
+                      SizedBox(height: 15.h),
 
                       // 關於我們
                       _buildSettingItem(
@@ -567,7 +567,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         title: '關於我們',
                         onTap: _openAboutUsWebpage,
                       ),
-                      SizedBox(height: 25.h),
+                      SizedBox(height: 35.h),
 
                       // 登出
                       _buildSettingItem(
@@ -575,7 +575,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         title: '登出',
                         onTap: _showLogoutConfirmDialog,
                       ),
-                      SizedBox(height: 12.h),
+                      SizedBox(height: 15.h),
 
                       // 刪除帳號
                       _buildSettingItem(
@@ -583,7 +583,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         title: '刪除帳號',
                         onTap: _showDeleteAccountConfirmDialog,
                       ),
-                      SizedBox(height: 20.h),
+                      SizedBox(height: 15.h),
                     ],
                   ),
                 ),
