@@ -386,6 +386,18 @@ class _ProfilePageState extends State<ProfilePage> {
                             if (currentUser != null) {
                               await _databaseService.deleteUser(currentUser.id);
                             }
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '刪除帳號成功',
+                                    style: const TextStyle(
+                                      fontFamily: 'OtsutomeFont',
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
                             // 登出用戶
                             await _authService.signOut();
                             if (mounted) {

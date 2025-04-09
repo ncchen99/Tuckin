@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'supabase_service.dart';
 import 'api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 資料庫服務，處理與資料庫相關的 CRUD 操作
 class DatabaseService {
@@ -351,6 +352,13 @@ class DatabaseService {
             .delete()
             .eq('user_id', userId);
         debugPrint('已刪除用戶基本資料: $userId');
+
+        // 確保清理本地存儲的登入狀態
+        await _supabaseService.client.auth.signOut();
+
+        // 可能需要清理本地存儲
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.clear(); // 清理所有相關存儲
 
         debugPrint('用戶刪除完成: $userId');
       },

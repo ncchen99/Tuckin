@@ -88,6 +88,12 @@ class RealtimeService with WidgetsBindingObserver {
     debugPrint('RealtimeService: 應用恢復前台');
 
     try {
+      // 檢查用戶是否已登入
+      if (!await _authService.isLoggedIn()) {
+        debugPrint('RealtimeService: 用戶未登入，跳過狀態檢查和導航');
+        return;
+      }
+
       // 重新連接實時訂閱
       if (!_isSubscribed && _userId != null) {
         await subscribeToUserStatus();
@@ -206,13 +212,30 @@ class RealtimeService with WidgetsBindingObserver {
         if (_lastUserStatus != status) {
           debugPrint('RealtimeService: 用戶狀態已改變，從 $_lastUserStatus 變為 $status');
           _lastUserStatus = status;
-          _navigateBasedOnStatus(status);
+
+          // 異步檢查用戶是否已登入，只有登入狀態才導航
+          _checkLoginAndNavigate(status);
         } else {
           debugPrint('RealtimeService: 用戶狀態未改變，保持當前頁面');
         }
       }
     } catch (e) {
       debugPrint('RealtimeService: 處理狀態變更事件時發生錯誤 - $e');
+    }
+  }
+
+  // 檢查登入狀態後再導航
+  Future<void> _checkLoginAndNavigate(String status) async {
+    try {
+      bool isLoggedIn = await _authService.isLoggedIn();
+      if (isLoggedIn) {
+        debugPrint('RealtimeService: 用戶已登入，執行導航');
+        _navigateBasedOnStatus(status);
+      } else {
+        debugPrint('RealtimeService: 用戶未登入，忽略狀態變化導航');
+      }
+    } catch (e) {
+      debugPrint('RealtimeService: 檢查登入狀態出錯 - $e');
     }
   }
 
@@ -224,6 +247,12 @@ class RealtimeService with WidgetsBindingObserver {
     }
 
     try {
+      // 首先檢查用戶是否已登入
+      if (!await _authService.isLoggedIn()) {
+        debugPrint('RealtimeService: 用戶未登入，跳過狀態檢查和導航');
+        return;
+      }
+
       final currentStatus = await _databaseService.getUserStatus(_userId!);
       debugPrint(
         'RealtimeService: 檢查到用戶當前狀態: $currentStatus，上一狀態: $_lastUserStatus',
@@ -250,68 +279,76 @@ class RealtimeService with WidgetsBindingObserver {
       return;
     }
 
-    final navigator = _navigatorKey!.currentState!;
+    // 由於這個方法可能在異步操作後被調用，再次檢查登入狀態
+    _authService.isLoggedIn().then((isLoggedIn) {
+      if (!isLoggedIn) {
+        debugPrint('RealtimeService: 導航時檢測到用戶未登入，放棄導航');
+        return;
+      }
 
-    // 獲取當前路由名稱
-    String? currentRoute;
-    navigator.popUntil((route) {
-      currentRoute = route.settings.name;
-      return true;
+      final navigator = _navigatorKey!.currentState!;
+
+      // 獲取當前路由名稱
+      String? currentRoute;
+      navigator.popUntil((route) {
+        currentRoute = route.settings.name;
+        return true;
+      });
+
+      debugPrint('RealtimeService: 當前路由: $currentRoute, 用戶狀態: $status');
+
+      switch (status) {
+        case 'initial':
+          // 初始狀態，應該在首頁
+          _navigateIfNotCurrent(navigator, '/home');
+          break;
+
+        case 'booking':
+          // 預約階段，應該在預約頁面
+          _navigateIfNotCurrent(navigator, '/dinner_reservation');
+          break;
+
+        case 'waiting_matching':
+          // 等待配對階段，應該在等待配對頁面
+          _navigateIfNotCurrent(navigator, '/matching_status');
+          break;
+
+        case 'waiting_confirmation':
+          // 等待確認階段，應該在等待確認頁面
+          // 如果用戶已經在餐廳選擇頁面，則不需要導航
+          if (currentRoute == '/restaurant_selection' ||
+              currentRoute == '/restaurant_reservation') {
+            debugPrint('RealtimeService: 用戶已在餐廳選擇頁面，不需要重新導航');
+          } else {
+            _navigateIfNotCurrent(navigator, '/attendance_confirmation');
+          }
+          break;
+
+        case 'waiting_other_users':
+          // 等待其他用戶階段，應該在等待其他用戶頁面
+          _navigateIfNotCurrent(navigator, '/dinner_info');
+          break;
+
+        case 'waiting_attendance':
+          // 等待出席階段，應該在晚餐資訊頁面
+          _navigateIfNotCurrent(navigator, '/dinner_info');
+          break;
+
+        case 'matching_failed':
+          // 配對失敗階段，應該回到首頁
+          _navigateIfNotCurrent(navigator, '/home');
+          break;
+
+        case 'rating':
+          // 評分階段，應該在評分頁面
+          _navigateIfNotCurrent(navigator, '/dinner_rating');
+          break;
+
+        default:
+          debugPrint('RealtimeService: 未知狀態 - $status，保持當前頁面');
+          break;
+      }
     });
-
-    debugPrint('RealtimeService: 當前路由: $currentRoute, 用戶狀態: $status');
-
-    switch (status) {
-      case 'initial':
-        // 初始狀態，應該在首頁
-        _navigateIfNotCurrent(navigator, '/home');
-        break;
-
-      case 'booking':
-        // 預約階段，應該在預約頁面
-        _navigateIfNotCurrent(navigator, '/dinner_reservation');
-        break;
-
-      case 'waiting_matching':
-        // 等待配對階段，應該在等待配對頁面
-        _navigateIfNotCurrent(navigator, '/matching_status');
-        break;
-
-      case 'waiting_confirmation':
-        // 等待確認階段，應該在等待確認頁面
-        // 如果用戶已經在餐廳選擇頁面，則不需要導航
-        if (currentRoute == '/restaurant_selection' ||
-            currentRoute == '/restaurant_reservation') {
-          debugPrint('RealtimeService: 用戶已在餐廳選擇頁面，不需要重新導航');
-        } else {
-          _navigateIfNotCurrent(navigator, '/attendance_confirmation');
-        }
-        break;
-
-      case 'waiting_other_users':
-        // 等待其他用戶階段，應該在等待其他用戶頁面
-        _navigateIfNotCurrent(navigator, '/dinner_info');
-        break;
-
-      case 'waiting_attendance':
-        // 等待出席階段，應該在晚餐資訊頁面
-        _navigateIfNotCurrent(navigator, '/dinner_info');
-        break;
-
-      case 'matching_failed':
-        // 配對失敗階段，應該回到首頁
-        _navigateIfNotCurrent(navigator, '/home');
-        break;
-
-      case 'rating':
-        // 評分階段，應該在評分頁面
-        _navigateIfNotCurrent(navigator, '/dinner_rating');
-        break;
-
-      default:
-        debugPrint('RealtimeService: 未知狀態 - $status，保持當前頁面');
-        break;
-    }
   }
 
   // 如果當前頁面不是目標頁面，則導航到目標頁面
