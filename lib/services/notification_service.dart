@@ -82,7 +82,7 @@ class NotificationService {
   // 初始化本地通知
   Future<void> _initializeLocalNotifications() async {
     const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/notification_icon');
 
     const InitializationSettings initSettings = InitializationSettings(
       android: androidSettings,
@@ -191,7 +191,7 @@ class NotificationService {
             channelDescription: '用於接收聚餐相關通知',
             importance: Importance.high,
             priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
+            icon: '@drawable/notification_icon',
           ),
         ),
         payload: message.data.toString(),

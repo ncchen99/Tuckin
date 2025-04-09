@@ -202,7 +202,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             ),
           ),
 
-          SizedBox(height: 25.h),
+          SizedBox(height: 35.h),
 
           // 圖示 - 使用頭像和圓形遮罩
           Center(
@@ -218,8 +218,8 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                     height: 150.w, // 使用相同的寬度單位確保是正方形
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: const Color(0xFF23456B),
-                        width: 2.w,
+                        color: const Color.fromARGB(255, 184, 80, 51),
+                        width: 3.w,
                       ),
                       shape: BoxShape.circle,
                       image: DecorationImage(
