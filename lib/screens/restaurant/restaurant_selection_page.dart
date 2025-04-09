@@ -289,6 +289,11 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                       'assets/images/ui/button/blue_m.png',
                                   width: 120.w,
                                   height: 60.h,
+                                  textStyle: TextStyle(
+                                    fontFamily: 'OtsutomeFont',
+                                    fontSize: 16.sp,
+                                    color: const Color(0xFFD1D1D1),
+                                  ),
                                   onPressed: () {
                                     _mapLinkFocusNode.unfocus();
                                     Navigator.pop(context);

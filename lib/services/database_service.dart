@@ -302,4 +302,58 @@ class DatabaseService {
       },
     );
   }
+
+  /// 刪除用戶及相關資料
+  ///
+  /// [userId] 要刪除的用戶 ID
+  /// 此操作將從所有相關表中移除用戶資料，不可恢復
+  Future<void> deleteUser(String userId) async {
+    return _apiService.handleRequest(
+      request: () async {
+        // 刪除用戶裝置令牌
+        await _supabaseService.client
+            .from('user_device_tokens')
+            .delete()
+            .eq('user_id', userId);
+        debugPrint('已刪除用戶裝置令牌: $userId');
+
+        // 刪除用戶食物偏好
+        await _supabaseService.client
+            .from(_userFoodPreferencesTable)
+            .delete()
+            .eq('user_id', userId);
+        debugPrint('已刪除用戶食物偏好: $userId');
+
+        // 刪除用戶通知
+        await _supabaseService.client
+            .from('user_notifications')
+            .delete()
+            .eq('user_id', userId);
+        debugPrint('已刪除用戶通知: $userId');
+
+        // 刪除用戶性格結果
+        await _supabaseService.client
+            .from(_personalityResultsTable)
+            .delete()
+            .eq('user_id', userId);
+        debugPrint('已刪除用戶性格結果: $userId');
+
+        // 刪除用戶狀態
+        await _supabaseService.client
+            .from(_userStatusTable)
+            .delete()
+            .eq('user_id', userId);
+        debugPrint('已刪除用戶狀態: $userId');
+
+        // 最後刪除用戶基本資料
+        await _supabaseService.client
+            .from(_userProfilesTable)
+            .delete()
+            .eq('user_id', userId);
+        debugPrint('已刪除用戶基本資料: $userId');
+
+        debugPrint('用戶刪除完成: $userId');
+      },
+    );
+  }
 }

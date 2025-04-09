@@ -233,7 +233,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         },
                         textStyle: TextStyle(
                           fontSize: 16.sp,
-                          color: Colors.white,
+                          color: const Color(0xFFD1D1D1),
                           fontFamily: 'OtsutomeFont',
                           fontWeight: FontWeight.bold,
                         ),
@@ -254,7 +254,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         },
                         textStyle: TextStyle(
                           fontSize: 16.sp,
-                          color: Colors.white,
+                          color: const Color(0xFFD1D1D1),
                           fontFamily: 'OtsutomeFont',
                           fontWeight: FontWeight.bold,
                         ),
@@ -367,7 +367,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         },
                         textStyle: TextStyle(
                           fontSize: 16.sp,
-                          color: Colors.white,
+                          color: const Color(0xFFD1D1D1),
                           fontFamily: 'OtsutomeFont',
                           fontWeight: FontWeight.bold,
                         ),
@@ -380,7 +380,13 @@ class _ProfilePageState extends State<ProfilePage> {
                         height: 55.h,
                         onPressed: () async {
                           try {
-                            // 未實現刪除帳號的功能，先登出
+                            // 刪除用戶資料
+                            final currentUser =
+                                await _authService.getCurrentUser();
+                            if (currentUser != null) {
+                              await _databaseService.deleteUser(currentUser.id);
+                            }
+                            // 登出用戶
                             await _authService.signOut();
                             if (mounted) {
                               Navigator.of(context).pop(); // 關閉對話框
@@ -389,11 +395,23 @@ class _ProfilePageState extends State<ProfilePage> {
                             }
                           } catch (e) {
                             debugPrint('刪除帳號錯誤: $e');
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '刪除帳號失敗: ${e.toString()}',
+                                    style: const TextStyle(
+                                      fontFamily: 'OtsutomeFont',
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
                           }
                         },
                         textStyle: TextStyle(
                           fontSize: 16.sp,
-                          color: Colors.white,
+                          color: const Color(0xFFD1D1D1),
                           fontFamily: 'OtsutomeFont',
                           fontWeight: FontWeight.bold,
                         ),
