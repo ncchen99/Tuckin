@@ -490,8 +490,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     // 中央品牌標誌
                     SizedBox(
-                      height: 34.h,
-                      width: 130.w,
+                      height: 35.h,
+                      width: 155.w,
                       child: Stack(
                         alignment: Alignment.center,
                         clipBehavior: Clip.none,
@@ -499,19 +499,24 @@ class _ProfilePageState extends State<ProfilePage> {
                           // 底部陰影層
                           Positioned(
                             top: 3.h,
+                            left: 0,
                             child: Image.asset(
                               'assets/images/icon/tuckin_t_brand.png',
-                              height: 33.h,
+                              height: 35.h,
                               fit: BoxFit.contain,
-                              color: Colors.black.withOpacity(0.4),
+                              color: Colors.black.withValues(alpha: .4),
                               colorBlendMode: BlendMode.srcIn,
                             ),
                           ),
                           // 主圖層
-                          Image.asset(
-                            'assets/images/icon/tuckin_t_brand.png',
-                            height: 34.h,
-                            fit: BoxFit.contain,
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            child: Image.asset(
+                              'assets/images/icon/tuckin_t_brand.png',
+                              height: 35.h,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ],
                       ),
