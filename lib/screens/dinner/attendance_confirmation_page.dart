@@ -179,7 +179,7 @@ class _AttendanceConfirmationPageState
           SnackBar(
             content: Text(
               '確認失敗: $e',
-              style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
             ),
           ),
         );
@@ -225,7 +225,7 @@ class _AttendanceConfirmationPageState
           SnackBar(
             content: Text(
               '取消失敗: $e',
-              style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
             ),
           ),
         );

@@ -7,7 +7,9 @@ import 'package:tuckin/utils/index.dart';
 // 下一個頁面
 
 class FoodPreferencePage extends StatefulWidget {
-  const FoodPreferencePage({super.key});
+  final bool isFromProfile;
+
+  const FoodPreferencePage({super.key, this.isFromProfile = false});
 
   @override
   State<FoodPreferencePage> createState() => _FoodPreferencePageState();
@@ -18,6 +20,7 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
   final DatabaseService _databaseService = DatabaseService();
   final Set<int> _selectedFoods = {}; // 用於存儲選中的食物ID
   bool _isLoading = false;
+  bool _isDataLoaded = false;
 
   // 食物類型列表 - 更新為目錄中提供的圖片
   final List<Map<String, dynamic>> _foodTypes = [
@@ -40,11 +43,59 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
     {'id': 17, 'name': '火鍋料理', 'image': 'assets/images/dish/hotpot.png'},
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadUserFoodPreferences();
+  }
+
+  // 加載用戶的飲食偏好
+  Future<void> _loadUserFoodPreferences() async {
+    if (widget.isFromProfile) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final currentUser = await _authService.getCurrentUser();
+        if (currentUser != null) {
+          final userProfile = await _databaseService.getUserCompleteProfile(
+            currentUser.id,
+          );
+
+          if (userProfile != null && userProfile['food_preferences'] != null) {
+            final foodPreferences = List<int>.from(
+              userProfile['food_preferences'],
+            );
+            setState(() {
+              _selectedFoods.clear();
+              _selectedFoods.addAll(foodPreferences);
+              _isDataLoaded = true;
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('載入用戶飲食偏好出錯: $e');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
   // 處理返回按鈕
   void _handleBack() {
-    // 使用NavigationService導航到profile_setup頁面
-    final navigationService = NavigationService();
-    navigationService.navigateToPreviousSetupStep(context, 'food_preference');
+    if (widget.isFromProfile) {
+      // 如果是從profile頁面導航過來的，返回profile頁面
+      Navigator.of(context).pop();
+    } else {
+      // 否則使用正常的onboarding流程返回
+      final navigationService = NavigationService();
+      navigationService.navigateToPreviousSetupStep(context, 'food_preference');
+    }
   }
 
   // 處理食物選擇
@@ -58,12 +109,17 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
     });
   }
 
-  // 處理下一步按鈕
+  // 處理下一步或完成按鈕
   Future<void> _handleNextStep() async {
     if (_selectedFoods.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('請至少選擇一種食物類型')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '請至少選擇一種食物類型',
+            style: TextStyle(fontFamily: 'OtsutomeFont'),
+          ),
+        ),
+      );
       return;
     }
     setState(() {
@@ -76,9 +132,14 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
 
       if (currentUser == null) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('您尚未登入，請先登入')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '您尚未登入，請先登入',
+                style: TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+            ),
+          );
         }
         return;
       }
@@ -92,16 +153,34 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
         foodPreferences,
       );
 
-      // 使用NavigationService進行導航
       if (mounted) {
-        final navigationService = NavigationService();
-        navigationService.navigateToNextSetupStep(context, 'food_preference');
+        if (widget.isFromProfile) {
+          // 如果是從profile頁面導航過來的，保存後返回profile頁面
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '飲食偏好更新成功',
+                style: TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+            ),
+          );
+          Navigator.of(context).pop();
+        } else {
+          // 否則繼續正常的onboarding流程
+          final navigationService = NavigationService();
+          navigationService.navigateToNextSetupStep(context, 'food_preference');
+        }
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('儲存資料失敗: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '儲存資料失敗: $error',
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -124,8 +203,8 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
     try {
       return WillPopScope(
         onWillPop: () async {
-          // 系統返回按鍵被點擊時導航到profile_setup頁面
-          Navigator.of(context).pushReplacementNamed('/profile_setup');
+          // 系統返回按鍵根據來源決定行為
+          _handleBack();
           return false; // 返回false阻止默認行為
         },
         child: Scaffold(
@@ -138,197 +217,233 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
               ),
             ),
             child: SafeArea(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  children: [
-                    // 頂部標題和返回按鈕放在同一行
-                    Padding(
-                      padding: EdgeInsets.only(top: 40.h, bottom: 20.h),
-                      child: Row(
-                        children: [
-                          // 左側返回按鈕
-                          Padding(
-                            padding: EdgeInsets.only(left: 20.w, bottom: 8.h),
-                            child: BackIconButton(
-                              onPressed: _handleBack,
-                              width: 35.w,
-                              height: 35.h,
-                            ),
-                          ),
-                          // 中央標題
-                          Expanded(
-                            child: Text(
-                              '飲食偏好設定',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 30.sp,
-                                fontFamily: 'OtsutomeFont',
-                                color: const Color(0xFF23456B),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          // 為了平衡布局，添加一個空白區域
-                          SizedBox(width: 55.w),
-                        ],
-                      ),
-                    ),
-
-                    // 提示文字
-                    Padding(
-                      padding: EdgeInsets.only(bottom: 20.h),
-                      child: Text(
-                        '請選擇您喜愛的食物類型 (可複選)',
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          fontFamily: 'OtsutomeFont',
-                          color: const Color(0xFF23456B),
+              child:
+                  _isLoading && !_isDataLoaded
+                      ? Center(
+                        child: LoadingImage(
+                          width: 60.w,
+                          height: 60.h,
+                          color: const Color(0xFFB33D1C),
                         ),
-                      ),
-                    ),
-
-                    // 食物選擇網格
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20.w),
-                      child: GridView.builder(
-                        physics:
-                            const NeverScrollableScrollPhysics(), // 禁用網格自身的滾動
-                        shrinkWrap: true, // 讓網格根據內容收縮
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 15.w,
-                          mainAxisSpacing: 15.h,
-                          childAspectRatio: 1.8, // 控制卡片長寬比
-                        ),
-                        itemCount: _foodTypes.length,
-                        itemBuilder: (context, index) {
-                          final food = _foodTypes[index];
-                          final isSelected = _selectedFoods.contains(
-                            food['id'],
-                          );
-
-                          return GestureDetector(
-                            onTap: () => _toggleFoodSelection(food['id']),
-                            child: Stack(
-                              children: [
-                                // 基本卡片容器
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.9),
-                                    borderRadius: BorderRadius.circular(12.r),
+                      )
+                      : SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          children: [
+                            // 頂部標題和返回按鈕放在同一行
+                            Padding(
+                              padding: EdgeInsets.only(top: 25.h, bottom: 20.h),
+                              child: Row(
+                                children: [
+                                  // 左側返回按鈕
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      left: 20.w,
+                                      bottom: 8.h,
+                                    ),
+                                    child: BackIconButton(
+                                      onPressed: _handleBack,
+                                      width: 35.w,
+                                      height: 35.h,
+                                    ),
                                   ),
-                                  clipBehavior:
-                                      Clip.hardEdge, // 使用clipBehavior來防止內容溢出
-                                  child: Stack(
-                                    children: [
-                                      // 食物名稱
-                                      Positioned(
-                                        left: 10.w,
-                                        top: 0,
-                                        bottom: 0,
-                                        child: Center(
-                                          child: Text(
-                                            food['name'],
-                                            style: TextStyle(
-                                              fontSize: 16.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-
-                                      // 食物圖片，修改為在容器內顯示
-                                      Positioned(
-                                        right: -28.w,
-                                        top: 0,
-                                        bottom: -32.h,
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.only(
-                                            topRight: Radius.circular(12.r),
-                                            bottomRight: Radius.circular(12.r),
-                                          ),
-                                          child: Container(
-                                            width: 100.w,
-                                            height: double.infinity,
-                                            alignment: Alignment.center,
-                                            child: Image.asset(
-                                              food['image'],
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (
-                                                context,
-                                                error,
-                                                stackTrace,
-                                              ) {
-                                                debugPrint(
-                                                  'FoodPreferencePage: 圖片加載錯誤 ${food['image']}: $error',
-                                                );
-                                                return const Icon(
-                                                  Icons.error,
-                                                  color: Colors.red,
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // 選中的邊框 - 置於最上層，改為橘色
-                                if (isSelected)
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12.r),
-                                      border: Border.all(
-                                        color: const Color(0xFFB33D1C), // 橘色主題色
-                                        width: 3,
+                                  // 中央標題
+                                  Expanded(
+                                    child: Text(
+                                      '飲食偏好設定',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 25.sp,
+                                        fontFamily: 'OtsutomeFont',
+                                        color: const Color(0xFF23456B),
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    // 下一步按鈕區域
-                    Container(
-                      margin: EdgeInsets.symmetric(vertical: 30.h),
-                      alignment: Alignment.center,
-                      child:
-                          _isLoading
-                              ? LoadingImage(
-                                width: 60.w,
-                                height: 60.h,
-                                color: const Color(0xFFB33D1C),
-                              )
-                              : ImageButton(
-                                text: '下一步',
-                                imagePath: 'assets/images/ui/button/red_l.png',
-                                width: 150.w,
-                                height: 70.h,
-                                onPressed: _handleNextStep,
-                                isEnabled: _isFormValid(), // 根據選擇狀態決定按鈕是否啟用
+                                  // 為了平衡布局，添加一個空白區域
+                                  SizedBox(width: 55.w),
+                                ],
                               ),
-                    ),
+                            ),
 
-                    // 進度指示器
-                    Padding(
-                      padding: EdgeInsets.only(bottom: 20.h),
-                      child: const ProgressDotsIndicator(
-                        totalSteps: 5,
-                        currentStep: 3,
+                            // 提示文字
+                            Padding(
+                              padding: EdgeInsets.only(bottom: 20.h),
+                              child: Text(
+                                '請選擇您喜愛的食物類型 (可複選)',
+                                style: TextStyle(
+                                  fontSize: 18.sp,
+                                  fontFamily: 'OtsutomeFont',
+                                  color: const Color(0xFF23456B),
+                                ),
+                              ),
+                            ),
+
+                            // 食物選擇網格
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 20.w),
+                              child: GridView.builder(
+                                physics:
+                                    const NeverScrollableScrollPhysics(), // 禁用網格自身的滾動
+                                shrinkWrap: true, // 讓網格根據內容收縮
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 15.w,
+                                      mainAxisSpacing: 15.h,
+                                      childAspectRatio: 1.8, // 控制卡片長寬比
+                                    ),
+                                itemCount: _foodTypes.length,
+                                itemBuilder: (context, index) {
+                                  final food = _foodTypes[index];
+                                  final isSelected = _selectedFoods.contains(
+                                    food['id'],
+                                  );
+
+                                  return GestureDetector(
+                                    onTap:
+                                        () => _toggleFoodSelection(food['id']),
+                                    child: Stack(
+                                      children: [
+                                        // 基本卡片容器
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.9,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12.r,
+                                            ),
+                                          ),
+                                          clipBehavior:
+                                              Clip.hardEdge, // 使用clipBehavior來防止內容溢出
+                                          child: Stack(
+                                            children: [
+                                              // 食物名稱
+                                              Positioned(
+                                                left: 10.w,
+                                                top: 0,
+                                                bottom: 0,
+                                                child: Center(
+                                                  child: Text(
+                                                    food['name'],
+                                                    style: TextStyle(
+                                                      fontSize: 16.sp,
+                                                      fontFamily:
+                                                          'OtsutomeFont',
+                                                      color: const Color(
+                                                        0xFF23456B,
+                                                      ),
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+
+                                              // 食物圖片，修改為在容器內顯示
+                                              Positioned(
+                                                right: -28.w,
+                                                top: 0,
+                                                bottom: -32.h,
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.only(
+                                                        topRight:
+                                                            Radius.circular(
+                                                              12.r,
+                                                            ),
+                                                        bottomRight:
+                                                            Radius.circular(
+                                                              12.r,
+                                                            ),
+                                                      ),
+                                                  child: Container(
+                                                    width: 100.w,
+                                                    height: double.infinity,
+                                                    alignment: Alignment.center,
+                                                    child: Image.asset(
+                                                      food['image'],
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (
+                                                        context,
+                                                        error,
+                                                        stackTrace,
+                                                      ) {
+                                                        debugPrint(
+                                                          'FoodPreferencePage: 圖片加載錯誤 ${food['image']}: $error',
+                                                        );
+                                                        return const Icon(
+                                                          Icons.error,
+                                                          color: Colors.red,
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        // 選中的邊框 - 置於最上層，改為橘色
+                                        if (isSelected)
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.transparent,
+                                              borderRadius:
+                                                  BorderRadius.circular(12.r),
+                                              border: Border.all(
+                                                color: const Color(
+                                                  0xFFB33D1C,
+                                                ), // 橘色主題色
+                                                width: 3,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                            // 下一步或完成按鈕區域
+                            Container(
+                              margin: EdgeInsets.symmetric(vertical: 30.h),
+                              alignment: Alignment.center,
+                              child:
+                                  _isLoading
+                                      ? LoadingImage(
+                                        width: 60.w,
+                                        height: 60.h,
+                                        color: const Color(0xFFB33D1C),
+                                      )
+                                      : ImageButton(
+                                        text:
+                                            widget.isFromProfile ? '完成' : '下一步',
+                                        imagePath:
+                                            'assets/images/ui/button/red_l.png',
+                                        width: 150.w,
+                                        height: 70.h,
+                                        onPressed: _handleNextStep,
+                                        isEnabled:
+                                            _isFormValid(), // 根據選擇狀態決定按鈕是否啟用
+                                      ),
+                            ),
+
+                            // 進度指示器 - 只在非profile來源時顯示
+                            if (!widget.isFromProfile)
+                              Padding(
+                                padding: EdgeInsets.only(bottom: 20.h),
+                                child: const ProgressDotsIndicator(
+                                  totalSteps: 5,
+                                  currentStep: 3,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
         ),

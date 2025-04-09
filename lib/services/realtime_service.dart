@@ -33,6 +33,9 @@ class RealtimeService with WidgetsBindingObserver {
   bool _isSubscribed = false;
   bool _isInitialized = false;
 
+  // 保存上一個用戶狀態
+  String? _lastUserStatus;
+
   // 初始化實時服務
   Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
     _navigatorKey = navigatorKey;
@@ -50,6 +53,10 @@ class RealtimeService with WidgetsBindingObserver {
       }
 
       _userId = user.id;
+
+      // 獲取初始用戶狀態
+      _lastUserStatus = await _databaseService.getUserStatus(_userId!);
+      debugPrint('RealtimeService: 初始用戶狀態: $_lastUserStatus');
 
       // 訂閱用戶狀態
       await subscribeToUserStatus();
@@ -86,8 +93,23 @@ class RealtimeService with WidgetsBindingObserver {
         await subscribeToUserStatus();
       }
 
-      // 檢查用戶狀態並導航
-      await checkUserStatusAndNavigate();
+      // 檢查用戶狀態並只在狀態改變時導航
+      if (_userId != null) {
+        final currentStatus = await _databaseService.getUserStatus(_userId!);
+        debugPrint(
+          'RealtimeService: 檢查到當前用戶狀態: $currentStatus，上一狀態: $_lastUserStatus',
+        );
+
+        if (_lastUserStatus != currentStatus) {
+          debugPrint(
+            'RealtimeService: 用戶狀態已改變，從 $_lastUserStatus 變為 $currentStatus',
+          );
+          _lastUserStatus = currentStatus;
+          _navigateBasedOnStatus(currentStatus);
+        } else {
+          debugPrint('RealtimeService: 用戶狀態未改變，保持當前頁面');
+        }
+      }
     } catch (e) {
       debugPrint('RealtimeService: 應用恢復處理錯誤 - $e');
     }
@@ -108,6 +130,9 @@ class RealtimeService with WidgetsBindingObserver {
       final user = await _authService.getCurrentUser();
       if (user != null) {
         _userId = user.id;
+        // 獲取初始用戶狀態
+        _lastUserStatus = await _databaseService.getUserStatus(_userId!);
+        debugPrint('RealtimeService: 重試初始化 - 獲取初始用戶狀態: $_lastUserStatus');
         await subscribeToUserStatus();
         _isInitialized = true;
       }
@@ -178,7 +203,13 @@ class RealtimeService with WidgetsBindingObserver {
       debugPrint('RealtimeService: 用戶狀態變更 - 新狀態: $status');
 
       if (status != null) {
-        _navigateBasedOnStatus(status);
+        if (_lastUserStatus != status) {
+          debugPrint('RealtimeService: 用戶狀態已改變，從 $_lastUserStatus 變為 $status');
+          _lastUserStatus = status;
+          _navigateBasedOnStatus(status);
+        } else {
+          debugPrint('RealtimeService: 用戶狀態未改變，保持當前頁面');
+        }
       }
     } catch (e) {
       debugPrint('RealtimeService: 處理狀態變更事件時發生錯誤 - $e');
@@ -193,9 +224,20 @@ class RealtimeService with WidgetsBindingObserver {
     }
 
     try {
-      final status = await _databaseService.getUserStatus(_userId!);
-      debugPrint('RealtimeService: 檢查到用戶當前狀態: $status');
-      _navigateBasedOnStatus(status);
+      final currentStatus = await _databaseService.getUserStatus(_userId!);
+      debugPrint(
+        'RealtimeService: 檢查到用戶當前狀態: $currentStatus，上一狀態: $_lastUserStatus',
+      );
+
+      if (_lastUserStatus != currentStatus) {
+        debugPrint(
+          'RealtimeService: 用戶狀態已改變，從 $_lastUserStatus 變為 $currentStatus',
+        );
+        _lastUserStatus = currentStatus;
+        _navigateBasedOnStatus(currentStatus);
+      } else {
+        debugPrint('RealtimeService: 用戶狀態未改變，保持當前頁面');
+      }
     } catch (e) {
       debugPrint('RealtimeService: 檢查用戶狀態錯誤 - $e');
     }

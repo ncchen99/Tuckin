@@ -4,6 +4,9 @@ import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
+import 'package:tuckin/screens/onboarding/profile_setup_page.dart';
+import 'package:tuckin/screens/onboarding/food_preference_page.dart';
+import 'package:tuckin/screens/onboarding/personality_test_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -160,10 +163,36 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 SizedBox(height: 30.h),
                 // 圖標
-                Image.asset(
-                  'assets/images/icon/logout.png',
+                SizedBox(
                   width: 60.w,
                   height: 60.h,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // 底部陰影
+                      Positioned(
+                        left: 0,
+                        top: 3.h,
+                        child: Image.asset(
+                          'assets/images/icon/logout.png',
+                          width: 60.w,
+                          height: 60.h,
+                          color: Colors.black.withOpacity(0.4),
+                          colorBlendMode: BlendMode.srcIn,
+                        ),
+                      ),
+                      // 主圖像
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        child: Image.asset(
+                          'assets/images/icon/logout.png',
+                          width: 60.w,
+                          height: 60.h,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
                 SizedBox(height: 15.h),
@@ -260,10 +289,36 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 SizedBox(height: 30.h),
                 // 圖標
-                Image.asset(
-                  'assets/images/icon/delete.png',
+                SizedBox(
                   width: 60.w,
                   height: 60.h,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // 底部陰影
+                      Positioned(
+                        left: 0,
+                        top: 3.h,
+                        child: Image.asset(
+                          'assets/images/icon/delete.png',
+                          width: 60.w,
+                          height: 60.h,
+                          color: Colors.black.withOpacity(0.4),
+                          colorBlendMode: BlendMode.srcIn,
+                        ),
+                      ),
+                      // 主圖像
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        child: Image.asset(
+                          'assets/images/icon/delete.png',
+                          width: 60.w,
+                          height: 60.h,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
                 SizedBox(height: 15.h),
@@ -374,7 +429,7 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               // 頂部標題和返回按鈕
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 25.h),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -434,7 +489,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         iconPath: 'assets/images/icon/user_profile.png',
                         title: '更改基本資料',
                         onTap: () {
-                          Navigator.of(context).pushNamed('/profile_setup');
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                      ProfileSetupPage(isFromProfile: true),
+                            ),
+                          );
                         },
                       ),
                       SizedBox(height: 12.h),
@@ -444,7 +506,14 @@ class _ProfilePageState extends State<ProfilePage> {
                         iconPath: 'assets/images/dish/american.png',
                         title: '更改飲食偏好',
                         onTap: () {
-                          Navigator.of(context).pushNamed('/food_preference');
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                      FoodPreferencePage(isFromProfile: true),
+                            ),
+                          );
                         },
                       ),
                       SizedBox(height: 12.h),
@@ -452,9 +521,16 @@ class _ProfilePageState extends State<ProfilePage> {
                       // 重新進行個性測驗
                       _buildSettingItem(
                         iconPath: 'assets/images/icon/brain.png',
-                        title: '重新進行個性測驗',
+                        title: '重新進行測驗',
                         onTap: () {
-                          Navigator.of(context).pushNamed('/personality_test');
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                      PersonalityTestPage(isFromProfile: true),
+                            ),
+                          );
                         },
                       ),
                       SizedBox(height: 12.h),

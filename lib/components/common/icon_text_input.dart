@@ -23,7 +23,6 @@ class IconTextInput extends StatelessWidget {
     return Container(
       margin: EdgeInsets.symmetric(vertical: 10.h),
       padding: EdgeInsets.symmetric(horizontal: 15.w),
-      width: context.widthPercent(0.8),
       height: 60.h,
       decoration: BoxDecoration(
         color: Colors.white,

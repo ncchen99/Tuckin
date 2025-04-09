@@ -6,7 +6,9 @@ import 'package:tuckin/utils/index.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PersonalityTestPage extends StatefulWidget {
-  const PersonalityTestPage({super.key});
+  final bool isFromProfile;
+
+  const PersonalityTestPage({super.key, this.isFromProfile = false});
 
   @override
   State<PersonalityTestPage> createState() => _PersonalityTestPageState();
@@ -18,6 +20,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   String? _questionOneAnswer; // 問題1的答案 (a or b)
   String? _questionTwoAnswer; // 問題2的答案 (a or b)
   bool _isLoading = false;
+  bool _isDataLoaded = false;
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
@@ -62,6 +65,69 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   };
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserPersonalityType();
+  }
+
+  // 載入用戶的個性類型
+  Future<void> _loadUserPersonalityType() async {
+    if (widget.isFromProfile) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final currentUser = await _authService.getCurrentUser();
+        if (currentUser != null) {
+          final userProfile = await _databaseService.getUserCompleteProfile(
+            currentUser.id,
+          );
+
+          if (userProfile != null && userProfile['personality_type'] != null) {
+            final personalityType = userProfile['personality_type'] as String;
+
+            // 根據個性類型反推答案
+            if (personalityType == '分析型') {
+              setState(() {
+                _questionOneAnswer = 'a';
+                _questionTwoAnswer = 'a';
+              });
+            } else if (personalityType == '功能型') {
+              setState(() {
+                _questionOneAnswer = 'a';
+                _questionTwoAnswer = 'b';
+              });
+            } else if (personalityType == '直覺型') {
+              setState(() {
+                _questionOneAnswer = 'b';
+                _questionTwoAnswer = 'b';
+              });
+            } else if (personalityType == '個人型') {
+              setState(() {
+                _questionOneAnswer = 'b';
+                _questionTwoAnswer = 'a';
+              });
+            }
+
+            setState(() {
+              _isDataLoaded = true;
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('載入用戶個性類型出錯: $e');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
@@ -78,12 +144,17 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
         curve: Curves.easeInOut,
       );
     } else {
-      // 在第一頁時，導航回food_preference頁面
-      final navigationService = NavigationService();
-      navigationService.navigateToPreviousSetupStep(
-        context,
-        'personality_test',
-      );
+      if (widget.isFromProfile) {
+        // 如果是從profile頁面導航過來的，返回profile頁面
+        Navigator.of(context).pop();
+      } else {
+        // 在第一頁時，導航回food_preference頁面
+        final navigationService = NavigationService();
+        navigationService.navigateToPreviousSetupStep(
+          context,
+          'personality_test',
+        );
+      }
     }
   }
 
@@ -104,9 +175,14 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   // 處理下一頁
   void _handleNext() {
     if (_questionOneAnswer == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('請選擇一個選項')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '請選擇一個選項',
+            style: TextStyle(fontFamily: 'OtsutomeFont'),
+          ),
+        ),
+      );
       return;
     }
 
@@ -130,17 +206,27 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   Future<void> _handleComplete() async {
     // 確保第二個問題有選擇
     if (_questionTwoAnswer == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('請選擇第二個問題的選項')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '請選擇第二個問題的選項',
+            style: TextStyle(fontFamily: 'OtsutomeFont'),
+          ),
+        ),
+      );
       return;
     }
 
     final currentUser = await _authService.getCurrentUser();
     if (currentUser == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('您尚未登入，請先登入')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '您尚未登入，請先登入',
+            style: TextStyle(fontFamily: 'OtsutomeFont'),
+          ),
+        ),
+      );
       return;
     }
 
@@ -155,34 +241,58 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
     _databaseService
         .updateUserPersonalityType(currentUser.id, personalityType)
         .then((_) async {
-          // 更新用戶狀態為 booking (聚餐預約狀態)
-          try {
-            await _databaseService.updateUserStatus(currentUser.id, 'booking');
+          if (!widget.isFromProfile) {
+            // 只有在不是從profile頁面來的時候，才更新用戶狀態為 booking
+            try {
+              await _databaseService.updateUserStatus(
+                currentUser.id,
+                'booking',
+              );
 
-            // 設置一個標誌表示是新用戶第一次使用
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('is_new_user', true);
-          } catch (error) {
-            debugPrint('更新用戶狀態出錯: $error');
+              // 設置一個標誌表示是新用戶第一次使用
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('is_new_user', true);
+            } catch (error) {
+              debugPrint('更新用戶狀態出錯: $error');
+            }
           }
 
           setState(() {
             _isLoading = false;
           });
-          // 使用NavigationService進行導航
-          final navigationService = NavigationService();
-          navigationService.navigateToNextSetupStep(
-            context,
-            'personality_test',
-          );
+
+          if (widget.isFromProfile) {
+            // 如果是從profile頁面導航過來的，保存後返回profile頁面
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  '測驗結果更新成功',
+                  style: TextStyle(fontFamily: 'OtsutomeFont'),
+                ),
+              ),
+            );
+            Navigator.of(context).pop();
+          } else {
+            // 使用NavigationService進行導航
+            final navigationService = NavigationService();
+            navigationService.navigateToNextSetupStep(
+              context,
+              'personality_test',
+            );
+          }
         })
         .catchError((error) {
           setState(() {
             _isLoading = false;
           });
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('儲存資料失敗: $error')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '儲存資料失敗: $error',
+                style: TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+            ),
+          );
         });
   }
 
@@ -202,8 +312,8 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
           );
           return false; // 阻止默認返回行為
         } else {
-          // 在第一頁時，導航回food_preference頁面
-          Navigator.of(context).pushReplacementNamed('/food_preference');
+          // 在第一頁時，處理返回邏輯
+          _handleBack();
           return false; // 阻止默認返回行為
         }
       },
@@ -217,303 +327,358 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
             ),
           ),
           child: SafeArea(
-            child: Stack(
-              children: [
-                // 右下角背景圖片 - 放在Stack的第一個元素作為底層
-                Positioned(
-                  right: -30.w, // 負值使圖片右側超出螢幕
-                  bottom: -30.h, // 負值使圖片底部超出螢幕
-                  child: Opacity(
-                    opacity: 0.65, // 降低透明度，使圖片更加融入背景
-                    child: ColorFiltered(
-                      // 降低彩度的矩陣
-                      colorFilter: const ColorFilter.matrix(<double>[
-                        0.6, 0.1, 0.1, 0, 0, // R影響
-                        0.1, 0.6, 0.1, 0, 0, // G影響
-                        0.1, 0.1, 0.6, 0, 0, // B影響
-                        0, 0, 0, 1, 0, // A影響
-                      ]),
-                      child: Image.asset(
-                        _currentPage == 0
-                            ? 'assets/images/illustrate/p1.png'
-                            : 'assets/images/illustrate/p2.png',
-                        width: 220.w, // 增大尺寸
-                        height: 220.h, // 增大尺寸
-                        fit: BoxFit.contain,
+            child:
+                _isLoading && !_isDataLoaded
+                    ? Center(
+                      child: LoadingImage(
+                        width: 60.w,
+                        height: 60.h,
+                        color: const Color(0xFFB33D1C),
                       ),
-                    ),
-                  ),
-                ),
-
-                // 主要內容
-                Column(
-                  children: [
-                    // 頂部標題和返回按鈕放在同一行
-                    Padding(
-                      padding: EdgeInsets.only(top: 40.h, bottom: 8.h),
-                      child: Row(
-                        children: [
-                          // 左側返回按鈕
-                          Padding(
-                            padding: EdgeInsets.only(left: 20.w, bottom: 8.h),
-                            child: BackIconButton(
-                              onPressed: _handleBack,
-                              width: 35.w,
-                              height: 35.h,
-                            ),
-                          ),
-                          // 中央標題（只有主標題）
-                          Expanded(
-                            child: Text(
-                              '個性測驗',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 30.sp,
-                                fontFamily: 'OtsutomeFont',
-                                color: const Color(0xFF23456B),
-                                fontWeight: FontWeight.bold,
+                    )
+                    : Stack(
+                      children: [
+                        // 右下角背景圖片 - 放在Stack的第一個元素作為底層
+                        Positioned(
+                          right: -30.w, // 負值使圖片右側超出螢幕
+                          bottom: -30.h, // 負值使圖片底部超出螢幕
+                          child: Opacity(
+                            opacity: 0.65, // 降低透明度，使圖片更加融入背景
+                            child: ColorFiltered(
+                              // 降低彩度的矩陣
+                              colorFilter: const ColorFilter.matrix(<double>[
+                                0.6, 0.1, 0.1, 0, 0, // R影響
+                                0.1, 0.6, 0.1, 0, 0, // G影響
+                                0.1, 0.1, 0.6, 0, 0, // B影響
+                                0, 0, 0, 1, 0, // A影響
+                              ]),
+                              child: Image.asset(
+                                _currentPage == 0
+                                    ? 'assets/images/illustrate/p1.png'
+                                    : 'assets/images/illustrate/p2.png',
+                                width: 220.w, // 增大尺寸
+                                height: 220.h, // 增大尺寸
+                                fit: BoxFit.contain,
                               ),
                             ),
                           ),
-                          // 為了平衡布局，添加一個空白區域
-                          SizedBox(width: 55.w),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    // 問題頁面區域
-                    Expanded(
-                      child: PageView(
-                        controller: _pageController,
-                        physics: const NeverScrollableScrollPhysics(),
-                        onPageChanged: (int page) {
-                          setState(() {
-                            _currentPage = page;
-                          });
-                        },
-                        children: [
-                          // 問題 1
-                          Column(
-                            children: [
-                              // 副標題 - 問題1
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: 20.h,
-                                  top: 20.h,
-                                ),
-                                child: Text(
-                                  _questions[0]['question'],
-                                  style: TextStyle(
-                                    fontSize: 18.sp,
-                                    fontFamily: 'OtsutomeFont',
-                                    color: const Color(0xFF23456B),
+                        // 主要內容
+                        Column(
+                          children: [
+                            // 頂部標題和返回按鈕放在同一行
+                            Padding(
+                              padding: EdgeInsets.only(top: 25.h, bottom: 8.h),
+                              child: Row(
+                                children: [
+                                  // 左側返回按鈕
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      left: 20.w,
+                                      bottom: 8.h,
+                                    ),
+                                    child: BackIconButton(
+                                      onPressed: _handleBack,
+                                      width: 35.w,
+                                      height: 35.h,
+                                    ),
                                   ),
-                                  textAlign: TextAlign.center,
-                                ),
+                                  // 中央標題（只有主標題）
+                                  Expanded(
+                                    child: Text(
+                                      '個性測驗',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 25.sp,
+                                        fontFamily: 'OtsutomeFont',
+                                        color: const Color(0xFF23456B),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  // 為了平衡布局，添加一個空白區域
+                                  SizedBox(width: 55.w),
+                                ],
                               ),
+                            ),
 
-                              // 問題1選項
-                              Expanded(
-                                child: ListView.builder(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 20.w,
-                                  ),
-                                  itemCount: _questions[0]['options'].length,
-                                  itemBuilder: (context, index) {
-                                    final option =
-                                        _questions[0]['options'][index];
-                                    final isSelected =
-                                        _questionOneAnswer == option['id'];
-
-                                    return GestureDetector(
-                                      onTap:
-                                          () => _selectQuestionOneAnswer(
-                                            option['id'],
-                                          ),
-                                      child: Container(
-                                        margin: EdgeInsets.only(bottom: 15.h),
-                                        padding: EdgeInsets.all(20.r),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.9),
-                                          borderRadius: BorderRadius.circular(
-                                            12.r,
-                                          ),
-                                          border: Border.all(
-                                            color:
-                                                isSelected
-                                                    ? const Color(0xFFB33D1C)
-                                                    : Colors.transparent,
-                                            width: 3,
-                                          ),
+                            // 問題頁面區域
+                            Expanded(
+                              child: PageView(
+                                controller: _pageController,
+                                physics: const NeverScrollableScrollPhysics(),
+                                onPageChanged: (int page) {
+                                  setState(() {
+                                    _currentPage = page;
+                                  });
+                                },
+                                children: [
+                                  // 問題 1
+                                  Column(
+                                    children: [
+                                      // 副標題 - 問題1
+                                      Padding(
+                                        padding: EdgeInsets.only(
+                                          bottom: 20.h,
+                                          top: 20.h,
                                         ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '${option['text']}',
-                                              style: TextStyle(
-                                                fontSize: 18.sp,
-                                                fontFamily: 'OtsutomeFont',
-                                                color: const Color(0xFF23456B),
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            SizedBox(height: 10.h),
-                                            Text(
-                                              option['description'],
-                                              style: TextStyle(
-                                                fontSize: 14.sp,
-                                                fontFamily: 'OtsutomeFont',
-                                                color: const Color(0xFF23456B),
-                                              ),
-                                            ),
-                                          ],
+                                        child: Text(
+                                          _questions[0]['question'],
+                                          style: TextStyle(
+                                            fontSize: 18.sp,
+                                            fontFamily: 'OtsutomeFont',
+                                            color: const Color(0xFF23456B),
+                                          ),
+                                          textAlign: TextAlign.center,
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
-                              ),
 
-                              // 下一步按鈕
-                              Container(
-                                margin: EdgeInsets.symmetric(vertical: 30.h),
-                                child: ImageButton(
-                                  text: '下一步',
-                                  imagePath:
-                                      'assets/images/ui/button/red_l.png',
-                                  width: 150.w,
-                                  height: 70.h,
-                                  onPressed: _handleNext,
-                                  isEnabled: _questionOneAnswer != null,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          // 問題 2
-                          Column(
-                            children: [
-                              // 副標題 - 問題2
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: 20.h,
-                                  top: 20.h,
-                                ),
-                                child: Text(
-                                  _questions[1]['question'],
-                                  style: TextStyle(
-                                    fontSize: 18.sp,
-                                    fontFamily: 'OtsutomeFont',
-                                    color: const Color(0xFF23456B),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-
-                              // 問題2選項
-                              Expanded(
-                                child: ListView.builder(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 20.w,
-                                  ),
-                                  itemCount: _questions[1]['options'].length,
-                                  itemBuilder: (context, index) {
-                                    final option =
-                                        _questions[1]['options'][index];
-                                    final isSelected =
-                                        _questionTwoAnswer == option['id'];
-
-                                    return GestureDetector(
-                                      onTap:
-                                          () => _selectQuestionTwoAnswer(
-                                            option['id'],
+                                      // 問題1選項
+                                      Expanded(
+                                        child: ListView.builder(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 20.w,
                                           ),
-                                      child: Container(
-                                        margin: EdgeInsets.only(bottom: 15.h),
-                                        padding: EdgeInsets.all(20.r),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.9),
-                                          borderRadius: BorderRadius.circular(
-                                            12.r,
-                                          ),
-                                          border: Border.all(
-                                            color:
-                                                isSelected
-                                                    ? const Color(0xFFB33D1C)
-                                                    : Colors.transparent,
-                                            width: 3,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '${option['text']}',
-                                              style: TextStyle(
-                                                fontSize: 18.sp,
-                                                fontFamily: 'OtsutomeFont',
-                                                color: const Color(0xFF23456B),
-                                                fontWeight: FontWeight.bold,
+                                          itemCount:
+                                              _questions[0]['options'].length,
+                                          itemBuilder: (context, index) {
+                                            final option =
+                                                _questions[0]['options'][index];
+                                            final isSelected =
+                                                _questionOneAnswer ==
+                                                option['id'];
+
+                                            return GestureDetector(
+                                              onTap:
+                                                  () =>
+                                                      _selectQuestionOneAnswer(
+                                                        option['id'],
+                                                      ),
+                                              child: Container(
+                                                margin: EdgeInsets.only(
+                                                  bottom: 15.h,
+                                                ),
+                                                padding: EdgeInsets.all(20.r),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white
+                                                      .withOpacity(0.9),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        12.r,
+                                                      ),
+                                                  border: Border.all(
+                                                    color:
+                                                        isSelected
+                                                            ? const Color(
+                                                              0xFFB33D1C,
+                                                            )
+                                                            : Colors
+                                                                .transparent,
+                                                    width: 3,
+                                                  ),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      '${option['text']}',
+                                                      style: TextStyle(
+                                                        fontSize: 18.sp,
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                        color: const Color(
+                                                          0xFF23456B,
+                                                        ),
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    SizedBox(height: 10.h),
+                                                    Text(
+                                                      option['description'],
+                                                      style: TextStyle(
+                                                        fontSize: 14.sp,
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                        color: const Color(
+                                                          0xFF23456B,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                            SizedBox(height: 10.h),
-                                            Text(
-                                              option['description'],
-                                              style: TextStyle(
-                                                fontSize: 14.sp,
-                                                fontFamily: 'OtsutomeFont',
-                                                color: const Color(0xFF23456B),
-                                              ),
-                                            ),
-                                          ],
+                                            );
+                                          },
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
-                              ),
 
-                              // 完成按鈕
-                              Container(
-                                margin: EdgeInsets.symmetric(vertical: 30.h),
-                                child:
-                                    _isLoading
-                                        ? LoadingImage(
-                                          width: 60.w,
-                                          height: 60.h,
-                                          color: const Color(0xFFB33D1C),
-                                        )
-                                        : ImageButton(
-                                          text: '完成',
+                                      // 下一步按鈕
+                                      Container(
+                                        margin: EdgeInsets.symmetric(
+                                          vertical: 30.h,
+                                        ),
+                                        child: ImageButton(
+                                          text: '下一步',
                                           imagePath:
                                               'assets/images/ui/button/red_l.png',
                                           width: 150.w,
                                           height: 70.h,
-                                          onPressed: _handleComplete,
-                                          isEnabled: _questionTwoAnswer != null,
+                                          onPressed: _handleNext,
+                                          isEnabled: _questionOneAnswer != null,
                                         ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                                      ),
+                                    ],
+                                  ),
 
-                    // 頁面底部：進度指示器
-                    Padding(
-                      padding: EdgeInsets.only(bottom: 20.h),
-                      child: const ProgressDotsIndicator(
-                        totalSteps: 5,
-                        currentStep: 4,
-                      ),
+                                  // 問題 2
+                                  Column(
+                                    children: [
+                                      // 副標題 - 問題2
+                                      Padding(
+                                        padding: EdgeInsets.only(
+                                          bottom: 20.h,
+                                          top: 20.h,
+                                        ),
+                                        child: Text(
+                                          _questions[1]['question'],
+                                          style: TextStyle(
+                                            fontSize: 18.sp,
+                                            fontFamily: 'OtsutomeFont',
+                                            color: const Color(0xFF23456B),
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+
+                                      // 問題2選項
+                                      Expanded(
+                                        child: ListView.builder(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 20.w,
+                                          ),
+                                          itemCount:
+                                              _questions[1]['options'].length,
+                                          itemBuilder: (context, index) {
+                                            final option =
+                                                _questions[1]['options'][index];
+                                            final isSelected =
+                                                _questionTwoAnswer ==
+                                                option['id'];
+
+                                            return GestureDetector(
+                                              onTap:
+                                                  () =>
+                                                      _selectQuestionTwoAnswer(
+                                                        option['id'],
+                                                      ),
+                                              child: Container(
+                                                margin: EdgeInsets.only(
+                                                  bottom: 15.h,
+                                                ),
+                                                padding: EdgeInsets.all(20.r),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white
+                                                      .withOpacity(0.9),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        12.r,
+                                                      ),
+                                                  border: Border.all(
+                                                    color:
+                                                        isSelected
+                                                            ? const Color(
+                                                              0xFFB33D1C,
+                                                            )
+                                                            : Colors
+                                                                .transparent,
+                                                    width: 3,
+                                                  ),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      '${option['text']}',
+                                                      style: TextStyle(
+                                                        fontSize: 18.sp,
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                        color: const Color(
+                                                          0xFF23456B,
+                                                        ),
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    SizedBox(height: 10.h),
+                                                    Text(
+                                                      option['description'],
+                                                      style: TextStyle(
+                                                        fontSize: 14.sp,
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                        color: const Color(
+                                                          0xFF23456B,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+
+                                      // 完成按鈕
+                                      Container(
+                                        margin: EdgeInsets.symmetric(
+                                          vertical: 30.h,
+                                        ),
+                                        child:
+                                            _isLoading
+                                                ? LoadingImage(
+                                                  width: 60.w,
+                                                  height: 60.h,
+                                                  color: const Color(
+                                                    0xFFB33D1C,
+                                                  ),
+                                                )
+                                                : ImageButton(
+                                                  text: '完成',
+                                                  imagePath:
+                                                      'assets/images/ui/button/red_l.png',
+                                                  width: 150.w,
+                                                  height: 70.h,
+                                                  onPressed: _handleComplete,
+                                                  isEnabled:
+                                                      _questionTwoAnswer !=
+                                                      null,
+                                                ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // 頁面底部：進度指示器 - 只在非profile來源時顯示
+                            if (!widget.isFromProfile)
+                              Padding(
+                                padding: EdgeInsets.only(bottom: 20.h),
+                                child: const ProgressDotsIndicator(
+                                  totalSteps: 5,
+                                  currentStep: 4,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ],
-            ),
           ),
         ),
       ),
