@@ -140,9 +140,9 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
     _navigationService.navigateToNotifications(context);
   }
 
-  // 在用戶設置圖標點擊處理函數中使用導航服務
+  // 處理用戶頭像點擊
   void _handleProfileTap() {
-    _navigationService.navigateToUserSettings(context);
+    _navigationService.navigateToProfile(context);
   }
 
   @override
@@ -187,7 +187,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
             child: Column(
               children: [
                 // 頂部導航欄
-                HeaderBar(title: '', onProfileTap: _handleProfileTap),
+                HeaderBar(title: ''),
 
                 Expanded(
                   child: Padding(

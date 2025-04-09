@@ -151,9 +151,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     Navigator.pushNamed(context, '/notifications');
   }
 
-  // 處理用戶設置按鈕點擊
+  // 處理用戶頭像點擊
   void _handleUserProfileTap() {
-    Navigator.pushNamed(context, '/user_settings');
+    _navigationService.navigateToProfile(context);
   }
 
   // 導航到匹配狀態頁面
@@ -182,10 +182,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                 Column(
                   children: [
                     // 頂部導航欄
-                    HeaderBar(
-                      title: '聚餐預約',
-                      onProfileTap: _handleUserProfileTap,
-                    ),
+                    HeaderBar(title: '聚餐預約'),
 
                     Expanded(
                       child: SingleChildScrollView(

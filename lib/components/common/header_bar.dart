@@ -27,6 +27,18 @@ class HeaderBar extends StatefulWidget {
 class _HeaderBarState extends State<HeaderBar> {
   bool _isBrandPressed = false;
   bool _isProfilePressed = false;
+  final NavigationService _navigationService = NavigationService();
+
+  // 處理個人資料點擊
+  void _handleProfileTap(BuildContext context) {
+    // 如果有提供onProfileTap回調，使用它
+    if (widget.onProfileTap != null) {
+      widget.onProfileTap!();
+    } else {
+      // 否則使用NavigationService導航到個人資料頁面
+      _navigationService.navigateToProfile(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +73,7 @@ class _HeaderBarState extends State<HeaderBar> {
           // 右側：個人資料圖標
           _buildProfileButton(
             'assets/images/icon/user_profile.png',
-            widget.onProfileTap,
+            () => _handleProfileTap(context),
             adaptiveShadowOffset,
           ),
         ],

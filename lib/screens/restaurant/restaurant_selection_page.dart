@@ -374,9 +374,9 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     }
   }
 
-  // 在用戶設置圖標點擊處理函數中使用導航服務
+  // 處理用戶頭像點擊
   void _handleProfileTap() {
-    _navigationService.navigateToUserSettings(context);
+    _navigationService.navigateToProfile(context);
   }
 
   @override
@@ -404,10 +404,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                     : Column(
                       children: [
                         // 頂部導航欄
-                        HeaderBar(
-                          title: '餐廳選擇',
-                          onProfileTap: _handleProfileTap,
-                        ),
+                        HeaderBar(title: '餐廳選擇'),
 
                         Expanded(
                           child: SingleChildScrollView(

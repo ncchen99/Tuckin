@@ -95,9 +95,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     }
   }
 
-  // 在用戶設置圖標點擊處理函數中使用導航服務
+  // 處理用戶頭像點擊
   void _handleProfileTap() {
-    _navigationService.navigateToUserSettings(context);
+    _navigationService.navigateToProfile(context);
   }
 
   // 獲取狀態相關的提示文字
@@ -788,10 +788,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 Column(
                   children: [
                     // 頂部導航欄
-                    HeaderBar(
-                      title: _getStatusText(),
-                      onProfileTap: _handleProfileTap,
-                    ),
+                    HeaderBar(title: _getStatusText()),
 
                     // 主要內容
                     Expanded(

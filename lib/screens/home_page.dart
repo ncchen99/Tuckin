@@ -46,6 +46,11 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // 處理用戶頭像點擊
+  void _handleProfileTap() {
+    _navigationService.navigateToProfile(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -153,6 +158,9 @@ class _HomePageState extends State<HomePage> {
                           ],
                         ),
                         SizedBox(height: 60.h),
+
+                        // 頂部導航欄
+                        HeaderBar(),
                       ],
                     ),
                   ),

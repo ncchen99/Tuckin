@@ -400,8 +400,9 @@ class _RatingPageState extends State<RatingPage> {
     );
   }
 
+  // 處理用戶頭像點擊
   void _handleProfileTap() {
-    _navigationService.navigateToUserSettings(context);
+    _navigationService.navigateToProfile(context);
   }
 
   @override
@@ -427,11 +428,7 @@ class _RatingPageState extends State<RatingPage> {
                     child: Column(
                       children: [
                         // HeaderBar也加入滾動區域
-                        HeaderBar(
-                          title: '聚餐評分',
-                          onProfileTap: _handleProfileTap,
-                          showBackButton: false,
-                        ),
+                        HeaderBar(title: '聚餐評分', showBackButton: false),
 
                         // 主要內容區域
                         Padding(

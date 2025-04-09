@@ -32,6 +32,8 @@ import 'screens/restaurant/restaurant_selection_page.dart';
 import 'screens/restaurant/restaurant_reservation_page.dart';
 import 'screens/dinner/dinner_info_page.dart';
 import 'screens/dinner/rating_page.dart';
+// 導入個人資料頁面
+import 'screens/profile/profile_page.dart';
 
 import 'utils/index.dart'; // 導入工具類
 
@@ -601,6 +603,9 @@ class _MyAppState extends State<MyApp> {
               (context) => const RestaurantReservationPage(),
           '/dinner_info': (context) => const DinnerInfoPage(),
           '/dinner_rating': (context) => const RatingPage(),
+
+          // 個人資料與設定頁面
+          '/profile': (context) => const ProfilePage(),
 
           // 輔助頁面路由
           // '/notifications': (context) => const NotificationsPage(),

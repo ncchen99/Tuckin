@@ -381,4 +381,9 @@ class NavigationService {
   void navigateToUserSettings(BuildContext context) {
     Navigator.of(context).pushNamed('/user_settings');
   }
+
+  /// 導航到個人資料頁面
+  void navigateToProfile(BuildContext context) {
+    Navigator.of(context).pushNamed('/profile');
+  }
 }
