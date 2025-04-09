@@ -14,7 +14,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart'; // 導入原�
 import 'package:tuckin/services/notification_service.dart';
 import 'package:tuckin/services/realtime_service.dart'; // 導入實時服務
 import 'package:firebase_core/firebase_core.dart';
-import 'dart:io'; // 添加導入IO庫用於網絡請求
+// 添加導入IO庫用於網絡請求
 import 'package:http/http.dart' as http; // 添加HTTP包用於網絡請求
 
 // 導入頁面

@@ -146,11 +146,11 @@ class RealtimeService with WidgetsBindingObserver {
 
       // 啟動訂閱並使用 await 等待訂閱完成
       debugPrint('RealtimeService: 正在啟動訂閱...');
-      await _userStatusChannel?.subscribe();
+      _userStatusChannel?.subscribe();
       _isSubscribed = true;
 
       debugPrint(
-        'RealtimeService: 用戶狀態訂閱成功! 監聽 user_status 表格中 user_id=${_userId} 的變更',
+        'RealtimeService: 用戶狀態訂閱成功! 監聽 user_status 表格中 user_id=$_userId 的變更',
       );
     } catch (e) {
       _isSubscribed = false;
@@ -172,7 +172,7 @@ class RealtimeService with WidgetsBindingObserver {
     debugPrint('RealtimeService: 事件詳情 - ${payload.toString()}');
 
     try {
-      final newRecord = payload.newRecord as Map<String, dynamic>;
+      final newRecord = payload.newRecord;
       final status = newRecord['status'] as String?;
 
       debugPrint('RealtimeService: 用戶狀態變更 - 新狀態: $status');

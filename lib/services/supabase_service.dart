@@ -77,7 +77,7 @@ class SupabaseService {
       // 測試一下實時連接是否正常
       try {
         final channel = _supabaseClient.channel('test_connection');
-        await channel.subscribe();
+        channel.subscribe();
         debugPrint('Supabase 實時連接測試成功，可以訂閱資料變更');
         await channel.unsubscribe();
       } catch (e) {
