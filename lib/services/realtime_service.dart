@@ -336,7 +336,17 @@ class RealtimeService with WidgetsBindingObserver {
 
         case 'matching_failed':
           // 配對失敗階段，應該回到首頁
-          _navigateIfNotCurrent(navigator, '/home');
+          _navigateIfNotCurrent(navigator, '/matching_status');
+          break;
+
+        case 'confirmation_timeout':
+          // 逾時未確認階段，應該導航到逾時未確認頁面
+          _navigateIfNotCurrent(navigator, '/confirmation_timeout');
+          break;
+
+        case 'low_attendance':
+          // 團體出席率過低階段，應該導航到團體出席率過低頁面
+          _navigateIfNotCurrent(navigator, '/low_attendance');
           break;
 
         case 'rating':

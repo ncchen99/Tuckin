@@ -82,13 +82,8 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Padding(
-                          padding: EdgeInsets.only(top: 25.h, bottom: 50.h),
-                          child: Image.asset(
-                            'assets/images/icon/tuckin_t_brand.png',
-                            width: 140.w,
-                          ),
-                        ),
+                        // 頂部導航欄
+                        HeaderBar(),
                         SizedBox(height: 150.h),
                         // 歡迎訊息
                         Padding(
@@ -136,7 +131,7 @@ class _HomePageState extends State<HomePage> {
                         Column(
                           children: [
                             ImageButton(
-                              text: '預約',
+                              text: '開始',
                               imagePath: 'assets/images/ui/button/red_l.png',
                               width: 160.w,
                               height: 70.h,
@@ -158,9 +153,6 @@ class _HomePageState extends State<HomePage> {
                           ],
                         ),
                         SizedBox(height: 60.h),
-
-                        // 頂部導航欄
-                        HeaderBar(),
                       ],
                     ),
                   ),

@@ -640,7 +640,6 @@ class _ProfilePageState extends State<ProfilePage> {
                         title: '刪除帳號',
                         onTap: _showDeleteAccountConfirmDialog,
                       ),
-                      SizedBox(height: 15.h),
                     ],
                   ),
                 ),

@@ -200,7 +200,9 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                         // 提示文字 - 根據用戶狀態顯示不同的文字
                         Center(
                           child: Text(
-                            _userStatus == 'matching_failed' ? '很抱歉！' : '預約成功！',
+                            _userStatus == 'matching_failed'
+                                ? '很抱歉 <(__)>'
+                                : '預約成功！',
                             style: TextStyle(
                               fontSize: 24.sp,
                               fontFamily: 'OtsutomeFont',

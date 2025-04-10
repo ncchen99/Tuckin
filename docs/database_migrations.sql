@@ -55,6 +55,8 @@ CHECK (status IN (
     'waiting_other_users', -- 等待其他用戶階段
     'waiting_attendance', -- 等待出席階段
     'matching_failed', -- 配對失敗階段
+    'confirmation_timeout', -- 逾時未確認階段
+    'low_attendance', -- 團體出席率過低階段
     'rating' -- 評分階段
 ));
 

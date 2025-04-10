@@ -124,6 +124,10 @@ class NavigationService {
       case 'waiting_other_users':
       case 'waiting_attendance':
         return '/dinner_info';
+      case 'confirmation_timeout':
+        return '/confirmation_timeout';
+      case 'low_attendance':
+        return '/low_attendance';
       case 'rating':
         return '/dinner_rating';
       default:
@@ -385,5 +389,15 @@ class NavigationService {
   /// 導航到個人資料頁面
   void navigateToProfile(BuildContext context) {
     Navigator.of(context).pushNamed('/profile');
+  }
+
+  /// 導航到逾時未確認頁面
+  void navigateToConfirmationTimeout(BuildContext context) {
+    Navigator.of(context).pushReplacementNamed('/confirmation_timeout');
+  }
+
+  /// 導航到團體出席率過低頁面
+  void navigateToLowAttendance(BuildContext context) {
+    Navigator.of(context).pushReplacementNamed('/low_attendance');
   }
 }

@@ -26,7 +26,7 @@ import 'screens/onboarding/personality_test_page.dart';
 import 'screens/home_page.dart';
 // 導入晚餐相關頁面
 import 'screens/dinner/dinner_reservation_page.dart';
-import 'screens/dinner/matching_status_page.dart';
+import 'screens/status/matching_status_page.dart';
 import 'screens/dinner/attendance_confirmation_page.dart';
 import 'screens/restaurant/restaurant_selection_page.dart';
 import 'screens/restaurant/restaurant_reservation_page.dart';
@@ -34,6 +34,9 @@ import 'screens/dinner/dinner_info_page.dart';
 import 'screens/dinner/rating_page.dart';
 // 導入個人資料頁面
 import 'screens/profile/profile_page.dart';
+// 導入新增狀態頁面
+import 'screens/status/confirmation_timeout_page.dart';
+import 'screens/status/low_attendance_page.dart';
 
 import 'utils/index.dart'; // 導入工具類
 
@@ -606,6 +609,10 @@ class _MyAppState extends State<MyApp> {
 
           // 個人資料與設定頁面
           '/profile': (context) => const ProfilePage(),
+
+          // 狀態提示頁面
+          '/confirmation_timeout': (context) => const ConfirmationTimeoutPage(),
+          '/low_attendance': (context) => const LowAttendancePage(),
 
           // 輔助頁面路由
           // '/notifications': (context) => const NotificationsPage(),
