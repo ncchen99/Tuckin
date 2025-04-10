@@ -209,7 +209,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
 
                     child: Text(
-                      '確定要登出嗎？您將需要重新登入才能使用所有功能。',
+                      '確定要登出嗎？\n要用功能需要再登入喔',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16.sp,
@@ -343,7 +343,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       horizontal: 10.w,
                     ),
                     child: Text(
-                      '確定要刪除您的帳號嗎？\n此操作無法撤銷，您的所有資料將被永久刪除。',
+                      '確定刪除帳號嗎？\n這一步不能後悔喔，所有資料都會被永久刪除',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16.sp,
