@@ -409,157 +409,164 @@ class _RatingPageState extends State<RatingPage> {
   Widget build(BuildContext context) {
     final cardWidth = MediaQuery.of(context).size.width - 48.w;
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/background/bg1.png'),
-            fit: BoxFit.cover,
+    return WillPopScope(
+      onWillPop: () async {
+        return false; // 禁用返回按鈕
+      },
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/background/bg1.png'),
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child:
-              _isLoading
-                  ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF23456B)),
-                  )
-                  : SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      children: [
-                        // HeaderBar也加入滾動區域
-                        HeaderBar(title: '聚餐評分', showBackButton: false),
+          child: SafeArea(
+            child:
+                _isLoading
+                    ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF23456B),
+                      ),
+                    )
+                    : SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        children: [
+                          // HeaderBar也加入滾動區域
+                          HeaderBar(title: '聚餐評分', showBackButton: false),
 
-                        // 主要內容區域
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 24.w),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              SizedBox(height: 20.h),
+                          // 主要內容區域
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 24.w),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                SizedBox(height: 20.h),
 
-                              // 說明文字
-                              Text(
-                                '此喜好調查僅用於之後聚餐的配對',
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontFamily: 'OtsutomeFont',
-                                  color: const Color(0xFF23456B),
-                                  fontWeight: FontWeight.bold,
+                                // 說明文字
+                                Text(
+                                  '此喜好調查僅用於之後聚餐的配對',
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    fontFamily: 'OtsutomeFont',
+                                    color: const Color(0xFF23456B),
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
 
-                              SizedBox(height: 25.h),
+                                SizedBox(height: 25.h),
 
-                              // 評分卡片
-                              ...List.generate(
-                                _participants.length,
-                                (index) => _buildRatingCard(index),
-                              ),
-
-                              SizedBox(height: 40.h),
-
-                              // 底部提示信息 - 垂直排列，寬度與卡片一致
-                              Container(
-                                width: cardWidth,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.7),
-                                  borderRadius: BorderRadius.circular(10.r),
+                                // 評分卡片
+                                ...List.generate(
+                                  _participants.length,
+                                  (index) => _buildRatingCard(index),
                                 ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
+
+                                SizedBox(height: 40.h),
+
+                                // 底部提示信息 - 垂直排列，寬度與卡片一致
+                                Container(
+                                  width: cardWidth,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.7),
                                     borderRadius: BorderRadius.circular(10.r),
-                                    onTap: _launchEmail,
-                                    child: Padding(
-                                      padding: EdgeInsets.all(15.h),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          // Email 圖標置中 (帶陰影)
-                                          SizedBox(
-                                            width: 30.w,
-                                            height: 30.h,
-                                            child: Stack(
-                                              children: [
-                                                // 底部陰影
-                                                Positioned(
-                                                  left: 0.w,
-                                                  top: 1.h,
-                                                  child: Image.asset(
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(10.r),
+                                      onTap: _launchEmail,
+                                      child: Padding(
+                                        padding: EdgeInsets.all(15.h),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            // Email 圖標置中 (帶陰影)
+                                            SizedBox(
+                                              width: 30.w,
+                                              height: 30.h,
+                                              child: Stack(
+                                                children: [
+                                                  // 底部陰影
+                                                  Positioned(
+                                                    left: 0.w,
+                                                    top: 1.h,
+                                                    child: Image.asset(
+                                                      'assets/images/icon/email.png',
+                                                      width: 28.w,
+                                                      height: 28.h,
+                                                      color: Colors.black
+                                                          .withOpacity(0.3),
+                                                      colorBlendMode:
+                                                          BlendMode.srcIn,
+                                                    ),
+                                                  ),
+                                                  // 主圖標
+                                                  Image.asset(
                                                     'assets/images/icon/email.png',
                                                     width: 28.w,
                                                     height: 28.h,
-                                                    color: Colors.black
-                                                        .withOpacity(0.3),
-                                                    colorBlendMode:
-                                                        BlendMode.srcIn,
                                                   ),
-                                                ),
-                                                // 主圖標
-                                                Image.asset(
-                                                  'assets/images/icon/email.png',
-                                                  width: 28.w,
-                                                  height: 28.h,
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          SizedBox(height: 8.h),
-                                          // 提示文字
-                                          Text(
-                                            '如果有任何想要反映的事情，請寄信到：',
-                                            style: TextStyle(
-                                              fontSize: 14.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF666666),
+                                            SizedBox(height: 8.h),
+                                            // 提示文字
+                                            Text(
+                                              '如果有任何想要反映的事情，請寄信到：',
+                                              style: TextStyle(
+                                                fontSize: 14.sp,
+                                                fontFamily: 'OtsutomeFont',
+                                                color: const Color(0xFF666666),
+                                              ),
+                                              textAlign: TextAlign.center,
                                             ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                          SizedBox(height: 4.h),
-                                          // Email地址
-                                          Text(
-                                            'help.tuckin@gmail.com',
-                                            style: TextStyle(
-                                              fontSize: 14.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
+                                            SizedBox(height: 4.h),
+                                            // Email地址
+                                            Text(
+                                              'help.tuckin@gmail.com',
+                                              style: TextStyle(
+                                                fontSize: 14.sp,
+                                                fontFamily: 'OtsutomeFont',
+                                                color: const Color(0xFF23456B),
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
                                             ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
 
-                              SizedBox(height: 40.h),
+                                SizedBox(height: 40.h),
 
-                              // 提交按鈕
-                              _isSubmitting
-                                  ? LoadingImage(
-                                    width: 60.w,
-                                    height: 60.h,
-                                    color: const Color(0xFF23456B),
-                                  )
-                                  : ImageButton(
-                                    text: '送出評分',
-                                    imagePath:
-                                        'assets/images/ui/button/red_m.png',
-                                    width: 160.w,
-                                    height: 70.h,
-                                    onPressed: _handleSubmitRating,
-                                  ),
+                                // 提交按鈕
+                                _isSubmitting
+                                    ? LoadingImage(
+                                      width: 60.w,
+                                      height: 60.h,
+                                      color: const Color(0xFF23456B),
+                                    )
+                                    : ImageButton(
+                                      text: '送出評分',
+                                      imagePath:
+                                          'assets/images/ui/button/red_m.png',
+                                      width: 160.w,
+                                      height: 70.h,
+                                      onPressed: _handleSubmitRating,
+                                    ),
 
-                              SizedBox(height: 30.h),
-                            ],
+                                SizedBox(height: 30.h),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+          ),
         ),
       ),
     );
