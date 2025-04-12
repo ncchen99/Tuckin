@@ -76,7 +76,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
             currentUser.id,
           );
 
-          if (userProfile != null && userProfile['profile'] != null) {
+          if (userProfile['profile'] != null) {
             final profile = userProfile['profile'];
 
             // 設置暱稱

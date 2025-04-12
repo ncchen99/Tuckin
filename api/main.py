@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from routers import group, restaurant, user, utils
+from routers import group, restaurant, user, utils, matching, dining
 
 app = FastAPI(
     title="TuckIn API",
@@ -24,6 +24,8 @@ app.include_router(group.router, prefix="/api/group", tags=["群組管理"])
 app.include_router(restaurant.router, prefix="/api/restaurant", tags=["餐廳管理"])
 app.include_router(user.router, prefix="/api/user", tags=["用戶資料"])
 app.include_router(utils.router, prefix="/api/utils", tags=["通用工具"])
+app.include_router(matching.router, prefix="/api/matching", tags=["配對系統"])
+app.include_router(dining.router, prefix="/api/dining", tags=["聚餐管理"])
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 

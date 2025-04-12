@@ -63,7 +63,7 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
             currentUser.id,
           );
 
-          if (userProfile != null && userProfile['food_preferences'] != null) {
+          if (userProfile['food_preferences'] != null) {
             final foodPreferences = List<int>.from(
               userProfile['food_preferences'],
             );

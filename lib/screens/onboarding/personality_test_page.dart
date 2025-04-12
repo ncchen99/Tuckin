@@ -84,7 +84,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
             currentUser.id,
           );
 
-          if (userProfile != null && userProfile['personality_type'] != null) {
+          if (userProfile['personality_type'] != null) {
             final personalityType = userProfile['personality_type'] as String;
 
             // 根據個性類型反推答案
