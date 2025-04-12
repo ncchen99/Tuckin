@@ -1,0 +1,6 @@
+開始呼叫批量配對API: 2025-04-13 04:02:45
+2025-04-13 04:02:45 - 批量配對API呼叫成功: {"success":true,"message":"批量配對任務已啟動","matched_groups":null,"remaining_users":null}
+開始呼叫批量配對API: 2025-04-13 04:03:45
+2025-04-13 04:03:45 - 錯誤: HTTP狀態碼 403 - {"detail":"未授權訪問"}
+開始呼叫批量配對API: 2025-04-13 04:03:53
+2025-04-13 04:03:53 - 批量配對API呼叫成功: {"success":true,"message":"批量配對任務已啟動","matched_groups":null,"remaining_users":null}
