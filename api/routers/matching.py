@@ -11,12 +11,12 @@ from schemas.matching import (
     MatchingGroup, MatchingUser, UserMatchingInfo, UserStatusExtended
 )
 from schemas.dining import DiningUserStatus
-from dependencies import get_supabase, get_current_user, get_supabase_service
+from dependencies import get_supabase, get_current_user, get_supabase_service, verify_cron_api_key
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.post("/batch", response_model=BatchMatchingResponse, status_code=status.HTTP_200_OK)
+@router.post("/batch", response_model=BatchMatchingResponse, status_code=status.HTTP_200_OK, dependencies=[Depends(verify_cron_api_key)])
 async def batch_matching(
     background_tasks: BackgroundTasks,
     supabase: Client = Depends(get_supabase_service)
@@ -24,6 +24,7 @@ async def batch_matching(
     """
     批量配對任務（週二 6:00 AM 觸發）
     將所有 waiting_matching 狀態的用戶按4人一組進行分組
+    此API僅限授權的Cron任務調用
     """
     # 實際實現會將此邏輯放入背景任務
     background_tasks.add_task(process_batch_matching, supabase)

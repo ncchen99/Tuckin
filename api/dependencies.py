@@ -1,9 +1,10 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from gotrue import User
 from postgrest import PostgrestClient
 from supabase import create_client, Client
 import logging
 import os
+from typing import Optional
 
 from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
 
@@ -78,4 +79,13 @@ async def get_current_user(supabase: Client = Depends(get_supabase)) -> User:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"認證錯誤: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
-        ) 
+        )
+
+# 獲取環境變數中的API密鑰，如果沒有設定則使用默認值
+CRON_API_KEY = os.environ.get("CRON_API_KEY", "your-default-api-key-change-this")
+
+# 依賴函數，用於驗證 cron job 調用
+async def verify_cron_api_key(x_api_key: Optional[str] = Header(None)):
+    if not x_api_key or x_api_key != CRON_API_KEY:
+        raise HTTPException(status_code=403, detail="未授權訪問")
+    return True 

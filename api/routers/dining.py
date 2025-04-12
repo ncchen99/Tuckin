@@ -7,7 +7,7 @@ from schemas.dining import (
     GroupStatusResponse, RatingRequest, RatingResponse,
     TableAttendanceConfirmation, DiningUserStatus
 )
-from dependencies import get_supabase, get_current_user
+from dependencies import get_supabase, get_current_user, verify_cron_api_key
 
 router = APIRouter()
 
@@ -66,7 +66,7 @@ async def handle_confirmation_timeout(
     background_tasks.add_task(process_confirmation_timeout, supabase)
     return {"success": True, "message": "確認超時處理任務已啟動"}
 
-@router.post("/matching-failed", status_code=status.HTTP_200_OK)
+@router.post("/matching-failed", status_code=status.HTTP_200_OK, dependencies=[Depends(verify_cron_api_key)])
 async def handle_matching_failed(
     background_tasks: BackgroundTasks,
     supabase: Client = Depends(get_supabase)
@@ -74,6 +74,7 @@ async def handle_matching_failed(
     """
     處理配對失敗（後台定時任務）
     將未配對成功的用戶標記為配對失敗
+    此API僅限授權的Cron任務調用
     """
     # 實際實現會將此邏輯放入背景任務
     background_tasks.add_task(process_matching_failed, supabase)
