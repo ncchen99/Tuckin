@@ -748,6 +748,38 @@ def process_auto_form_groups():
         "remaining_users": waiting_count
     }
 
+def test_scenario_5():
+    """場景5: 7個用戶配對 - 會形成一個完整組和一個不完整組"""
+    logger.info("========== 測試場景5: 7個用戶配對形成完整組和不完整組 ==========")
+    
+    # 清空模擬數據庫
+    mock_db.users = {}
+    mock_db.groups = []
+    
+    # 創建測試用戶 - 共7人
+    # 分析型: 2男2女
+    for i in range(2):
+        user = MockDBUser(str(uuid.uuid4()), "male", "分析型", f"分析型男{i+1}")
+        mock_db.add_user(user)
+    for i in range(2):
+        user = MockDBUser(str(uuid.uuid4()), "female", "分析型", f"分析型女{i+1}")
+        mock_db.add_user(user)
+    
+    # 功能型: 1男2女
+    user = MockDBUser(str(uuid.uuid4()), "male", "功能型", "功能型男1")
+    mock_db.add_user(user)
+    for i in range(2):
+        user = MockDBUser(str(uuid.uuid4()), "female", "功能型", f"功能型女{i+1}")
+        mock_db.add_user(user)
+    
+    # 執行配對
+    process_batch_matching()
+    
+    # 驗證結果
+    verify_matching_results()
+    
+    logger.info("場景5測試完成")
+
 def run_all_tests():
     """運行所有測試"""
     logger.info("開始運行所有配對測試...")
@@ -761,6 +793,7 @@ def run_all_tests():
     test_scenario_3()
     test_scenario_4()
     test_auto_form_groups()
+    test_scenario_5()  # 添加新的測試場景
     
     logger.info("所有測試完成")
 

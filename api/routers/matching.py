@@ -513,7 +513,7 @@ async def process_batch_matching(supabase: Client):
             group_id = group_response.data[0]["id"]
             created_groups += 1
             
-            # 更新用戶狀態
+    # 更新用戶狀態
             confirmation_deadline = datetime.now() + timedelta(hours=24)
             
             for user_id in group["user_ids"]:
@@ -759,7 +759,7 @@ async def process_auto_form_groups(supabase: Client):
             group_id = group_response.data[0]["id"]
             created_groups += 1
             
-            # 更新用戶狀態
+    # 更新用戶狀態
             confirmation_deadline = datetime.now() + timedelta(hours=24)
             
             for user_id in group["user_ids"]:
