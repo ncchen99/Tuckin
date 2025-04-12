@@ -213,12 +213,12 @@ async def join_matching(
             .execute()
         
         # 返回加入等待名單的響應
-        return {
+    return {
             "status": "waiting_matching",
-            "message": "您已加入聚餐配對等待名單",
-            "group_id": None,
-            "deadline": None
-        }
+        "message": "您已加入聚餐配對等待名單",
+        "group_id": None,
+        "deadline": None
+    }
 
 @router.post("/auto-form", response_model=AutoFormGroupsResponse, status_code=status.HTTP_200_OK)
 async def auto_form_groups(
@@ -316,97 +316,179 @@ async def process_batch_matching(supabase: Client):
                 "remaining_users": len(waiting_user_ids)
             }
         
-        # 4. 按人格類型和性別分組
-        groups = {
-            '分析型': {'male': [], 'female': []},
-            '功能型': {'male': [], 'female': []},
-            '直覺型': {'male': [], 'female': []},
-            '個人型': {'male': [], 'female': []}
+        # 4. 按性別和人格類型分組
+        all_users = {
+            'male': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []},
+            'female': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
         }
         
         for user_id, data in user_data.items():
             p_type = data["personality_type"]
             gender = data["gender"]
-            if p_type and gender and p_type in groups and gender in groups[p_type]:
-                groups[p_type][gender].append(user_id)
+            if p_type and gender and p_type in all_users[gender]:
+                all_users[gender][p_type].append(user_id)
         
         # 記錄各類型人數
-        for p_type in groups:
-            logger.info(f"{p_type}: 男 {len(groups[p_type]['male'])}人, 女 {len(groups[p_type]['female'])}人")
+        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
+            m_count = len(all_users['male'][p_type])
+            f_count = len(all_users['female'][p_type])
+            logger.info(f"{p_type}: 男 {m_count}人, 女 {f_count}人")
         
         # 5. 執行配對算法
         result_groups = []
         
-        # 步驟 1: 優先分配 2男2女 組
+        # 步驟 1: 按人格類型優先分配 2男2女 組
         for p_type in ['分析型', '功能型', '直覺型', '個人型']:
             # 隨機打亂順序，避免固定順序選擇
-            random.shuffle(groups[p_type]['male'])
-            random.shuffle(groups[p_type]['female'])
+            random.shuffle(all_users['male'][p_type])
+            random.shuffle(all_users['female'][p_type])
             
-            while len(groups[p_type]['male']) >= 2 and len(groups[p_type]['female']) >= 2:
+            while len(all_users['male'][p_type]) >= 2 and len(all_users['female'][p_type]) >= 2:
                 group = {
-                    "user_ids": groups[p_type]['male'][:2] + groups[p_type]['female'][:2],
-                    "personality_type": p_type,
+                    "user_ids": all_users['male'][p_type][:2] + all_users['female'][p_type][:2],
                     "is_complete": True,
                     "male_count": 2,
                     "female_count": 2
                 }
                 result_groups.append(group)
-                groups[p_type]['male'] = groups[p_type]['male'][2:]
-                groups[p_type]['female'] = groups[p_type]['female'][2:]
+                all_users['male'][p_type] = all_users['male'][p_type][2:]
+                all_users['female'][p_type] = all_users['female'][p_type][2:]
         
-        # 步驟 2: 處理剩餘用戶（4人組，不限性別）
+        # 步驟 2: 混合人格類型，但保持性別平衡 2男2女
+        remaining_male = []
+        remaining_female = []
+        
+        # 收集剩餘的用戶
         for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-            remaining = groups[p_type]['male'] + groups[p_type]['female']
+            remaining_male.extend([(uid, p_type) for uid in all_users['male'][p_type]])
+            remaining_female.extend([(uid, p_type) for uid in all_users['female'][p_type]])
+        
+        # 如果還能形成2男2女組，繼續配對
+        while len(remaining_male) >= 2 and len(remaining_female) >= 2:
+            # 選擇2名男性和2名女性
+            selected_male = remaining_male[:2]
+            selected_female = remaining_female[:2]
             
-            while len(remaining) >= 4:
-                # 計算實際性別比例
-                group_users = remaining[:4]
-                group_male_count = sum(1 for uid in group_users if user_data[uid]["gender"] == 'male')
-                group_female_count = 4 - group_male_count
-                
-                group = {
-                    "user_ids": group_users,
-                    "personality_type": p_type,
-                    "is_complete": True,
-                    "male_count": group_male_count,
-                    "female_count": group_female_count
-                }
-                result_groups.append(group)
-                remaining = remaining[4:]
+            # 提取用戶ID和人格類型
+            male_users = [uid for uid, _ in selected_male]
+            female_users = [uid for uid, _ in selected_female]
+            
+            # 確定主導人格類型
+            personality_counts = {}
+            for _, p_type in selected_male + selected_female:
+                personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
+            
+            dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0]
+            
+            group = {
+                "user_ids": male_users + female_users,
+                "is_complete": True,
+                "male_count": 2,
+                "female_count": 2
+            }
+            result_groups.append(group)
+            remaining_male = remaining_male[2:]
+            remaining_female = remaining_female[2:]
         
-        # 步驟 3: 處理不足4人的組
+        # 步驟 3: 處理剩餘用戶，按相同人格類型優先配對4人組
         remaining_users = []
-        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-            remaining = groups[p_type]['male'] + groups[p_type]['female']
-            if remaining:
-                remaining_users.extend([(user_id, p_type) for user_id in remaining])
+        for gender in ['male', 'female']:
+            for p_type in ['分析型', '功能型', '直覺型', '個人型']:
+                if gender == 'male':
+                    remaining_users.extend([(uid, p_type, 'male') for uid in all_users[gender][p_type]])
+                else:
+                    remaining_users.extend([(uid, p_type, 'female') for uid in all_users[gender][p_type]])
         
-        # 按人格類型分組（不足4人）
-        grouped_remaining = {}
-        for user_id, p_type in remaining_users:
-            if p_type not in grouped_remaining:
-                grouped_remaining[p_type] = []
-            grouped_remaining[p_type].append(user_id)
+        # 按人格類型分組
+        personality_groups = {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
+        for uid, p_type, gender in remaining_users:
+            personality_groups[p_type].append((uid, gender))
         
-        for p_type, users in grouped_remaining.items():
-            while users:
-                group_size = min(4, len(users))
-                group_users = users[:group_size]
+        # 處理每個人格類型組
+        for p_type, users in personality_groups.items():
+            while len(users) >= 4:
+                # 提取用戶ID
+                group_users = [uid for uid, _ in users[:4]]
                 
                 # 計算性別比例
-                male_count = sum(1 for uid in group_users if user_data[uid]["gender"] == 'male')
-                female_count = group_size - male_count
+                genders = [gender for _, gender in users[:4]]
+                male_count = genders.count('male')
+                female_count = genders.count('female')
                 
                 group = {
                     "user_ids": group_users,
-                    "personality_type": p_type,
-                    "is_complete": group_size == 4,
+                    "is_complete": True,
                     "male_count": male_count,
                     "female_count": female_count
                 }
                 result_groups.append(group)
-                users = users[group_size:]
+                users = users[4:]
+            
+            # 保存剩餘不足4人的用戶
+            personality_groups[p_type] = users
+        
+        # 步驟 4: 將所有剩餘用戶混合配對
+        all_remaining = []
+        for p_type in personality_groups:
+            all_remaining.extend([(uid, p_type, gender) for uid, gender in personality_groups[p_type]])
+        
+        while len(all_remaining) >= 4:
+            # 提取用戶信息
+            group_infos = all_remaining[:4]
+            group_users = [uid for uid, _, _ in group_infos]
+            
+            # 計算性別比例
+            genders = [gender for _, _, gender in group_infos]
+            male_count = genders.count('male')
+            female_count = genders.count('female')
+            
+            # 確定主導人格類型
+            personality_counts = {}
+            for _, p_type, _ in group_infos:
+                personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
+            
+            dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0]
+            
+            group = {
+                "user_ids": group_users,
+                "is_complete": True,
+                "male_count": male_count,
+                "female_count": female_count
+            }
+            result_groups.append(group)
+            all_remaining = all_remaining[4:]
+        
+        # 步驟 5: 如果剩餘3人，形成一個不完整組
+        if len(all_remaining) == 3:
+            # 提取用戶信息
+            group_infos = all_remaining
+            group_users = [uid for uid, _, _ in group_infos]
+            
+            # 計算性別比例
+            genders = [gender for _, _, gender in group_infos]
+            male_count = genders.count('male')
+            female_count = genders.count('female')
+            
+            # 確定主導人格類型
+            personality_counts = {}
+            for _, p_type, _ in group_infos:
+                personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
+            
+            dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0]
+            
+            group = {
+                "user_ids": group_users,
+                "is_complete": False,
+                "male_count": male_count,
+                "female_count": female_count
+            }
+            result_groups.append(group)
+            all_remaining = []
+        
+        # 如果還有1-2人，保持等待狀態
+        remaining_count = len(all_remaining)
+        if remaining_count > 0:
+            logger.info(f"剩餘 {remaining_count} 人無法配對成組，保持等待狀態")
         
         logger.info(f"配對結果: 共形成 {len(result_groups)} 個組別")
         
@@ -418,7 +500,6 @@ async def process_batch_matching(supabase: Client):
             
             group_response = supabase.table("matching_groups").insert({
                 "user_ids": group["user_ids"],
-                "personality_type": group["personality_type"],
                 "is_complete": group["is_complete"],
                 "male_count": group["male_count"],
                 "female_count": group["female_count"],
@@ -469,12 +550,16 @@ async def process_batch_matching(supabase: Client):
         result_message = f"批量配對完成：共創建 {created_groups} 個組別"
         logger.info(result_message)
         
+        # 計算未配對用戶數量
+        total_matched_users = sum(len(g["user_ids"]) for g in result_groups)
+        remaining_users = len(waiting_user_ids) - total_matched_users
+        
         # 返回配對結果
         return {
             "success": True,
             "message": result_message,
             "matched_groups": created_groups,
-            "remaining_users": len(waiting_user_ids) - sum(len(g["user_ids"]) for g in result_groups)
+            "remaining_users": remaining_users
         }
         
     except Exception as e:
@@ -559,38 +644,97 @@ async def process_auto_form_groups(supabase: Client):
                 "remaining_users": len(waiting_user_ids)
             }
         
-        # 簡化的成桌邏輯：按3-4人一組分配
-        result_groups = []
-        available_users = valid_users
-        random.shuffle(available_users)  # 隨機排序
+        # 將用戶按人格類型分組
+        personality_groups = {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
+        for uid in valid_users:
+            p_type = user_data[uid]["personality_type"]
+            if p_type in personality_groups:
+                personality_groups[p_type].append((uid, user_data[uid]["gender"]))
         
-        while len(available_users) >= 3:
-            # 決定組大小，優先4人，若剩餘人數為3或7則選3人
-            group_size = 3 if len(available_users) == 3 or len(available_users) == 7 else 4
-            group_users = available_users[:group_size]
+        # 處理每個人格類型的用戶組
+        result_groups = []
+        all_remaining = []
+        
+        # 1. 優先配對單一人格類型的4人組
+        for p_type, users in personality_groups.items():
+            random.shuffle(users)  # 隨機打亂順序
             
-            # 獲取主導人格類型
-            personality_counts = {}
-            for uid in group_users:
-                p_type = user_data[uid]["personality_type"]
-                if p_type:
-                    personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
+            while len(users) >= 4:
+                group_users = [uid for uid, _ in users[:4]]
+                
+                # 計算性別比例
+                genders = [gender for _, gender in users[:4]]
+                male_count = genders.count('male')
+                female_count = genders.count('female')
+                
+                group = {
+                    "user_ids": group_users,
+                    "is_complete": True,
+                    "male_count": male_count,
+                    "female_count": female_count
+                }
+                result_groups.append(group)
+                users = users[4:]
             
-            dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0] if personality_counts else "分析型"
+            # 保存剩餘不足4人的用戶
+            all_remaining.extend([(uid, p_type, gender) for uid, gender in users])
+        
+        # 2. 混合不同人格類型，形成4人組
+        while len(all_remaining) >= 4:
+            group_infos = all_remaining[:4]
+            group_users = [uid for uid, _, _ in group_infos]
             
             # 計算性別比例
-            male_count = sum(1 for uid in group_users if user_data[uid]["gender"] == 'male')
-            female_count = group_size - male_count
+            genders = [gender for _, _, gender in group_infos]
+            male_count = genders.count('male')
+            female_count = genders.count('female')
+            
+            # 確定主導人格類型
+            personality_counts = {}
+            for _, p_type, _ in group_infos:
+                personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
+            
+            dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0]
             
             group = {
                 "user_ids": group_users,
-                "personality_type": dominant_personality,
-                "is_complete": group_size == 4,
+                "is_complete": True,
                 "male_count": male_count,
                 "female_count": female_count
             }
             result_groups.append(group)
-            available_users = available_users[group_size:]
+            all_remaining = all_remaining[4:]
+        
+        # 3. 如果剩餘3人，形成一個不完整組
+        if len(all_remaining) == 3:
+            group_infos = all_remaining
+            group_users = [uid for uid, _, _ in group_infos]
+            
+            # 計算性別比例
+            genders = [gender for _, _, gender in group_infos]
+            male_count = genders.count('male')
+            female_count = genders.count('female')
+            
+            # 確定主導人格類型
+            personality_counts = {}
+            for _, p_type, _ in group_infos:
+                personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
+            
+            dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0]
+            
+            group = {
+                "user_ids": group_users,
+                "is_complete": False,
+                "male_count": male_count,
+                "female_count": female_count
+            }
+            result_groups.append(group)
+            all_remaining = []
+        
+        # 如果還有1-2人，保持等待狀態
+        remaining_count = len(all_remaining)
+        if remaining_count > 0:
+            logger.info(f"剩餘 {remaining_count} 人無法成桌，保持等待狀態")
         
         logger.info(f"成桌結果: 共形成 {len(result_groups)} 個組別")
         
@@ -602,7 +746,6 @@ async def process_auto_form_groups(supabase: Client):
             
             group_response = supabase.table("matching_groups").insert({
                 "user_ids": group["user_ids"],
-                "personality_type": group["personality_type"],
                 "is_complete": group["is_complete"],
                 "male_count": group["male_count"],
                 "female_count": group["female_count"],
@@ -651,11 +794,15 @@ async def process_auto_form_groups(supabase: Client):
         result_message = f"自動成桌完成：共創建 {created_groups} 個組別"
         logger.info(result_message)
         
+        # 計算未配對用戶數量
+        total_matched_users = sum(len(g["user_ids"]) for g in result_groups)
+        remaining_users = len(valid_users) - total_matched_users
+        
         return {
             "success": True,
             "message": result_message,
             "created_groups": created_groups,
-            "remaining_users": len(available_users)
+            "remaining_users": remaining_users
         }
         
     except Exception as e:
