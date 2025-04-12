@@ -6,13 +6,6 @@ SELECT
     personal_desc
 FROM user_profiles;
 
--- 創建 group_uuid_mapping 表
-CREATE TABLE IF NOT EXISTS group_uuid_mapping (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    group_id TEXT NOT NULL,
-    user_id UUID NOT NULL REFERENCES auth.users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 -- 創建 dining_events 表
 CREATE TABLE IF NOT EXISTS dining_events (
@@ -63,38 +56,53 @@ CREATE TABLE IF NOT EXISTS restaurant_votes (
     UNIQUE(restaurant_id, group_id, user_id)
 );
 
--- 創建 ratings 表
-CREATE TABLE IF NOT EXISTS ratings (
+-- 創建 matching_groups 表（配對算法用）
+CREATE TABLE IF NOT EXISTS matching_groups (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES auth.users(id),
-    score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 5),
-    comment TEXT,
-    uncomfortable_rating BOOLEAN DEFAULT FALSE,
+    user_ids UUID[] NOT NULL,
+    personality_type TEXT NOT NULL,
+    is_complete BOOLEAN DEFAULT FALSE,
+    male_count INTEGER DEFAULT 0,
+    female_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'waiting_confirmation',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(restaurant_id, user_id)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 創建 matching_scores 表
-CREATE TABLE IF NOT EXISTS matching_scores (
+-- 創建 user_status 表（跟踪用戶配對狀態）
+CREATE TABLE IF NOT EXISTS user_status (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES auth.users(id),
-    target_user_id UUID NOT NULL REFERENCES auth.users(id),
-    score DOUBLE PRECISION DEFAULT 0.0,
-    last_calculated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, target_user_id)
+    status TEXT NOT NULL DEFAULT 'waiting_matching',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 創建 user_notifications 表
-CREATE TABLE IF NOT EXISTS user_notifications (
+-- 創建 user_matching_info 表（儲存配對相關信息）
+CREATE TABLE IF NOT EXISTS user_matching_info (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES auth.users(id),
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    data JSONB,
+    matching_group_id UUID REFERENCES matching_groups(id),
+    confirmation_deadline TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    read_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
 );
+
+-- 創建用戶狀態擴展視圖（保持與原結構兼容）
+CREATE OR REPLACE VIEW user_status_extended AS
+SELECT 
+    us.id, 
+    us.user_id, 
+    us.status, 
+    umi.matching_group_id AS group_id,
+    umi.confirmation_deadline,
+    us.created_at, 
+    us.updated_at
+FROM 
+    user_status us
+LEFT JOIN 
+    user_matching_info umi ON us.user_id = umi.user_id;
 
 -- 創建必要的索引來優化查詢性能
 CREATE INDEX IF NOT EXISTS idx_dining_events_group_id ON dining_events(group_id);
@@ -107,6 +115,12 @@ CREATE INDEX IF NOT EXISTS idx_matching_scores_user_id ON matching_scores(user_i
 CREATE INDEX IF NOT EXISTS idx_matching_scores_target_user_id ON matching_scores(target_user_id);
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_id ON user_notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_notifications_read_at ON user_notifications(read_at);
+CREATE INDEX IF NOT EXISTS idx_user_status_user_id ON user_status(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_status_status ON user_status(status);
+CREATE INDEX IF NOT EXISTS idx_user_matching_info_user_id ON user_matching_info(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_matching_info_matching_group_id ON user_matching_info(matching_group_id);
+CREATE INDEX IF NOT EXISTS idx_matching_groups_personality_type ON matching_groups(personality_type);
+CREATE INDEX IF NOT EXISTS idx_matching_groups_status ON matching_groups(status);
 
 -- 設置 RLS 權限，以下為範例，實際使用時應根據需求進行調整
 ALTER TABLE dining_events ENABLE ROW LEVEL SECURITY;
@@ -116,6 +130,9 @@ ALTER TABLE restaurant_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ratings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matching_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_uuid_mapping ENABLE ROW LEVEL SECURITY;
+ALTER TABLE matching_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_status ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_matching_info ENABLE ROW LEVEL SECURITY;
 
 -- 為管理員提供所有表的完全存取權限
 CREATE POLICY admin_all ON dining_events FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
@@ -125,13 +142,12 @@ CREATE POLICY admin_all ON restaurant_votes FOR ALL TO authenticated USING (auth
 CREATE POLICY admin_all ON ratings FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
 CREATE POLICY admin_all ON matching_scores FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
 CREATE POLICY admin_all ON group_uuid_mapping FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
+CREATE POLICY admin_all ON matching_groups FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
+CREATE POLICY admin_all ON user_status FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
+CREATE POLICY admin_all ON user_matching_info FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
 
 -- 為用戶提供對餐廳表的讀取權限
 CREATE POLICY restaurants_read ON restaurants FOR SELECT TO authenticated USING (true);
-
--- 為用戶提供對自己評分的讀寫權限
-CREATE POLICY ratings_own ON ratings FOR ALL TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY ratings_read ON ratings FOR SELECT TO authenticated USING (true);
 
 -- 為群組成員提供對群組聚餐事件的讀取權限
 CREATE POLICY dining_events_group_read ON dining_events 
@@ -141,10 +157,23 @@ CREATE POLICY dining_events_group_read ON dining_events
         WHERE user_id = auth.uid()
     ));
 
--- 為群組成員提供對群組餐廳投票的讀取權限
-CREATE POLICY restaurant_votes_group_read ON restaurant_votes 
+-- 為用戶提供對自己狀態的讀取/更新權限
+CREATE POLICY user_status_self ON user_status 
+    FOR ALL TO authenticated 
+    USING (user_id = auth.uid());
+
+-- 為用戶提供對自己配對信息的讀取/更新權限
+CREATE POLICY user_matching_info_self ON user_matching_info 
+    FOR ALL TO authenticated 
+    USING (user_id = auth.uid());
+
+-- 為用戶提供對自己所在配對組的讀取權限
+CREATE POLICY matching_groups_member ON matching_groups 
     FOR SELECT TO authenticated 
-    USING (group_id IN (
-        SELECT group_id FROM group_uuid_mapping 
-        WHERE user_id = auth.uid()
-    )); 
+    USING (id IN (
+        SELECT matching_group_id FROM user_matching_info 
+        WHERE user_id = auth.uid() AND matching_group_id IS NOT NULL
+    ));
+
+-- 創建 ratings 表 對其他用戶的評價
+-- TODO: 需要設計 ratings 表的 schema

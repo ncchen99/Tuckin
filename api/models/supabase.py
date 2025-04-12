@@ -92,14 +92,6 @@ class DiningEventParticipant:
     is_attending: bool
     created_at: datetime
 
-# 匹配分數模型
-class MatchingScore:
-    id: str
-    user_id: str
-    target_user_id: str
-    score: float
-    last_calculated: datetime
-
 # 通知模型
 class Notification:
     id: str

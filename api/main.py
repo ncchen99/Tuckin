@@ -5,8 +5,8 @@ import uvicorn
 from routers import group, restaurant, user, utils, matching, dining
 
 app = FastAPI(
-    title="TuckIn API",
-    description="學生交友與聚餐平台的API服務",
+    title="Tuckin API",
+    description="Tuckin 的API服務",
     version="0.1.0"
 )
 
