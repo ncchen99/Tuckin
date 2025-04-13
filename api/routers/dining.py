@@ -7,14 +7,14 @@ from schemas.dining import (
     GroupStatusResponse, RatingRequest, RatingResponse,
     TableAttendanceConfirmation, DiningUserStatus
 )
-from dependencies import get_supabase, get_current_user, verify_cron_api_key
+from dependencies import get_supabase, get_supabase_service, get_current_user, verify_cron_api_key
 
 router = APIRouter()
 
 @router.post("/confirm", response_model=ConfirmAttendanceResponse, status_code=status.HTTP_200_OK)
 async def confirm_attendance(
     request: ConfirmAttendanceRequest,
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
@@ -30,6 +30,7 @@ async def confirm_attendance(
         "confirmed_status": request.status
     }
 
+# 查詢桌位中所有用戶的確認狀態，應該不需要
 @router.get("/groups/{group_id}/status", response_model=GroupStatusResponse)
 async def get_group_status(
     group_id: str,

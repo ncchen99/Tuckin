@@ -6,7 +6,7 @@ from routers import group, restaurant, user, utils, matching, dining
 
 app = FastAPI(
     title="Tuckin API",
-    description="Tuckin 的API服務",
+    description="Tuckin 的 API 服務",
     version="0.1.0"
 )
 

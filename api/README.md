@@ -40,6 +40,7 @@ SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_KEY=your_supabase_service_key
 FIREBASE_CONFIG={"your_firebase_config_json"}
+CRON_API_KEY=your_cron_api_key # 用於定時任務驗證
 GOOGLE_PLACES_API_KEY=your_google_places_api_key
 R2_ACCOUNT_ID=your_r2_account_id
 R2_ACCESS_KEY_ID=your_r2_access_key

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from supabase import Client
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import random
 from datetime import datetime, timedelta
 import logging
+from collections import Counter
 
 from schemas.matching import (
     JoinMatchingRequest, JoinMatchingResponse, 
@@ -12,6 +13,7 @@ from schemas.matching import (
 )
 from schemas.dining import DiningUserStatus
 from dependencies import get_supabase, get_current_user, get_supabase_service, verify_cron_api_key
+from services.notification_service import NotificationService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -153,8 +155,8 @@ async def join_matching(
     
     # 5. 更新用戶狀態
     if joined_group:
-        # 設置確認截止時間（24小時後）
-        confirmation_deadline = datetime.now() + timedelta(hours=24)
+        # # 用戶需在週三 13:00 PM 前確認
+        confirmation_deadline = datetime.now() + timedelta(hours=7)
         
         # 檢查或創建用戶狀態
         user_status_resp = supabase.table("user_status") \
@@ -196,7 +198,7 @@ async def join_matching(
         # 返回成功加入組別的響應
         return {
             "status": "waiting_confirmation",
-            "message": "您已被分配到桌位，請在24小時內確認參加",
+            "message": "您已被分配到桌位，請在七小時內確認參加",
             "group_id": joined_group_id,
             "deadline": confirmation_deadline
         }
@@ -509,6 +511,7 @@ async def process_batch_matching(supabase: Client):
         logger.info(f"配對結果: 共形成 {len(result_groups)} 個組別")
         
         # 6. 將結果保存到數據庫
+        notification_service = NotificationService(use_service_role=True)
         created_groups = 0
         for group in result_groups:
             # 創建分組記錄
@@ -529,8 +532,16 @@ async def process_batch_matching(supabase: Client):
             group_id = group_response.data[0]["id"]
             created_groups += 1
             
-    # 更新用戶狀態
-            confirmation_deadline = datetime.now() + timedelta(hours=24)
+            # 更新用戶狀態
+            # 用戶需在週三 13:00 PM 前確認 (七小時過後)
+            confirmation_deadline = datetime.now() + timedelta(hours=7)
+            
+            # 準備發送通知
+            notification_data = {
+                "type": "matching_confirmation",
+                "group_id": group_id,
+                "deadline": confirmation_deadline.isoformat()
+            }
             
             for user_id in group["user_ids"]:
                 try:
@@ -560,8 +571,27 @@ async def process_batch_matching(supabase: Client):
                             "matching_group_id": group_id,
                             "confirmation_deadline": confirmation_deadline.isoformat()
                         }).execute()
+                    
+                    # 發送配對成功通知
+                    try:
+                        await notification_service.send_notification(
+                            user_id=user_id,
+                            title="配對成功！",
+                            body="您已被配對到聚餐小組，請在規定時間內確認參加",
+                            data=notification_data
+                        )
+                        logger.info(f"成功發送配對通知到用戶 {user_id}")
+                    except Exception as ne:
+                        logger.error(f"發送通知給用戶 {user_id} 失敗: {str(ne)}")
+                        
                 except Exception as e:
                     logger.error(f"更新用戶 {user_id} 狀態失敗: {str(e)}")
+            
+            # 新增: 為群組推薦餐廳
+            try:
+                await recommend_restaurants_for_group(supabase, group_id, group["user_ids"])
+            except Exception as e:
+                logger.error(f"為群組 {group_id} 推薦餐廳時出錯: {str(e)}")
         
         result_message = f"批量配對完成：共創建 {created_groups} 個組別"
         logger.info(result_message)
@@ -837,6 +867,7 @@ async def process_auto_form_groups(supabase: Client):
         logger.info(f"配對結果: 共形成 {len(result_groups)} 個組別")
         
         # 6. 將結果保存到數據庫
+        notification_service = NotificationService(use_service_role=True)
         created_groups = 0
         for group in result_groups:
             # 創建分組記錄
@@ -857,8 +888,16 @@ async def process_auto_form_groups(supabase: Client):
             group_id = group_response.data[0]["id"]
             created_groups += 1
             
-    # 更新用戶狀態
-            confirmation_deadline = datetime.now() + timedelta(hours=24)
+            # 更新用戶狀態
+            # 用戶需在週三 13:00 PM 前確認 (七小時過後)
+            confirmation_deadline = datetime.now() + timedelta(hours=7)
+            
+            # 準備發送通知
+            notification_data = {
+                "type": "matching_confirmation",
+                "group_id": group_id,
+                "deadline": confirmation_deadline.isoformat()
+            }
             
             for user_id in group["user_ids"]:
                 try:
@@ -886,8 +925,27 @@ async def process_auto_form_groups(supabase: Client):
                             "matching_group_id": group_id,
                             "confirmation_deadline": confirmation_deadline.isoformat()
                         }).execute()
+                    
+                    # 發送配對成功通知
+                    try:
+                        await notification_service.send_notification(
+                            user_id=user_id,
+                            title="自動成桌成功！",
+                            body="您已被成功分配到聚餐小組，請在規定時間內確認參加",
+                            data=notification_data
+                        )
+                        logger.info(f"成功發送自動成桌通知到用戶 {user_id}")
+                    except Exception as ne:
+                        logger.error(f"發送通知給用戶 {user_id} 失敗: {str(ne)}")
+                
                 except Exception as e:
                     logger.error(f"更新用戶 {user_id} 狀態失敗: {str(e)}")
+            
+            # 新增: 為群組推薦餐廳
+            try:
+                await recommend_restaurants_for_group(supabase, group_id, group["user_ids"])
+            except Exception as e:
+                logger.error(f"為群組 {group_id} 推薦餐廳時出錯: {str(e)}")
         
         result_message = f"自動成桌完成：共創建 {created_groups} 個組別"
         logger.info(result_message)
@@ -911,4 +969,175 @@ async def process_auto_form_groups(supabase: Client):
             "message": error_message,
             "created_groups": 0,
             "remaining_users": None
-        } 
+        }
+
+# 在文件末尾添加餐廳推薦相關函數
+async def recommend_restaurants_for_group(supabase: Client, group_id: str, user_ids: List[str]) -> bool:
+    """
+    為群組推薦餐廳並保存到restaurant_votes表
+    
+    基於群組成員的食物偏好，推薦2家餐廳
+    """
+    try:
+        logger.info(f"為群組 {group_id} 推薦餐廳")
+        
+        # 1. 獲取群組成員的食物偏好
+        food_preferences = await get_group_food_preferences(supabase, user_ids)
+        if not food_preferences:
+            logger.warning(f"無法獲取群組 {group_id} 成員的食物偏好")
+            return False
+            
+        # 2. 根據偏好選擇兩家餐廳
+        recommended_restaurants = await select_recommended_restaurants(supabase, food_preferences)
+        if not recommended_restaurants or len(recommended_restaurants) == 0:
+            logger.warning(f"無法為群組 {group_id} 推薦餐廳")
+            return False
+            
+        # 3. 將推薦餐廳保存到restaurant_votes表
+        for restaurant_id in recommended_restaurants:
+            # 檢查是否已存在記錄
+            existing_vote = supabase.table("restaurant_votes") \
+                .select("id") \
+                .eq("group_id", group_id) \
+                .eq("restaurant_id", restaurant_id) \
+                .is_("user_id", "null") \
+                .eq("is_system_recommendation", True) \
+                .execute()
+                
+            if existing_vote.data and len(existing_vote.data) > 0:
+                logger.info(f"餐廳 {restaurant_id} 已經推薦給群組 {group_id}")
+                continue
+                
+            # 插入推薦記錄
+            supabase.table("restaurant_votes").insert({
+                "restaurant_id": restaurant_id,
+                "group_id": group_id,
+                "user_id": None,  # 系統推薦不關聯用戶
+                "is_system_recommendation": True,
+                "created_at": datetime.now().isoformat()
+            }).execute()
+            
+            logger.info(f"成功為群組 {group_id} 推薦餐廳 {restaurant_id}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"推薦餐廳時出錯: {str(e)}")
+        return False
+
+async def get_group_food_preferences(supabase: Client, user_ids: List[str]) -> Dict[str, int]:
+    """
+    獲取群組成員的食物偏好並匯總
+    返回格式: {'台灣料理': 3, '日式料理': 2, ...}
+    """
+    try:
+        # 查詢用戶的食物偏好
+        preferences_response = supabase.table("user_food_preferences") \
+            .select("user_id, preference_id") \
+            .in_("user_id", user_ids) \
+            .execute()
+            
+        if not preferences_response.data:
+            return {}
+            
+        # 獲取偏好ID列表
+        preference_ids = [pref["preference_id"] for pref in preferences_response.data]
+        
+        # 查詢偏好對應的類別
+        categories_response = supabase.table("food_preferences") \
+            .select("id, name") \
+            .in_("id", preference_ids) \
+            .execute()
+            
+        if not categories_response.data:
+            return {}
+            
+        # 創建ID到類別名稱的映射
+        id_to_category = {item["id"]: item["name"] for item in categories_response.data}
+        
+        # 統計每個類別的偏好計數
+        preferences_counter = Counter()
+        for pref in preferences_response.data:
+            pref_id = pref["preference_id"]
+            if pref_id in id_to_category:
+                preferences_counter[id_to_category[pref_id]] += 1
+                
+        return dict(preferences_counter)
+        
+    except Exception as e:
+        logger.error(f"獲取群組食物偏好時出錯: {str(e)}")
+        return {}
+
+async def select_recommended_restaurants(
+    supabase: Client, 
+    food_preferences: Dict[str, int], 
+    limit: int = 2
+) -> List[str]:
+    """
+    基於食物偏好選擇推薦餐廳
+    
+    策略:
+    1. 如果有共同偏好，優先選擇符合最受歡迎類別的餐廳
+    2. 如果偏好多樣化，選擇覆蓋多數用戶偏好的餐廳
+    3. 如果沒有偏好資料，隨機選擇餐廳
+    """
+    try:
+        if not food_preferences:
+            # 如果沒有偏好資料，隨機選擇餐廳
+            random_restaurants = supabase.table("restaurants") \
+                .select("id") \
+                .limit(limit) \
+                .order("created_at") \
+                .execute()
+                
+            return [r["id"] for r in random_restaurants.data] if random_restaurants.data else []
+        
+        # 按偏好度排序類別
+        sorted_preferences = sorted(food_preferences.items(), key=lambda x: x[1], reverse=True)
+        
+        # 選擇排名前 limit*2 的類別，增加多樣性
+        top_categories = [category for category, _ in sorted_preferences[:limit*2]]
+        
+        if not top_categories:
+            return []
+            
+        # 從這些類別中查詢餐廳
+        recommended_ids = []
+        for category in top_categories:
+            if len(recommended_ids) >= limit:
+                break
+                
+            # 查詢指定類別的餐廳
+            category_restaurants = supabase.table("restaurants") \
+                .select("id") \
+                .eq("category", category) \
+                .limit(1) \
+                .order("created_at") \
+                .execute()
+                
+            if category_restaurants.data:
+                restaurant_id = category_restaurants.data[0]["id"]
+                if restaurant_id not in recommended_ids:
+                    recommended_ids.append(restaurant_id)
+        
+        # 如果推薦不足，使用隨機餐廳補充
+        if len(recommended_ids) < limit:
+            remaining = limit - len(recommended_ids)
+            
+            # 排除已選擇的餐廳
+            random_restaurants = supabase.table("restaurants") \
+                .select("id") \
+                .not_("id", "in", f"({','.join(recommended_ids)})") \
+                .limit(remaining) \
+                .order("created_at") \
+                .execute()
+                
+            if random_restaurants.data:
+                for r in random_restaurants.data:
+                    recommended_ids.append(r["id"])
+        
+        return recommended_ids
+        
+    except Exception as e:
+        logger.error(f"選擇推薦餐廳時出錯: {str(e)}")
+        return [] 

@@ -27,7 +27,7 @@ class TableAttendanceConfirmation(str, Enum):
     PENDING = "pending"
 
 class DiningEventBase(BaseModel):
-    group_id: str
+    matching_group_id: str
     restaurant_id: Optional[str] = None
     name: str = Field(..., min_length=1, max_length=100)
     date: datetime
@@ -35,12 +35,12 @@ class DiningEventBase(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
 
 class DiningEventCreate(DiningEventBase):
-    creator_id: str
+    pass
 
 class DiningEventResponse(DiningEventBase):
     id: UUID
-    creator_id: str
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True
@@ -48,7 +48,7 @@ class DiningEventResponse(DiningEventBase):
 class DiningEventParticipantBase(BaseModel):
     event_id: str
     user_id: str
-    is_attending: bool = True
+    attendance_status: str = "pending"  # 'pending', 'confirmed', 'declined'
 
 class DiningEventParticipantCreate(DiningEventParticipantBase):
     pass
@@ -56,6 +56,7 @@ class DiningEventParticipantCreate(DiningEventParticipantBase):
 class DiningEventParticipant(DiningEventParticipantBase):
     id: UUID
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True

@@ -4,19 +4,20 @@ from datetime import datetime
 from uuid import UUID
 
 class RestaurantBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    category: Optional[str] = Field(None, max_length=50)
-    description: Optional[str] = Field(None, max_length=500)
-    address: Optional[str] = Field(None, max_length=200)
+    name: str
+    category: Optional[str] = None
+    description: Optional[str] = None
+    address: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    image_path: Optional[str] = Field(None, max_length=200)
-    business_hours: Optional[str] = Field(None, max_length=200)
+    image_path: Optional[str] = None
+    business_hours: Optional[str] = None
+    google_place_id: Optional[str] = None
 
 class RestaurantCreate(RestaurantBase):
-    google_place_id: Optional[str] = Field(None, max_length=100)
+    pass
 
-class RestaurantResponse(RestaurantBase):
+class Restaurant(RestaurantBase):
     id: UUID
     created_at: datetime
 
@@ -26,8 +27,8 @@ class RestaurantResponse(RestaurantBase):
 class RestaurantVoteBase(BaseModel):
     restaurant_id: str
     group_id: str
-    user_id: str
-    vote_value: int = Field(..., ge=1, le=5)
+    user_id: Optional[str] = None
+    is_system_recommendation: bool = False
 
 class RestaurantVoteCreate(RestaurantVoteBase):
     pass
@@ -38,6 +39,24 @@ class RestaurantVote(RestaurantVoteBase):
 
     class Config:
         orm_mode = True
+
+class RestaurantSearchQuery(BaseModel):
+    query: Optional[str] = None
+    category: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    radius: Optional[int] = 5000  # meters
+    limit: int = 10
+    
+class GroupRestaurantVotesResponse(BaseModel):
+    group_id: str
+    restaurants: List[Restaurant]
+    user_votes: List[RestaurantVote]
+    system_recommendations: List[Restaurant] = []
+    
+class UserVoteRequest(BaseModel):
+    group_id: str
+    restaurant_id: str
 
 class RatingBase(BaseModel):
     restaurant_id: str

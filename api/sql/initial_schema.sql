@@ -10,14 +10,14 @@ FROM user_profiles;
 -- 創建 dining_events 表
 CREATE TABLE IF NOT EXISTS dining_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    group_id TEXT NOT NULL,
-    restaurant_id TEXT,
+    matching_group_id UUID NOT NULL REFERENCES matching_groups(id),
+    restaurant_id UUID REFERENCES restaurants(id),
     name TEXT NOT NULL,
     date TIMESTAMP WITH TIME ZONE NOT NULL,
-    status TEXT NOT NULL DEFAULT 'planned',
+    status TEXT NOT NULL DEFAULT 'confirmed',
     description TEXT,
-    creator_id UUID NOT NULL REFERENCES auth.users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 創建 dining_event_participants 表
@@ -25,8 +25,9 @@ CREATE TABLE IF NOT EXISTS dining_event_participants (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     event_id UUID NOT NULL REFERENCES dining_events(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id),
-    is_attending BOOLEAN DEFAULT TRUE,
+    attendance_status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'confirmed', 'declined'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(event_id, user_id)
 );
 
@@ -49,11 +50,11 @@ CREATE TABLE IF NOT EXISTS restaurants (
 CREATE TABLE IF NOT EXISTS restaurant_votes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
-    group_id TEXT NOT NULL,
-    user_id UUID NOT NULL REFERENCES auth.users(id),
-    vote_value INTEGER NOT NULL CHECK (vote_value BETWEEN 1 AND 5),
+    group_id UUID NOT NULL REFERENCES matching_groups(id),
+    user_id UUID REFERENCES auth.users(id),
+    is_system_recommendation BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(restaurant_id, group_id, user_id)
+    UNIQUE(restaurant_id, group_id, user_id) WHERE user_id IS NOT NULL
 );
 
 -- 創建 matching_groups 表（配對算法用）
@@ -111,8 +112,6 @@ CREATE INDEX IF NOT EXISTS idx_dining_event_participants_event_id ON dining_even
 CREATE INDEX IF NOT EXISTS idx_restaurant_votes_group_id ON restaurant_votes(group_id);
 CREATE INDEX IF NOT EXISTS idx_restaurant_votes_restaurant_id ON restaurant_votes(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_restaurant_id ON ratings(restaurant_id);
-CREATE INDEX IF NOT EXISTS idx_matching_scores_user_id ON matching_scores(user_id);
-CREATE INDEX IF NOT EXISTS idx_matching_scores_target_user_id ON matching_scores(target_user_id);
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_id ON user_notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_notifications_read_at ON user_notifications(read_at);
 CREATE INDEX IF NOT EXISTS idx_user_status_user_id ON user_status(user_id);
