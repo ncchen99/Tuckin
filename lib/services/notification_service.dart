@@ -47,6 +47,14 @@ class NotificationService {
         saveTokenToSupabase();
       });
 
+      // 設置前台通知選項
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+
       // 處理後台消息
       FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler,
@@ -180,6 +188,12 @@ class NotificationService {
 
     // 顯示本地通知
     if (message.notification != null) {
+      // 創建一個新的消息數據，添加標記以防止後台處理程序重複顯示
+      final Map<String, dynamic> modifiedData = Map<String, dynamic>.from(
+        message.data,
+      );
+      modifiedData['showNotification'] = 'false';
+
       await _localNotifications.show(
         message.hashCode,
         message.notification!.title,
@@ -192,9 +206,11 @@ class NotificationService {
             importance: Importance.high,
             priority: Priority.high,
             icon: '@drawable/notification_icon',
+            // 確保小圖示可見
+            color: const Color(0xFFB33D1C),
           ),
         ),
-        payload: message.data.toString(),
+        payload: modifiedData.toString(),
       );
     }
   }
@@ -205,4 +221,46 @@ class NotificationService {
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint('收到後台消息: ${message.notification?.title}');
+
+  // 只有當應用在後台時才顯示通知
+  // 檢查消息數據中是否有特殊標記，避免重複通知
+  if (message.notification != null &&
+      message.data['showNotification'] != 'false') {
+    // 為後台通知配置小圖標
+    // 創建通知頻道
+    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+        FlutterLocalNotificationsPlugin();
+
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'tuckin_notification_channel',
+      'TuckIn 通知',
+      description: '用於接收聚餐相關通知',
+      importance: Importance.high,
+    );
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(channel);
+
+    // 如果消息包含通知，則顯示本地通知
+    await flutterLocalNotificationsPlugin.show(
+      message.hashCode,
+      message.notification!.title,
+      message.notification!.body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'tuckin_notification_channel',
+          'TuckIn 通知',
+          channelDescription: '用於接收聚餐相關通知',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@drawable/notification_icon',
+          color: const Color(0xFFB33D1C),
+        ),
+      ),
+      payload: message.data.toString(),
+    );
+  }
 }

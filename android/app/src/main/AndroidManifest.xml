@@ -32,6 +32,14 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- 設定Firebase通知默認圖標 -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/notification_icon" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/ic_launcher_background" />
+
             <!-- 添加 Firebase 消息服務 -->
         <service
             android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService"

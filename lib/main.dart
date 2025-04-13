@@ -16,6 +16,7 @@ import 'package:tuckin/services/realtime_service.dart'; // 導入實時服務
 import 'package:firebase_core/firebase_core.dart';
 // 添加導入IO庫用於網絡請求
 import 'package:http/http.dart' as http; // 添加HTTP包用於網絡請求
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -138,10 +139,17 @@ Future<String> _determineInitialRoute() async {
 // 初始化通知服務的函數
 Future<void> _initializeNotificationService() async {
   try {
+    debugPrint('開始初始化通知服務...');
     await NotificationService().initialize(navigatorKey);
     debugPrint('通知服務初始化成功');
+
+    // 獲取 FCM token 並輸出（僅用於調試）
+    final token = await FirebaseMessaging.instance.getToken();
+    debugPrint('FCM Token: ${token?.substring(0, 50)}...');
   } catch (e) {
     debugPrint('通知服務初始化錯誤: $e');
+    // 輸出詳細錯誤堆疊
+    debugPrintStack(label: '通知服務初始化錯誤堆疊');
     // 通知服務初始化失敗不阻止應用程序啟動
   }
 }
