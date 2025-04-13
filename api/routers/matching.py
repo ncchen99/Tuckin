@@ -70,14 +70,66 @@ async def join_matching(
                 "deadline": user_status.get("confirmation_deadline")
             }
     
-    # 2. 查找不足4人的桌位
-    incomplete_groups_response = supabase.table("matching_groups") \
-        .select("id, user_ids, male_count, female_count, is_complete") \
-        .eq("is_complete", False) \
-        .eq("status", "waiting_confirmation") \
+    # 2. 獲取用戶的配對偏好
+    preference_response = supabase.table("user_matching_preferences") \
+        .select("prefer_school_only") \
+        .eq("user_id", user_id) \
         .execute()
     
-    # 3. 獲取用戶個人資料（性別）
+    prefer_school_only = False
+    if preference_response.data and len(preference_response.data) > 0:
+        prefer_school_only = preference_response.data[0].get("prefer_school_only", False)
+    
+    # 3. 查找不足4人的桌位
+    incomplete_groups_query = supabase.table("matching_groups") \
+        .select("id, user_ids, male_count, female_count, is_complete") \
+        .eq("is_complete", False) \
+        .eq("status", "waiting_confirmation")
+    
+    # 如果用戶只願意與校內同學配對，則只查找全部是校內同學的組別
+    if prefer_school_only:
+        # 獲取所有不完整的組別
+        incomplete_groups_response = incomplete_groups_query.execute()
+        
+        if incomplete_groups_response.data:
+            # 篩選出符合條件的組別：所有成員都是校內專屬配對
+            filtered_groups = []
+            for group in incomplete_groups_response.data:
+                group_id = group["id"]
+                user_ids = group["user_ids"] or []
+                
+                # 檢查用戶是否已在該組
+                if user_id in user_ids:
+                    # 用戶已在此組，直接返回已加入的狀態
+                    return {
+                        "status": "waiting_confirmation",
+                        "message": "您已加入該聚餐小組",
+                        "group_id": group_id,
+                        "deadline": None  # 需要從資料庫查詢
+                    }
+                
+                # 檢查組內所有成員的偏好
+                if user_ids:
+                    member_prefs = supabase.table("user_matching_preferences") \
+                        .select("user_id, prefer_school_only") \
+                        .in_("user_id", user_ids) \
+                        .execute()
+                    
+                    all_school_only = True
+                    for member in member_prefs.data:
+                        if not member.get("prefer_school_only", False):
+                            all_school_only = False
+                            break
+                    
+                    if all_school_only:
+                        filtered_groups.append(group)
+            
+            incomplete_groups_response.data = filtered_groups
+    else:
+        # 如果用戶不要求校內專屬配對，則可以加入任何組別
+        incomplete_groups_response = incomplete_groups_query.execute()
+    
+    # 4. 獲取用戶個人資料（性別）
     profile_response = supabase.table("user_profiles") \
         .select("gender") \
         .eq("user_id", user_id) \
@@ -91,7 +143,7 @@ async def join_matching(
     
     gender = profile_response.data[0]["gender"]
     
-    # 4. 查找適合的不完整組別
+    # 5. 查找適合的不完整組別
     joined_group = None
     joined_group_id = None
     
@@ -153,9 +205,9 @@ async def join_matching(
             joined_group = True
             joined_group_id = group_id
     
-    # 5. 更新用戶狀態
+    # 6. 更新用戶狀態
     if joined_group:
-        # # 用戶需在週三 13:00 PM 前確認
+        # 用戶需在七小時內確認
         confirmation_deadline = datetime.now() + timedelta(hours=7)
         
         # 檢查或創建用戶狀態
@@ -204,11 +256,6 @@ async def join_matching(
         }
     else:
         # 如果沒有適合的組別
-        
-        # todo: 如果沒有適合的組別，
-        # 1. 檢查等待名單中是否有其他用戶(>=3人)
-        # 2. 如果沒有，則加入等待名單
-        # 3. 如果有，則將等待的用戶煮成群組
         
         # 檢查或創建用戶狀態
         user_status_resp = supabase.table("user_status") \
@@ -267,48 +314,111 @@ async def _match_users_into_groups(user_data: Dict[str, Dict[str, str]]) -> Tupl
     根據用戶資料將用戶分組配對
     
     Args:
-        user_data: 格式 {user_id: {"gender": gender, "personality_type": personality_type}}
+        user_data: 格式 {user_id: {"gender": gender, "personality_type": personality_type, "prefer_school_only": bool}}
         
     Returns:
         Tuple[List[Dict], List[Tuple]]: 返回 (結果組別, 剩餘未配對用戶)
     """
-    # 按性別和人格類型分組
-    all_users = {
+    # 首先按照校內配對偏好將用戶分為兩組
+    school_only_users = {}
+    mixed_users = {}
+    
+    for user_id, data in user_data.items():
+        if data.get("prefer_school_only", False):
+            school_only_users[user_id] = data
+        else:
+            mixed_users[user_id] = data
+    
+    logger.info(f"僅校內配對用戶數: {len(school_only_users)}, 混合配對用戶數: {len(mixed_users)}")
+    
+    # 按性別和人格類型分組 - 對校內專屬配對用戶
+    school_only_by_type = {
         'male': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []},
         'female': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
     }
     
-    for user_id, data in user_data.items():
+    # 按性別和人格類型分組 - 對混合配對用戶
+    mixed_by_type = {
+        'male': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []},
+        'female': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
+    }
+    
+    # 將用戶分類到對應組別
+    for user_id, data in school_only_users.items():
         p_type = data["personality_type"]
         gender = data["gender"]
-        if p_type and gender and p_type in all_users[gender]:
-            all_users[gender][p_type].append(user_id)
+        if p_type and gender and p_type in school_only_by_type[gender]:
+            school_only_by_type[gender][p_type].append(user_id)
     
-    # 記錄各類型人數
+    for user_id, data in mixed_users.items():
+        p_type = data["personality_type"]
+        gender = data["gender"]
+        if p_type and gender and p_type in mixed_by_type[gender]:
+            mixed_by_type[gender][p_type].append(user_id)
+    
+    # 記錄各類型人數 - 校內專屬
+    logger.info("校內專屬配對用戶分布:")
     for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-        m_count = len(all_users['male'][p_type])
-        f_count = len(all_users['female'][p_type])
+        m_count = len(school_only_by_type['male'][p_type])
+        f_count = len(school_only_by_type['female'][p_type])
         logger.info(f"{p_type}: 男 {m_count}人, 女 {f_count}人")
     
-    # 執行配對算法
+    # 記錄各類型人數 - 混合配對
+    logger.info("混合配對用戶分布:")
+    for p_type in ['分析型', '功能型', '直覺型', '個人型']:
+        m_count = len(mixed_by_type['male'][p_type])
+        f_count = len(mixed_by_type['female'][p_type])
+        logger.info(f"{p_type}: 男 {m_count}人, 女 {f_count}人")
+    
+    # 執行配對算法 - 分別處理兩組用戶
+    result_groups = []
+    
+    # 先處理校內專屬配對用戶
+    school_only_groups = await _match_user_group(school_only_by_type)
+    result_groups.extend(school_only_groups)
+    
+    # 再處理混合配對用戶
+    mixed_groups = await _match_user_group(mixed_by_type)
+    result_groups.extend(mixed_groups)
+    
+    # 收集剩餘的用戶 - 這些用戶暫時無法被配對
+    remaining_school_only = []
+    for gender in ['male', 'female']:
+        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
+            for uid in school_only_by_type[gender][p_type]:
+                remaining_school_only.append((uid, p_type, gender, True))  # True表示校內專屬
+    
+    remaining_mixed = []
+    for gender in ['male', 'female']:
+        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
+            for uid in mixed_by_type[gender][p_type]:
+                remaining_mixed.append((uid, p_type, gender, False))  # False表示混合配對
+    
+    all_remaining = remaining_school_only + remaining_mixed
+    
+    return result_groups, all_remaining
+
+# 新增輔助函數來處理一組用戶的配對邏輯
+async def _match_user_group(users_by_type):
+    """處理一組用戶的配對邏輯"""
     result_groups = []
     
     # 步驟 1: 按人格類型優先分配 2男2女 組
     for p_type in ['分析型', '功能型', '直覺型', '個人型']:
         # 隨機打亂順序，避免固定順序選擇
-        random.shuffle(all_users['male'][p_type])
-        random.shuffle(all_users['female'][p_type])
+        random.shuffle(users_by_type['male'][p_type])
+        random.shuffle(users_by_type['female'][p_type])
         
-        while len(all_users['male'][p_type]) >= 2 and len(all_users['female'][p_type]) >= 2:
+        while len(users_by_type['male'][p_type]) >= 2 and len(users_by_type['female'][p_type]) >= 2:
             group = {
-                "user_ids": all_users['male'][p_type][:2] + all_users['female'][p_type][:2],
+                "user_ids": users_by_type['male'][p_type][:2] + users_by_type['female'][p_type][:2],
                 "is_complete": True,
                 "male_count": 2,
                 "female_count": 2
             }
             result_groups.append(group)
-            all_users['male'][p_type] = all_users['male'][p_type][2:]
-            all_users['female'][p_type] = all_users['female'][p_type][2:]
+            users_by_type['male'][p_type] = users_by_type['male'][p_type][2:]
+            users_by_type['female'][p_type] = users_by_type['female'][p_type][2:]
     
     # 步驟 2: 混合人格類型，但保持性別平衡 2男2女
     remaining_male = []
@@ -316,8 +426,8 @@ async def _match_users_into_groups(user_data: Dict[str, Dict[str, str]]) -> Tupl
     
     # 收集剩餘的用戶
     for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-        remaining_male.extend([(uid, p_type) for uid in all_users['male'][p_type]])
-        remaining_female.extend([(uid, p_type) for uid in all_users['female'][p_type]])
+        remaining_male.extend([(uid, p_type) for uid in users_by_type['male'][p_type]])
+        remaining_female.extend([(uid, p_type) for uid in users_by_type['female'][p_type]])
     
     # 如果還能形成2男2女組，繼續配對
     while len(remaining_male) >= 2 and len(remaining_female) >= 2:
@@ -347,13 +457,14 @@ async def _match_users_into_groups(user_data: Dict[str, Dict[str, str]]) -> Tupl
         remaining_female = remaining_female[2:]
     
     # 步驟 3: 處理剩餘用戶，按相同人格類型優先配對4人組
+    # 這部分邏輯與原來相同，確保完整處理所有剩餘用戶
     remaining_users = []
     for gender in ['male', 'female']:
         for p_type in ['分析型', '功能型', '直覺型', '個人型']:
             if gender == 'male':
-                remaining_users.extend([(uid, p_type, 'male') for uid in all_users[gender][p_type]])
+                remaining_users.extend([(uid, p_type, 'male') for uid in users_by_type[gender][p_type]])
             else:
-                remaining_users.extend([(uid, p_type, 'female') for uid in all_users[gender][p_type]])
+                remaining_users.extend([(uid, p_type, 'female') for uid in users_by_type[gender][p_type]])
     
     # 按人格類型分組
     personality_groups = {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
@@ -441,7 +552,7 @@ async def _match_users_into_groups(user_data: Dict[str, Dict[str, str]]) -> Tupl
         result_groups.append(group)
         all_remaining = []
     
-    return result_groups, all_remaining
+    return result_groups
 
 async def _save_matching_groups_to_db(
     supabase: Client, 
@@ -582,6 +693,12 @@ async def _get_waiting_users_data(supabase: Client, waiting_status: str = "waiti
         .in_("user_id", waiting_user_ids) \
         .execute()
     
+    # 獲取用戶配對偏好 - 是否只想與校內同學配對
+    preference_response = supabase.table("user_matching_preferences") \
+        .select("user_id, prefer_school_only") \
+        .in_("user_id", waiting_user_ids) \
+        .execute()
+    
     # 檢查是否找到用戶資料
     if not profiles_response.data or not personality_response.data:
         logger.warning("無法獲取用戶資料或人格類型")
@@ -592,12 +709,23 @@ async def _get_waiting_users_data(supabase: Client, waiting_status: str = "waiti
     for profile in profiles_response.data:
         user_id = profile["user_id"]
         gender = profile["gender"]
-        user_data[user_id] = {"gender": gender, "personality_type": None}
+        user_data[user_id] = {
+            "gender": gender, 
+            "personality_type": None,
+            "prefer_school_only": False  # 默認值為False
+        }
     
     for result in personality_response.data:
         user_id = result["user_id"]
         if user_id in user_data:
             user_data[user_id]["personality_type"] = result["personality_type"]
+    
+    # 添加配對偏好資料
+    if preference_response.data:
+        for pref in preference_response.data:
+            user_id = pref["user_id"]
+            if user_id in user_data:
+                user_data[user_id]["prefer_school_only"] = pref["prefer_school_only"]
     
     # 記錄有效用戶數量
     valid_users = [uid for uid, data in user_data.items() 

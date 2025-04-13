@@ -191,3 +191,29 @@ BEGIN
         ALTER TABLE restaurant_votes ADD COLUMN is_system_recommendation BOOLEAN DEFAULT FALSE;
     END IF;
 END $$;
+
+-- 創建用戶配對偏好表
+CREATE TABLE IF NOT EXISTS user_matching_preferences (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id),
+    prefer_school_only BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
+);
+
+-- 設置 RLS 權限
+ALTER TABLE user_matching_preferences ENABLE ROW LEVEL SECURITY;
+CREATE POLICY service_all ON user_matching_preferences FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY user_view_own_preferences ON user_matching_preferences FOR SELECT TO authenticated USING (user_id = auth.uid());
+
+-- 創建必要的索引
+CREATE INDEX IF NOT EXISTS idx_user_matching_preferences_user_id ON user_matching_preferences(user_id);
+
+-- 為所有現有用戶創建配對偏好記錄，預設設置為"是"(prefer_school_only=true)
+INSERT INTO user_matching_preferences (user_id, prefer_school_only)
+SELECT user_id, true FROM user_profiles
+WHERE NOT EXISTS (
+    SELECT 1 FROM user_matching_preferences 
+    WHERE user_matching_preferences.user_id = user_profiles.user_id
+);

@@ -42,6 +42,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     super.initState();
     _checkIfNewUser();
     _calculateDates();
+    _loadUserPreferences();
   }
 
   // 計算日期
@@ -105,6 +106,23 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     debugPrint('選擇的聚餐日期: ${DateFormat('yyyy-MM-dd').format(_nextDinnerDate)}');
   }
 
+  // 從資料庫加載用戶的配對偏好
+  Future<void> _loadUserPreferences() async {
+    try {
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser != null) {
+        final preferSchoolOnly = await _databaseService
+            .getUserMatchingPreference(currentUser.id);
+
+        setState(() {
+          _onlyNckuStudents = preferSchoolOnly;
+        });
+      }
+    } catch (error) {
+      debugPrint('加載用戶配對偏好錯誤: $error');
+    }
+  }
+
   // 檢查是否為新用戶
   Future<void> _checkIfNewUser() async {
     try {
@@ -160,6 +178,15 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
   Future<void> _navigateToMatchingStatus() async {
     // 使用 NavigationService 導航到匹配狀態頁面
     _navigationService.navigateToUserStatusPage(context);
+  }
+
+  // 處理用戶配對偏好切換
+  void _handlePreferenceChange(bool? value) {
+    if (value != null) {
+      setState(() {
+        _onlyNckuStudents = value;
+      });
+    }
   }
 
   @override
@@ -252,6 +279,13 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                                                   await _authService
                                                       .getCurrentUser();
                                               if (currentUser != null) {
+                                                // 儲存用戶的配對偏好
+                                                await _databaseService
+                                                    .updateUserMatchingPreference(
+                                                      currentUser.id,
+                                                      _onlyNckuStudents,
+                                                    );
+
                                                 // 更新用戶狀態為等待配對階段
                                                 await _databaseService
                                                     .updateUserStatus(
@@ -451,13 +485,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                   // 勾選框
                   CustomCheckbox(
                     value: _onlyNckuStudents,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _onlyNckuStudents = value;
-                        });
-                      }
-                    },
+                    onChanged: _handlePreferenceChange,
                   ),
                   SizedBox(width: 10.w),
                   // 文字說明 - 移除Expanded讓文字自然寬度，並調整與checkbox的對齊方式

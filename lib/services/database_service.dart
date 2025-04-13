@@ -23,6 +23,8 @@ class DatabaseService {
   static const String _personalityResultsTable = 'user_personality_results';
   static const String _userFoodPreferencesTable = 'user_food_preferences';
   static const String _userStatusTable = 'user_status';
+  static const String _userMatchingPreferencesTable =
+      'user_matching_preferences';
 
   /// 更新用戶基本資料
   ///
@@ -135,6 +137,45 @@ class DatabaseService {
         }
 
         debugPrint('用戶性格類型更新成功: $userId, 類型: $personalityType');
+      },
+    );
+  }
+
+  /// 更新用戶配對偏好
+  ///
+  /// [userId] 用戶 ID
+  /// [preferSchoolOnly] 是否只想與校內同學聚餐
+  Future<void> updateUserMatchingPreference(
+    String userId,
+    bool preferSchoolOnly,
+  ) async {
+    return _apiService.handleRequest(
+      request: () async {
+        // 檢查用戶配對偏好是否已存在
+        final existingPreference =
+            await _supabaseService.client
+                .from(_userMatchingPreferencesTable)
+                .select()
+                .eq('user_id', userId)
+                .maybeSingle();
+
+        if (existingPreference != null) {
+          // 更新現有偏好
+          await _supabaseService.client
+              .from(_userMatchingPreferencesTable)
+              .update({'prefer_school_only': preferSchoolOnly})
+              .eq('user_id', userId);
+        } else {
+          // 創建新偏好記錄
+          await _supabaseService.client
+              .from(_userMatchingPreferencesTable)
+              .insert({
+                'user_id': userId,
+                'prefer_school_only': preferSchoolOnly,
+              });
+        }
+
+        debugPrint('用戶配對偏好更新成功: $userId, 偏好校內: $preferSchoolOnly');
       },
     );
   }
@@ -289,6 +330,24 @@ class DatabaseService {
     );
   }
 
+  /// 獲取用戶配對偏好
+  ///
+  /// [userId] 用戶 ID
+  Future<bool> getUserMatchingPreference(String userId) async {
+    return _apiService.handleRequest(
+      request: () async {
+        final preferenceData =
+            await _supabaseService.client
+                .from(_userMatchingPreferencesTable)
+                .select('prefer_school_only')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+        return preferenceData?['prefer_school_only'] ?? false;
+      },
+    );
+  }
+
   // 獲取用戶個人資料
   Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     return _apiService.handleRequest(
@@ -324,6 +383,13 @@ class DatabaseService {
             .delete()
             .eq('user_id', userId);
         debugPrint('已刪除用戶食物偏好: $userId');
+
+        // 刪除用戶配對偏好
+        await _supabaseService.client
+            .from(_userMatchingPreferencesTable)
+            .delete()
+            .eq('user_id', userId);
+        debugPrint('已刪除用戶配對偏好: $userId');
 
         // 刪除用戶通知
         await _supabaseService.client
