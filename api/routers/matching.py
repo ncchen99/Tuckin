@@ -82,52 +82,16 @@ async def join_matching(
     
     # 3. 查找不足4人的桌位
     incomplete_groups_query = supabase.table("matching_groups") \
-        .select("id, user_ids, male_count, female_count, is_complete") \
+        .select("id, user_ids, male_count, female_count, is_complete, school_only") \
         .eq("is_complete", False) \
         .eq("status", "waiting_confirmation")
     
-    # 如果用戶只願意與校內同學配對，則只查找全部是校內同學的組別
+    # 如果用戶只願意與校內同學配對，則只查找校內專屬的組別
     if prefer_school_only:
-        # 獲取所有不完整的組別
-        incomplete_groups_response = incomplete_groups_query.execute()
-        
-        if incomplete_groups_response.data:
-            # 篩選出符合條件的組別：所有成員都是校內專屬配對
-            filtered_groups = []
-            for group in incomplete_groups_response.data:
-                group_id = group["id"]
-                user_ids = group["user_ids"] or []
-                
-                # 檢查用戶是否已在該組
-                if user_id in user_ids:
-                    # 用戶已在此組，直接返回已加入的狀態
-                    return {
-                        "status": "waiting_confirmation",
-                        "message": "您已加入該聚餐小組",
-                        "group_id": group_id,
-                        "deadline": None  # 需要從資料庫查詢
-                    }
-                
-                # 檢查組內所有成員的偏好
-                if user_ids:
-                    member_prefs = supabase.table("user_matching_preferences") \
-                        .select("user_id, prefer_school_only") \
-                        .in_("user_id", user_ids) \
-                        .execute()
-                    
-                    all_school_only = True
-                    for member in member_prefs.data:
-                        if not member.get("prefer_school_only", False):
-                            all_school_only = False
-                            break
-                    
-                    if all_school_only:
-                        filtered_groups.append(group)
-            
-            incomplete_groups_response.data = filtered_groups
-    else:
-        # 如果用戶不要求校內專屬配對，則可以加入任何組別
-        incomplete_groups_response = incomplete_groups_query.execute()
+        incomplete_groups_query = incomplete_groups_query.eq("school_only", True)
+    
+    # 執行查詢
+    incomplete_groups_response = incomplete_groups_query.execute()
     
     # 4. 獲取用戶個人資料（性別）
     profile_response = supabase.table("user_profiles") \
@@ -574,15 +538,37 @@ async def _save_matching_groups_to_db(
     total_matched_users = 0
     
     for group in result_groups:
+        # 檢查組別是否為校內專屬組
+        user_ids = group["user_ids"]
+        is_school_only = False
+        
+        # 獲取組內用戶的配對偏好
+        if user_ids:
+            preference_response = supabase.table("user_matching_preferences") \
+                .select("user_id, prefer_school_only") \
+                .in_("user_id", user_ids) \
+                .execute()
+            
+            # 如果所有用戶都是校內專屬配對，則設置群組為校內專屬
+            if preference_response.data:
+                all_school_only = True
+                for pref in preference_response.data:
+                    if not pref.get("prefer_school_only", False):
+                        all_school_only = False
+                        break
+                
+                is_school_only = all_school_only
+        
         # 創建分組記錄
-        logger.info(f"創建組別: {group}")
+        logger.info(f"創建組別: {group}, 校內專屬: {is_school_only}")
         
         group_response = supabase.table("matching_groups").insert({
             "user_ids": group["user_ids"],
             "is_complete": group["is_complete"],
             "male_count": group["male_count"],
             "female_count": group["female_count"],
-            "status": "waiting_confirmation"
+            "status": "waiting_confirmation",
+            "school_only": is_school_only
         }).execute()
         
         if not group_response.data:

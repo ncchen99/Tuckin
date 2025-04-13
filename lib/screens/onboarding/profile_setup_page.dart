@@ -25,6 +25,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   bool _isLoading = false;
   bool _isDataLoaded = false;
+  bool _hasBackPressed = false; // 追蹤是否已按過返回鍵
 
   @override
   void initState() {
@@ -161,8 +162,33 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   // 處理返回按鈕
   void _handleBack() {
     if (widget.isFromProfile) {
-      // 如果是從profile頁面導航過來的，返回profile頁面
-      Navigator.of(context).pop();
+      // 如果是從profile頁面導航過來的
+      if (!_hasBackPressed) {
+        // 第一次點擊，顯示提示
+        setState(() {
+          _hasBackPressed = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '尚未儲存資料，再點擊一次返回離開',
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        // 2秒後重置返回狀態
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            setState(() {
+              _hasBackPressed = false;
+            });
+          }
+        });
+      } else {
+        // 第二次點擊，返回頁面
+        Navigator.of(context).pop();
+      }
     } else {
       // 顯示提示訊息，告知用戶無法返回
       ScaffoldMessenger.of(context).showSnackBar(
@@ -291,8 +317,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       // 根據來源決定系統返回按鈕行為
       onWillPop: () async {
         _handleBack();
-        // 只有在從profile頁面來時才允許返回
-        return widget.isFromProfile;
+        // 阻止默認返回行為，讓我們的_handleBack邏輯決定是否返回
+        return false;
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,

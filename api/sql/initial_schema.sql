@@ -69,10 +69,24 @@ CREATE TABLE IF NOT EXISTS matching_groups (
     is_complete BOOLEAN DEFAULT FALSE,
     male_count INTEGER DEFAULT 0,
     female_count INTEGER DEFAULT 0,
+    school_only BOOLEAN DEFAULT FALSE,
     status TEXT DEFAULT 'waiting_confirmation',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 為已有的群組添加school_only欄位（如果欄位不存在）
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'matching_groups' 
+        AND column_name = 'school_only'
+    ) THEN
+        ALTER TABLE matching_groups ADD COLUMN school_only BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;
 
 -- 創建 user_status 表（跟踪用戶配對狀態）
 CREATE TABLE IF NOT EXISTS user_status (

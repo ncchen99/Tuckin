@@ -23,6 +23,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   bool _isDataLoaded = false;
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _hasBackPressed = false; // 追蹤是否已按過返回鍵
 
   // 個性類型問題與選項
   final List<Map<String, dynamic>> _questions = [
@@ -145,8 +146,33 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
       );
     } else {
       if (widget.isFromProfile) {
-        // 如果是從profile頁面導航過來的，返回profile頁面
-        Navigator.of(context).pop();
+        // 如果是從profile頁面導航過來的
+        if (!_hasBackPressed) {
+          // 第一次點擊，顯示提示
+          setState(() {
+            _hasBackPressed = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '尚未儲存資料，再點擊一次返回離開',
+                style: TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          // 2秒後重置返回狀態
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              setState(() {
+                _hasBackPressed = false;
+              });
+            }
+          });
+        } else {
+          // 第二次點擊，返回頁面
+          Navigator.of(context).pop();
+        }
       } else {
         // 在第一頁時，導航回food_preference頁面
         final navigationService = NavigationService();
