@@ -22,6 +22,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
   bool _isNewUser = false;
   // 預約進行中
   bool _isReserving = false;
+  // 是否為校內email
+  bool _isSchoolEmail = false;
   // 添加服務
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
@@ -43,6 +45,21 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     _checkIfNewUser();
     _calculateDates();
     _loadUserPreferences();
+    _checkUserEmail();
+  }
+
+  // 檢查用戶email是否為校內email
+  Future<void> _checkUserEmail() async {
+    try {
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser != null && currentUser.email != null) {
+        setState(() {
+          _isSchoolEmail = _authService.isNCKUEmail(currentUser.email);
+        });
+      }
+    } catch (error) {
+      debugPrint('檢查用戶Email錯誤: $error');
+    }
   }
 
   // 計算日期
@@ -113,9 +130,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
       if (currentUser != null) {
         final preferSchoolOnly = await _databaseService
             .getUserMatchingPreference(currentUser.id);
-
         setState(() {
-          _onlyNckuStudents = preferSchoolOnly;
+          _onlyNckuStudents = preferSchoolOnly ?? false;
         });
       }
     } catch (error) {
@@ -283,7 +299,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                                                 await _databaseService
                                                     .updateUserMatchingPreference(
                                                       currentUser.id,
-                                                      _onlyNckuStudents,
+                                                      _isSchoolEmail
+                                                          ? _onlyNckuStudents
+                                                          : false,
                                                     );
 
                                                 // 更新用戶狀態為等待配對階段
@@ -460,49 +478,53 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
             ),
           ),
 
-          SizedBox(height: 20.h),
-
-          // 分隔線
-          Container(
-            height: 1,
-            color: Colors.grey[300],
-            margin: EdgeInsets.symmetric(horizontal: 15.w),
-          ),
-
-          // 整合成大限定選項到卡片中 - 置中排列
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _onlyNckuStudents = !_onlyNckuStudents;
-              });
-            },
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 15.h),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // 勾選框
-                  CustomCheckbox(
-                    value: _onlyNckuStudents,
-                    onChanged: _handlePreferenceChange,
-                  ),
-                  SizedBox(width: 10.w),
-                  // 文字說明 - 移除Expanded讓文字自然寬度，並調整與checkbox的對齊方式
-                  Text(
-                    '想與校內同學聚餐',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
-                      fontWeight: FontWeight.bold,
-                      height: 2,
+          // 只有校內email用戶才顯示分隔線和配對偏好選項
+          if (_isSchoolEmail) ...[
+            SizedBox(height: 20.h),
+            // 分隔線
+            Container(
+              height: 1,
+              color: Colors.grey[300],
+              margin: EdgeInsets.symmetric(horizontal: 15.w),
+            ),
+            // 校內同學配對選項
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _onlyNckuStudents = !_onlyNckuStudents;
+                });
+              },
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 15.h),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // 勾選框
+                    CustomCheckbox(
+                      value: _onlyNckuStudents,
+                      onChanged: _handlePreferenceChange,
                     ),
-                  ),
-                ],
+                    SizedBox(width: 10.w),
+                    // 文字說明
+                    Text(
+                      '想與校內同學聚餐',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontFamily: 'OtsutomeFont',
+                        color: const Color(0xFF23456B),
+                        fontWeight: FontWeight.bold,
+                        height: 2,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
+          if (!_isSchoolEmail)
+            // 非校內用戶增加底部padding以保持美觀
+            SizedBox(height: _isSchoolEmail ? 0 : 25.h),
         ],
       ),
     );

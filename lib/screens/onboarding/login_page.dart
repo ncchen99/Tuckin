@@ -82,6 +82,24 @@ class _LoginPageState extends State<LoginPage> {
         // 設置成大標記
         _isNCKUEmail = _authService.isNCKUEmail(response.user!.email);
 
+        // 設定用戶配對偏好（如果是校內Email則預設為true，否則為false）
+        try {
+          // 檢查用戶是否已設定配對偏好
+          final hasPreference = await _databaseService
+              .getUserMatchingPreference(response.user!.id);
+
+          // 如果用戶尚未設定配對偏好，則根據Email設定預設值
+          if (hasPreference == null) {
+            await _databaseService.updateUserMatchingPreference(
+              response.user!.id,
+              _isNCKUEmail, // 如果是校內Email則為true，否則為false
+            );
+            debugPrint('已為用戶設定初始配對偏好: ${_isNCKUEmail ? "只與校內同學" : "不限制"}');
+          }
+        } catch (prefError) {
+          debugPrint('設定用戶配對偏好出錯: $prefError');
+        }
+
         // 登入成功，使用NavigationService來處理導航
         if (mounted) {
           final navigationService = NavigationService();

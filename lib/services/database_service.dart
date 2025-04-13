@@ -333,7 +333,7 @@ class DatabaseService {
   /// 獲取用戶配對偏好
   ///
   /// [userId] 用戶 ID
-  Future<bool> getUserMatchingPreference(String userId) async {
+  Future<bool?> getUserMatchingPreference(String userId) async {
     return _apiService.handleRequest(
       request: () async {
         final preferenceData =
@@ -343,7 +343,12 @@ class DatabaseService {
                 .eq('user_id', userId)
                 .maybeSingle();
 
-        return preferenceData?['prefer_school_only'] ?? false;
+        // 如果沒有找到數據，返回null表示尚未設定
+        if (preferenceData == null) {
+          return null;
+        }
+
+        return preferenceData['prefer_school_only'] ?? false;
       },
     );
   }
