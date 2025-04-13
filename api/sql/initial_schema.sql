@@ -220,6 +220,8 @@ CREATE TABLE IF NOT EXISTS user_matching_preferences (
 ALTER TABLE user_matching_preferences ENABLE ROW LEVEL SECURITY;
 CREATE POLICY service_all ON user_matching_preferences FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
 CREATE POLICY user_view_own_preferences ON user_matching_preferences FOR SELECT TO authenticated USING (user_id = auth.uid());
+CREATE POLICY user_insert_own_preferences ON user_matching_preferences FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+CREATE POLICY user_update_own_preferences ON user_matching_preferences FOR UPDATE TO authenticated USING (user_id = auth.uid());
 
 -- 創建必要的索引
 CREATE INDEX IF NOT EXISTS idx_user_matching_preferences_user_id ON user_matching_preferences(user_id);

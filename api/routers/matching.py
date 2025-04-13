@@ -211,6 +211,32 @@ async def join_matching(
                 "confirmation_deadline": confirmation_deadline.isoformat()
             }).execute()
         
+        # 新增: 發送配對成功通知
+        try:
+            # 準備通知數據
+            notification_data = {
+                "type": "matching_confirmation",
+                "group_id": joined_group_id,
+                "deadline": confirmation_deadline.isoformat()
+            }
+            
+            # 格式化時間字符串
+            confirmation_deadline_str = confirmation_deadline.strftime('%a %H:%M')
+            
+            # 初始化通知服務
+            notification_service = NotificationService()
+            
+            # 發送通知
+            await notification_service.send_notification(
+                user_id=user_id,
+                title="找到了！",
+                body=f"成功找到聚餐夥伴，請在 {confirmation_deadline_str} 前確認",
+                data=notification_data
+            )
+            logger.info(f"成功發送配對通知到用戶 {user_id}")
+        except Exception as ne:
+            logger.error(f"發送通知給用戶 {user_id} 失敗: {str(ne)}")
+        
         # 返回成功加入組別的響應
         return {
             "status": "waiting_confirmation",
@@ -521,7 +547,8 @@ async def _match_user_group(users_by_type):
 async def _save_matching_groups_to_db(
     supabase: Client, 
     result_groups: List[Dict], 
-    notification_service: NotificationService
+    notification_service: NotificationService,
+    confirm_deadline: datetime
 ) -> Tuple[int, int]:
     """
     將配對結果保存到數據庫，更新用戶狀態，發送通知
@@ -581,7 +608,7 @@ async def _save_matching_groups_to_db(
         
         # 更新用戶狀態
         # 用戶需在七小時後確認
-        confirmation_deadline = datetime.now() + timedelta(hours=7)
+        confirmation_deadline = confirm_deadline
         
         # 準備發送通知
         notification_data = {
@@ -747,7 +774,7 @@ async def process_batch_matching(supabase: Client):
         
         # 3. 將結果保存到數據庫
         notification_service = NotificationService(use_service_role=True)
-        created_groups, total_matched_users = await _save_matching_groups_to_db(supabase, result_groups, notification_service)
+        created_groups, total_matched_users = await _save_matching_groups_to_db(supabase, result_groups, notification_service, datetime.now() + timedelta(hours=24))
         
         result_message = f"批量配對完成：共創建 {created_groups} 個組別"
         logger.info(result_message)
@@ -801,7 +828,7 @@ async def process_auto_form_groups(supabase: Client):
         
         # 3. 將結果保存到數據庫
         notification_service = NotificationService(use_service_role=True)
-        created_groups, total_matched_users = await _save_matching_groups_to_db(supabase, result_groups, notification_service)
+        created_groups, total_matched_users = await _save_matching_groups_to_db(supabase, result_groups, notification_service, datetime.now() + timedelta(hours=7))
         
         result_message = f"自動成桌完成：共創建 {created_groups} 個組別"
         logger.info(result_message)
