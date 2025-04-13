@@ -235,7 +235,7 @@ async def join_matching(
         "deadline": None
     }
 
-@router.post("/auto-form", response_model=AutoFormGroupsResponse, status_code=status.HTTP_200_OK)
+@router.post("/auto-form", response_model=AutoFormGroupsResponse, status_code=status.HTTP_200_OK, dependencies=[Depends(verify_cron_api_key)])
 async def auto_form_groups(
     background_tasks: BackgroundTasks,
     supabase: Client = Depends(get_supabase_service)
@@ -243,6 +243,7 @@ async def auto_form_groups(
     """
     自動成桌任務（週三 06:00 AM 觸發）
     若等待名單中用戶數≥3人，自動組成新桌位
+    此API僅限授權的Cron任務調用
     """
     # 實際實現會將此邏輯放入背景任務
     background_tasks.add_task(process_auto_form_groups, supabase)
