@@ -259,9 +259,12 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                                                       'waiting_matching',
                                                     );
 
-                                                // // 導航到配對狀態頁面
-                                                // if (!mounted) return;
-                                                // await _navigateToMatchingStatus();
+                                                // // 延遲一下導航到配對狀態頁面
+                                                if (!mounted) return;
+                                                await Future.delayed(
+                                                  const Duration(seconds: 2),
+                                                );
+                                                await _navigateToMatchingStatus();
                                               }
                                             } catch (e) {
                                               debugPrint('預約時出錯: $e');

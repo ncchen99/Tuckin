@@ -645,22 +645,98 @@ async def process_auto_form_groups(supabase: Client):
                 "remaining_users": len(waiting_user_ids)
             }
         
-        # 將用戶按人格類型分組
-        personality_groups = {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
-        for uid in valid_users:
-            p_type = user_data[uid]["personality_type"]
-            if p_type in personality_groups:
-                personality_groups[p_type].append((uid, user_data[uid]["gender"]))
+        # 4. 按性別和人格類型分組
+        all_users = {
+            'male': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []},
+            'female': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
+        }
         
-        # 處理每個人格類型的用戶組
+        for user_id, data in user_data.items():
+            p_type = data["personality_type"]
+            gender = data["gender"]
+            if p_type and gender and p_type in all_users[gender]:
+                all_users[gender][p_type].append(user_id)
+        
+        # 記錄各類型人數
+        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
+            m_count = len(all_users['male'][p_type])
+            f_count = len(all_users['female'][p_type])
+            logger.info(f"{p_type}: 男 {m_count}人, 女 {f_count}人")
+        
+        # 5. 執行配對算法
         result_groups = []
-        all_remaining = []
         
-        # 1. 優先配對單一人格類型的4人組
-        for p_type, users in personality_groups.items():
-            random.shuffle(users)  # 隨機打亂順序
+        # 步驟 1: 按人格類型優先分配 2男2女 組
+        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
+            # 隨機打亂順序，避免固定順序選擇
+            random.shuffle(all_users['male'][p_type])
+            random.shuffle(all_users['female'][p_type])
             
+            while len(all_users['male'][p_type]) >= 2 and len(all_users['female'][p_type]) >= 2:
+                group = {
+                    "user_ids": all_users['male'][p_type][:2] + all_users['female'][p_type][:2],
+                    "is_complete": True,
+                    "male_count": 2,
+                    "female_count": 2
+                }
+                result_groups.append(group)
+                all_users['male'][p_type] = all_users['male'][p_type][2:]
+                all_users['female'][p_type] = all_users['female'][p_type][2:]
+        
+        # 步驟 2: 混合人格類型，但保持性別平衡 2男2女
+        remaining_male = []
+        remaining_female = []
+        
+        # 收集剩餘的用戶
+        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
+            remaining_male.extend([(uid, p_type) for uid in all_users['male'][p_type]])
+            remaining_female.extend([(uid, p_type) for uid in all_users['female'][p_type]])
+        
+        # 如果還能形成2男2女組，繼續配對
+        while len(remaining_male) >= 2 and len(remaining_female) >= 2:
+            # 選擇2名男性和2名女性
+            selected_male = remaining_male[:2]
+            selected_female = remaining_female[:2]
+            
+            # 提取用戶ID和人格類型
+            male_users = [uid for uid, _ in selected_male]
+            female_users = [uid for uid, _ in selected_female]
+            
+            # 確定主導人格類型
+            personality_counts = {}
+            for _, p_type in selected_male + selected_female:
+                personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
+            
+            dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0]
+            
+            group = {
+                "user_ids": male_users + female_users,
+                "is_complete": True,
+                "male_count": 2,
+                "female_count": 2
+            }
+            result_groups.append(group)
+            remaining_male = remaining_male[2:]
+            remaining_female = remaining_female[2:]
+        
+        # 步驟 3: 處理剩餘用戶，按相同人格類型優先配對4人組
+        remaining_users = []
+        for gender in ['male', 'female']:
+            for p_type in ['分析型', '功能型', '直覺型', '個人型']:
+                if gender == 'male':
+                    remaining_users.extend([(uid, p_type, 'male') for uid in all_users[gender][p_type]])
+                else:
+                    remaining_users.extend([(uid, p_type, 'female') for uid in all_users[gender][p_type]])
+        
+        # 按人格類型分組
+        personality_groups = {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
+        for uid, p_type, gender in remaining_users:
+            personality_groups[p_type].append((uid, gender))
+        
+        # 處理每個人格類型組
+        for p_type, users in personality_groups.items():
             while len(users) >= 4:
+                # 提取用戶ID
                 group_users = [uid for uid, _ in users[:4]]
                 
                 # 計算性別比例
@@ -678,10 +754,15 @@ async def process_auto_form_groups(supabase: Client):
                 users = users[4:]
             
             # 保存剩餘不足4人的用戶
-            all_remaining.extend([(uid, p_type, gender) for uid, gender in users])
+            personality_groups[p_type] = users
         
-        # 2. 混合不同人格類型，形成4人組
+        # 步驟 4: 將所有剩餘用戶混合配對
+        all_remaining = []
+        for p_type in personality_groups:
+            all_remaining.extend([(uid, p_type, gender) for uid, gender in personality_groups[p_type]])
+        
         while len(all_remaining) >= 4:
+            # 提取用戶信息
             group_infos = all_remaining[:4]
             group_users = [uid for uid, _, _ in group_infos]
             
@@ -706,8 +787,9 @@ async def process_auto_form_groups(supabase: Client):
             result_groups.append(group)
             all_remaining = all_remaining[4:]
         
-        # 3. 如果剩餘3人，形成一個不完整組
+        # 步驟 5: 如果剩餘3人，形成一個不完整組
         if len(all_remaining) == 3:
+            # 提取用戶信息
             group_infos = all_remaining
             group_users = [uid for uid, _, _ in group_infos]
             
@@ -735,11 +817,11 @@ async def process_auto_form_groups(supabase: Client):
         # 如果還有1-2人，保持等待狀態
         remaining_count = len(all_remaining)
         if remaining_count > 0:
-            logger.info(f"剩餘 {remaining_count} 人無法成桌，保持等待狀態")
+            logger.info(f"剩餘 {remaining_count} 人無法配對成組，保持等待狀態")
         
-        logger.info(f"成桌結果: 共形成 {len(result_groups)} 個組別")
+        logger.info(f"配對結果: 共形成 {len(result_groups)} 個組別")
         
-        # 保存到數據庫
+        # 6. 將結果保存到數據庫
         created_groups = 0
         for group in result_groups:
             # 創建分組記錄
