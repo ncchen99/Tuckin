@@ -17,11 +17,20 @@ class RestaurantBase(BaseModel):
 class RestaurantCreate(RestaurantBase):
     pass
 
+class RestaurantResponse(RestaurantBase):
+    id: UUID
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        orm_mode = True
+
 class Restaurant(RestaurantBase):
     id: UUID
     created_at: datetime
 
     class Config:
+        from_attributes = True
         orm_mode = True
 
 class RestaurantVoteBase(BaseModel):
@@ -38,6 +47,7 @@ class RestaurantVote(RestaurantVoteBase):
     created_at: datetime
 
     class Config:
+        from_attributes = True
         orm_mode = True
 
 class RestaurantSearchQuery(BaseModel):
@@ -73,4 +83,5 @@ class Rating(RatingBase):
     created_at: datetime
 
     class Config:
+        from_attributes = True
         orm_mode = True 

@@ -24,7 +24,8 @@ class MatchingPreference(MatchingPreferenceBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 class BatchMatchingRequest(BaseModel):
     matching_date: Optional[datetime] = None  # 可選，不提供則默認為當前日期
@@ -74,7 +75,12 @@ class MatchingGroup(BaseModel):
     male_count: int = 0
     female_count: int = 0
     created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: Optional[datetime] = None
     status: str = "waiting_confirmation"  # waiting_confirmation, confirmed, cancelled
+
+    class Config:
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 class MatchingUser(BaseModel):
     id: UUID
@@ -84,6 +90,10 @@ class MatchingUser(BaseModel):
     status: str = "waiting_matching"  # waiting_matching, matched, cancelled
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 class UserMatchingInfo(BaseModel):
     id: UUID
@@ -92,6 +102,10 @@ class UserMatchingInfo(BaseModel):
     confirmation_deadline: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 class UserStatusExtended(BaseModel):
     id: UUID
@@ -103,4 +117,5 @@ class UserStatusExtended(BaseModel):
     updated_at: datetime
 
     class Config:
-        orm_mode = True 
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容 

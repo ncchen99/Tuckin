@@ -18,4 +18,5 @@ class NotificationResponse(NotificationBase):
     read_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True 
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容 

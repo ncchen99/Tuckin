@@ -15,7 +15,8 @@ class GroupMember(GroupMemberBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 class GroupBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
@@ -31,11 +32,13 @@ class GroupResponse(GroupBase):
     members: Optional[List[GroupMember]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 class GroupUuidMapping(BaseModel):
     group_id: str
     user_id: str
 
     class Config:
-        orm_mode = True 
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容 

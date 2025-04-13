@@ -53,9 +53,13 @@ CREATE TABLE IF NOT EXISTS restaurant_votes (
     group_id UUID NOT NULL REFERENCES matching_groups(id),
     user_id UUID REFERENCES auth.users(id),
     is_system_recommendation BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(restaurant_id, group_id, user_id) WHERE user_id IS NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 使用部分索引建立唯一約束，只對user_id非空的記錄生效
+CREATE UNIQUE INDEX IF NOT EXISTS unique_restaurant_vote_per_user 
+ON restaurant_votes (restaurant_id, group_id, user_id) 
+WHERE user_id IS NOT NULL;
 
 -- 創建 matching_groups 表（配對算法用）
 CREATE TABLE IF NOT EXISTS matching_groups (
@@ -174,3 +178,16 @@ COMMENT ON TABLE matching_groups IS '此表僅限API服務訪問';
 
 -- 創建 ratings 表 對其他用戶的評價
 -- TODO: 需要設計 ratings 表的 schema
+
+-- 確保 restaurant_votes 表中存在 is_system_recommendation 欄位
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'restaurant_votes' 
+        AND column_name = 'is_system_recommendation'
+    ) THEN
+        ALTER TABLE restaurant_votes ADD COLUMN is_system_recommendation BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;

@@ -43,7 +43,8 @@ class DiningEventResponse(DiningEventBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 class DiningEventParticipantBase(BaseModel):
     event_id: str
@@ -59,7 +60,8 @@ class DiningEventParticipant(DiningEventParticipantBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 # 新增的聚餐配對流程相關模型
 class MatchingUserBase(BaseModel):
@@ -77,7 +79,8 @@ class MatchingUser(MatchingUserBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 class MatchingGroupBase(BaseModel):
     status: str
@@ -96,7 +99,8 @@ class MatchingGroup(MatchingGroupBase):
     members: List[Dict[str, Any]] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容
 
 class ConfirmAttendanceRequest(BaseModel):
     user_id: str
@@ -114,7 +118,7 @@ class GroupStatusResponse(BaseModel):
     members: List[Dict[str, Any]]
 
 class JoinMatchingRequest(BaseModel):
-    user_id: str
+    pass  # 不需要手動輸入user_id，將從JWT令牌中獲取
 
 class MatchingResponse(BaseModel):
     status: str
@@ -145,4 +149,5 @@ class MatchingScore(MatchingScoreBase):
     id: UUID
 
     class Config:
-        orm_mode = True 
+        from_attributes = True
+        orm_mode = True  # 為了向後兼容 

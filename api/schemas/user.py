@@ -19,6 +19,7 @@ class UserProfileResponse(UserProfileBase):
     updated_at: Optional[datetime]
 
     class Config:
+        from_attributes = True
         orm_mode = True
 
 class UserDeviceToken(BaseModel):
@@ -27,4 +28,5 @@ class UserDeviceToken(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
+        from_attributes = True
         orm_mode = True 
