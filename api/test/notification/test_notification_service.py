@@ -29,7 +29,7 @@ async def test_send_notification():
     notification_service = NotificationService(use_service_role=True)
     
     # 發送測試通知
-    user_id = "b7d41439-206b-4dca-a09d-2a3d3f7b4202"  # 替換為實際用戶ID
+    user_id = "dc9d847a-5dec-48e9-9a1e-75320eb38e46"  # 替換為實際用戶ID
     
     try:
         result = await notification_service.send_notification(
