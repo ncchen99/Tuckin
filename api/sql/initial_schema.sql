@@ -134,17 +134,17 @@ ALTER TABLE matching_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_status ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_matching_info ENABLE ROW LEVEL SECURITY;
 
--- 為管理員提供所有表的完全存取權限
-CREATE POLICY admin_all ON dining_events FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
-CREATE POLICY admin_all ON dining_event_participants FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
-CREATE POLICY admin_all ON restaurants FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
-CREATE POLICY admin_all ON restaurant_votes FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
-CREATE POLICY admin_all ON ratings FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
-CREATE POLICY admin_all ON matching_scores FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
-CREATE POLICY admin_all ON group_uuid_mapping FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
-CREATE POLICY admin_all ON matching_groups FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
-CREATE POLICY admin_all ON user_status FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
-CREATE POLICY admin_all ON user_matching_info FOR ALL TO authenticated USING (auth.uid() IN (SELECT auth.uid() FROM auth.users WHERE auth.uid() IN (SELECT id FROM admins)));
+-- 為API服務提供所有表的完全存取權限
+CREATE POLICY service_all ON dining_events FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY service_all ON dining_event_participants FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY service_all ON restaurants FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY service_all ON restaurant_votes FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY service_all ON ratings FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY service_all ON matching_scores FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY service_all ON group_uuid_mapping FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY service_all ON matching_groups FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY service_all ON user_status FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+CREATE POLICY service_all ON user_matching_info FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
 
 -- 為用戶提供對餐廳表的讀取權限
 CREATE POLICY restaurants_read ON restaurants FOR SELECT TO authenticated USING (true);
@@ -157,23 +157,21 @@ CREATE POLICY dining_events_group_read ON dining_events
         WHERE user_id = auth.uid()
     ));
 
--- 為用戶提供對自己狀態的讀取/更新權限
-CREATE POLICY user_status_self ON user_status 
-    FOR ALL TO authenticated 
-    USING (user_id = auth.uid());
+-- 刪除現有的用戶級別訪問策略（針對user_status, user_matching_info和matching_groups）
+DROP POLICY IF EXISTS user_matching_info_self ON user_matching_info;
+DROP POLICY IF EXISTS matching_groups_member ON matching_groups;
 
--- 為用戶提供對自己配對信息的讀取/更新權限
-CREATE POLICY user_matching_info_self ON user_matching_info 
-    FOR ALL TO authenticated 
-    USING (user_id = auth.uid());
-
--- 為用戶提供對自己所在配對組的讀取權限
-CREATE POLICY matching_groups_member ON matching_groups 
+-- 為user_matching_info表添加用戶訪問權限
+CREATE POLICY user_view_own_matching_info ON user_matching_info 
     FOR SELECT TO authenticated 
-    USING (id IN (
-        SELECT matching_group_id FROM user_matching_info 
-        WHERE user_id = auth.uid() AND matching_group_id IS NOT NULL
-    ));
+    USING (user_id = auth.uid());
+
+-- 對user_status_extended視圖應用RLS
+ALTER VIEW user_status_extended SECURITY INVOKER;
+
+-- 添加安全性備註
+COMMENT ON TABLE user_matching_info IS '此表允許用戶查看自己的數據，API服務可完全訪問';
+COMMENT ON TABLE matching_groups IS '此表僅限API服務訪問';
 
 -- 創建 ratings 表 對其他用戶的評價
 -- TODO: 需要設計 ratings 表的 schema
