@@ -38,17 +38,20 @@ async def batch_matching(
 @router.post("/join", response_model=JoinMatchingResponse)
 async def join_matching(
     request: JoinMatchingRequest,
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
     用戶參加聚餐配對
     嘗試將用戶補入不足4人的桌位或進入等待名單
     """
+    # 使用JWT令牌中的用戶ID
+    user_id = current_user.user.id
+    
     # 1. 檢查用戶是否已在等待或已配對
     status_response = supabase.table("user_status_extended") \
         .select("id, user_id, status, group_id, confirmation_deadline") \
-        .eq("user_id", request.user_id) \
+        .eq("user_id", user_id) \
         .execute()
     
     # 如果用戶已有狀態記錄且正在進行中
@@ -67,51 +70,41 @@ async def join_matching(
     
     # 2. 查找不足4人的桌位
     incomplete_groups_response = supabase.table("matching_groups") \
-        .select("id, user_ids, personality_type, male_count, female_count, is_complete") \
+        .select("id, user_ids, male_count, female_count, is_complete") \
         .eq("is_complete", False) \
         .eq("status", "waiting_confirmation") \
         .execute()
     
-    # 3. 獲取用戶個人資料（性別和人格類型）
+    # 3. 獲取用戶個人資料（性別）
     profile_response = supabase.table("user_profiles") \
         .select("gender") \
-        .eq("user_id", request.user_id) \
+        .eq("user_id", user_id) \
         .execute()
     
-    personality_response = supabase.table("user_personality_results") \
-        .select("personality_type") \
-        .eq("user_id", request.user_id) \
-        .execute()
-    
-    if not profile_response.data or not personality_response.data:
+    if not profile_response.data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無法獲取用戶個人資料或人格測試結果"
+            detail="無法獲取用戶個人資料"
         )
     
     gender = profile_response.data[0]["gender"]
-    personality_type = personality_response.data[0]["personality_type"]
     
-    # 4. 查找適合的不完整組別（優先同人格類型）
+    # 4. 查找適合的不完整組別
     joined_group = None
     joined_group_id = None
     
     if incomplete_groups_response.data:
-        # 優先選擇相同人格類型的組別
-        matching_groups = [g for g in incomplete_groups_response.data if g["personality_type"] == personality_type]
+        # 計算加入後性別比例最平衡的群組
+        best_group = None
+        best_balance_score = float('inf')  # 較小的分數表示更平衡
         
-        # 如果沒有相同類型的，選擇任意類型
-        if not matching_groups and incomplete_groups_response.data:
-            matching_groups = incomplete_groups_response.data
-        
-        if matching_groups:
-            # 選擇第一個組別加入
-            group = matching_groups[0]
+        for group in incomplete_groups_response.data:
+            user_ids = group["user_ids"] or []
             group_id = group["id"]
-            user_ids = group["user_ids"] or []  # 確保是列表
             
             # 檢查用戶是否已在該組
-            if request.user_id in user_ids:
+            if user_id in user_ids:
+                # 用戶已在此組，直接返回已加入的狀態
                 return {
                     "status": "waiting_confirmation",
                     "message": "您已加入該聚餐小組",
@@ -119,8 +112,29 @@ async def join_matching(
                     "deadline": None  # 需要從資料庫查詢
                 }
             
+            # 計算加入後的性別比例
+            male_count = group["male_count"] + (1 if gender == "male" else 0)
+            female_count = group["female_count"] + (1 if gender == "female" else 0)
+            total_count = len(user_ids) + 1
+            
+            # 計算性別平衡分數 (|男性比例-50%| 越接近0越平衡)
+            if total_count > 0:
+                male_percentage = (male_count / total_count) * 100
+                balance_score = abs(male_percentage - 50)
+                
+                # 如果找到更平衡的群組，更新最佳選擇
+                if balance_score < best_balance_score:
+                    best_balance_score = balance_score
+                    best_group = group
+        
+        # 使用選出的最佳群組
+        if best_group:
+            group = best_group
+            group_id = group["id"]
+            user_ids = group["user_ids"] or []  # 確保是列表
+            
             # 更新組別信息
-            user_ids.append(request.user_id)
+            user_ids.append(user_id)
             is_complete = len(user_ids) >= 4
             male_count = group["male_count"] + (1 if gender == "male" else 0)
             female_count = group["female_count"] + (1 if gender == "female" else 0)
@@ -145,7 +159,7 @@ async def join_matching(
         # 檢查或創建用戶狀態
         user_status_resp = supabase.table("user_status") \
             .select("id") \
-            .eq("user_id", request.user_id) \
+            .eq("user_id", user_id) \
             .execute()
             
         # 更新用戶狀態為等待確認
@@ -155,15 +169,15 @@ async def join_matching(
                 "updated_at": datetime.now().isoformat()
             }).eq("id", user_status_resp.data[0]["id"]).execute()
         else:
-            supabase.table("user_status").insert({
-                "user_id": request.user_id,
-                "status": "waiting_confirmation"
-            }).execute()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用戶資料不存在"
+            )
         
         # 創建或更新配對信息
         matching_info_resp = supabase.table("user_matching_info") \
             .select("id") \
-            .eq("user_id", request.user_id) \
+            .eq("user_id", user_id) \
             .execute()
             
         if matching_info_resp.data:
@@ -174,7 +188,7 @@ async def join_matching(
             }).eq("id", matching_info_resp.data[0]["id"]).execute()
         else:
             supabase.table("user_matching_info").insert({
-                "user_id": request.user_id,
+                "user_id": user_id,
                 "matching_group_id": joined_group_id,
                 "confirmation_deadline": confirmation_deadline.isoformat()
             }).execute()
@@ -192,7 +206,7 @@ async def join_matching(
         # 檢查或創建用戶狀態
         user_status_resp = supabase.table("user_status") \
             .select("id") \
-            .eq("user_id", request.user_id) \
+            .eq("user_id", user_id) \
             .execute()
         
         # 更新用戶狀態為等待配對
@@ -202,15 +216,15 @@ async def join_matching(
                 "updated_at": datetime.now().isoformat()
             }).eq("id", user_status_resp.data[0]["id"]).execute()
         else:
-            supabase.table("user_status").insert({
-                "user_id": request.user_id,
-                "status": "waiting_matching"
-            }).execute()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用戶資料不存在"
+            )
         
         # 清除任何之前的配對信息
         supabase.table("user_matching_info") \
             .delete() \
-            .eq("user_id", request.user_id) \
+            .eq("user_id", user_id) \
             .execute()
         
         # 返回加入等待名單的響應
@@ -224,7 +238,7 @@ async def join_matching(
 @router.post("/auto-form", response_model=AutoFormGroupsResponse, status_code=status.HTTP_200_OK)
 async def auto_form_groups(
     background_tasks: BackgroundTasks,
-    supabase: Client = Depends(get_supabase)
+    supabase: Client = Depends(get_supabase_service)
 ):
     """
     自動成桌任務（週三 06:00 AM 觸發）

@@ -102,6 +102,18 @@ class AuthService {
         accessToken: accessToken,
       );
 
+      // 輸出JWT token以供調試使用
+      final session = response.session;
+      if (session != null) {
+        debugPrint('=== JWT Token 開始 ===');
+        final token = session.accessToken;
+        for (int i = 0; i < token.length; i += 500) {
+          int end = (i + 500 < token.length) ? i + 500 : token.length;
+          debugPrint(token.substring(i, end));
+        }
+        debugPrint('=== JWT Token 結束 ===');
+      }
+
       // 登入成功後，保存FCM token
       final notificationService = NotificationService();
       await notificationService.saveTokenToSupabase();

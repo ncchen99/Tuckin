@@ -382,7 +382,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
                         // 生理性別選擇
                         Container(
-                          margin: EdgeInsets.symmetric(vertical: 10.h),
+                          margin: EdgeInsets.symmetric(vertical: 5.h),
                           padding: EdgeInsets.symmetric(horizontal: 20.w),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,7 +521,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
                         // 個人亮點描述輸入框
                         Container(
-                          margin: EdgeInsets.symmetric(vertical: 15.h),
+                          margin: EdgeInsets.symmetric(vertical: 20.h),
                           padding: EdgeInsets.symmetric(horizontal: 20.w),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

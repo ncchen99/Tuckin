@@ -36,7 +36,7 @@ class BatchMatchingResponse(BaseModel):
     remaining_users: Optional[int] = None
 
 class JoinMatchingRequest(BaseModel):
-    user_id: str
+    pass  # 不需要手動輸入user_id，將從JWT令牌中獲取
 
 class JoinMatchingResponse(BaseModel):
     status: str

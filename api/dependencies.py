@@ -1,4 +1,5 @@
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from gotrue import User
 from postgrest import PostgrestClient
 from supabase import create_client, Client
@@ -11,7 +12,7 @@ from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
 # 設置日誌記錄器
 logger = logging.getLogger(__name__)
 
-# 創建 Supabase 客戶端
+# 創建 Supabase 客戶端，基本上不會用到
 def get_supabase() -> Client:
     try:
         if not SUPABASE_URL or not SUPABASE_KEY:
@@ -23,8 +24,9 @@ def get_supabase() -> Client:
         
         # 測試連接
         try:
-            health_check = client.table("user_status").select("count(*)", count="exact").execute()
-            logger.info(f"Supabase 連接成功: user_status 表記錄數 = {health_check.count if hasattr(health_check, 'count') else '未知'}")
+            # 使用更簡單的查詢來測試連接
+            health_check = client.table("user_status").select("id").limit(1).execute()
+            logger.info(f"Supabase 連接成功")
         except Exception as e:
             logger.warning(f"Supabase 連接測試遇到問題: {str(e)}")
         
@@ -34,7 +36,7 @@ def get_supabase() -> Client:
         # 我們還是返回客戶端，但在日誌中記錄錯誤
         return create_client(SUPABASE_URL or "", SUPABASE_KEY or "")
 
-# 創建 Supabase 服務客戶端 (擁有更高權限)
+# 創建 Supabase 服務客戶端 (擁有更高權限)，主要是使用這個
 def get_supabase_service() -> Client:
     try:
         if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
@@ -49,40 +51,53 @@ def get_supabase_service() -> Client:
         return create_client(SUPABASE_URL or "", SUPABASE_KEY or "")
 
 # 獲取 Postgrest 客戶端
-def get_postgrest(supabase: Client = Depends(get_supabase)) -> PostgrestClient:
+def get_postgrest(supabase: Client = Depends(get_supabase_service)) -> PostgrestClient:
     return supabase.table
 
-# 驗證當前用戶
-async def get_current_user(supabase: Client = Depends(get_supabase)) -> User:
+# 創建安全依賴
+security = HTTPBearer()
+
+# 修改驗證當前用戶的函數
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    supabase: Client = Depends(get_supabase_service)
+) -> User:
     try:
-        # 記錄當前環境變數檢查
-        env_vars = {
-            "SUPABASE_URL": os.environ.get("SUPABASE_URL", "未設置"),
-            "SUPABASE_KEY_SET": bool(os.environ.get("SUPABASE_KEY")),
-            "CONFIG_URL": SUPABASE_URL[:10] + "..." if SUPABASE_URL else "未設置"
-        }
-        logger.debug(f"環境變數檢查: {env_vars}")
+        # 從請求頭獲取令牌
+        token = credentials.credentials
+        logger.debug(f"收到的JWT令牌: {token[:10]}...")
         
-        user = supabase.auth.get_user()
-        if not user:
-            logger.warning("用戶驗證失敗: 未找到用戶")
+        # 使用令牌驗證用戶
+        try:
+            # 通過JWT令牌獲取用戶
+            user = supabase.auth.get_user(token)
+            if not user or not user.user:
+                logger.warning("用戶驗證失敗: JWT令牌無效")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="無效的認證令牌",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            logger.info(f"用戶驗證成功: {user.user.email}")
+            return user
+        except Exception as e:
+            logger.error(f"JWT驗證失敗: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="用戶未登入",
+                detail=f"JWT認證錯誤: {str(e)}",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        logger.info(f"用戶驗證成功: {user.user.email if hasattr(user, 'user') and hasattr(user.user, 'email') else '未知'}")
-        return user
     except Exception as e:
-        logger.error(f"用戶驗證出錯: {str(e)}")
+        logger.error(f"用戶驗證過程出錯: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"認證錯誤: {str(e)}",
+            detail="未提供有效的認證信息",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
 # 獲取環境變數中的API密鑰，如果沒有設定則使用默認值
-CRON_API_KEY = os.environ.get("CRON_API_KEY", "your-default-api-key-change-this")
+CRON_API_KEY = os.environ.get("CRON_API_KEY", "")
 
 # 依賴函數，用於驗證 cron job 調用
 async def verify_cron_api_key(x_api_key: Optional[str] = Header(None)):
