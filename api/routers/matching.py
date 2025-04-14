@@ -18,6 +18,113 @@ from services.notification_service import NotificationService
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# 新增輔助函數，提取重複邏輯
+async def update_user_status_to_confirmation(
+    supabase: Client, 
+    user_id: str, 
+    group_id: str, 
+    confirmation_deadline: datetime
+) -> bool:
+    """
+    將用戶狀態更新為等待確認，並創建或更新配對信息
+    """
+    try:
+        # 更新用戶狀態為等待確認
+        status_update_resp = supabase.table("user_status").update({
+            "status": "waiting_confirmation",
+            "updated_at": datetime.now().isoformat()
+        }).eq("user_id", user_id).execute()
+        
+        if not status_update_resp.data:
+            logger.warning(f"更新用戶 {user_id} 狀態失敗或用戶狀態不存在")
+            # 即使狀態更新失敗，仍嘗試更新配對信息
+        
+        # 創建或更新配對信息
+        matching_info_resp = supabase.table("user_matching_info") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        if matching_info_resp.data:
+            supabase.table("user_matching_info").update({
+                "matching_group_id": group_id,
+                "confirmation_deadline": confirmation_deadline.isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }).eq("id", matching_info_resp.data[0]["id"]).execute()
+        else:
+            supabase.table("user_matching_info").insert({
+                "user_id": user_id,
+                "matching_group_id": group_id,
+                "confirmation_deadline": confirmation_deadline.isoformat()
+            }).execute()
+        
+        return True
+    except Exception as e:
+        logger.error(f"更新用戶 {user_id} 狀態或配對信息失敗: {str(e)}")
+        return False
+
+async def send_matching_notification(
+    notification_service: NotificationService,
+    user_id: str,
+    group_id: str,
+    deadline: datetime
+) -> bool:
+    """
+    發送配對成功通知
+    """
+    try:
+        # 準備通知數據
+        notification_data = {
+            "type": "matching_confirmation",
+            "group_id": group_id,
+            "deadline": deadline.isoformat()
+        }
+        
+        # 格式化時間字符串
+        confirmation_deadline_str = deadline.strftime('%a %H:%M')
+        
+        # 發送通知
+        await notification_service.send_notification(
+            user_id=user_id,
+            title="找到了！",
+            body=f"成功找到聚餐夥伴，請在 {confirmation_deadline_str} 前確認",
+            data=notification_data
+        )
+        logger.info(f"成功發送配對通知到用戶 {user_id}")
+        return True
+    except Exception as ne:
+        logger.error(f"發送通知給用戶 {user_id} 失敗: {str(ne)}")
+        return False
+
+async def create_matching_group(
+    supabase: Client,
+    user_group: Dict,
+    is_school_only: bool = False
+) -> Optional[str]:
+    """
+    創建配對組並返回組ID
+    """
+    try:
+        logger.info(f"創建組別: {user_group}, 校內專屬: {is_school_only}")
+        
+        group_response = supabase.table("matching_groups").insert({
+            "user_ids": user_group["user_ids"],
+            "is_complete": user_group["is_complete"],
+            "male_count": user_group["male_count"],
+            "female_count": user_group["female_count"],
+            "status": "waiting_confirmation",
+            "school_only": is_school_only
+        }).execute()
+        
+        if not group_response.data:
+            logger.error(f"創建組別失敗: {group_response.error}")
+            return None
+            
+        return group_response.data[0]["id"]
+    except Exception as e:
+        logger.error(f"創建配對組失敗: {str(e)}")
+        return None
+
 @router.post("/batch", response_model=BatchMatchingResponse, status_code=status.HTTP_200_OK, dependencies=[Depends(verify_cron_api_key)])
 async def batch_matching(
     background_tasks: BackgroundTasks,
@@ -45,7 +152,7 @@ async def join_matching(
 ):
     """
     用戶參加聚餐配對
-    嘗試將用戶補入不足4人的桌位或進入等待名單
+    嘗試將用戶補入不足4人的桌位或嘗試與等待中的用戶組成新桌位，否則進入等待名單
     """
     # 使用JWT令牌中的用戶ID
     user_id = current_user.user.id
@@ -158,84 +265,42 @@ async def join_matching(
             female_count = group["female_count"] + (1 if gender == "female" else 0)
             
             # 更新組別
-            supabase.table("matching_groups").update({
+            update_group_resp = supabase.table("matching_groups").update({
                 "user_ids": user_ids,
                 "is_complete": is_complete,
                 "male_count": male_count,
                 "female_count": female_count,
                 "updated_at": datetime.now().isoformat()
             }).eq("id", group_id).execute()
-            
-            joined_group = True
-            joined_group_id = group_id
+
+            if update_group_resp.data:
+                joined_group = True
+                joined_group_id = group_id
+            else:
+                logger.error(f"更新組別 {group_id} 失敗: {update_group_resp.error}")
+                # 可能需要處理更新失敗的情況，例如將用戶放入等待列表
     
     # 6. 更新用戶狀態
-    if joined_group:
+    if joined_group and joined_group_id:
         # 用戶需在七小時內確認
         confirmation_deadline = datetime.now() + timedelta(hours=7)
         
-        # 檢查或創建用戶狀態
-        user_status_resp = supabase.table("user_status") \
-            .select("id") \
-            .eq("user_id", user_id) \
-            .execute()
-            
-        # 更新用戶狀態為等待確認
-        if user_status_resp.data:
-            supabase.table("user_status").update({
-                "status": "waiting_confirmation",
-                "updated_at": datetime.now().isoformat()
-            }).eq("id", user_status_resp.data[0]["id"]).execute()
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="用戶資料不存在"
-            )
+        # 更新用戶狀態和配對信息 (使用輔助函數)
+        update_success = await update_user_status_to_confirmation(
+            supabase, user_id, joined_group_id, confirmation_deadline
+        )
         
-        # 創建或更新配對信息
-        matching_info_resp = supabase.table("user_matching_info") \
-            .select("id") \
-            .eq("user_id", user_id) \
-            .execute()
-            
-        if matching_info_resp.data:
-            supabase.table("user_matching_info").update({
-                "matching_group_id": joined_group_id,
-                "confirmation_deadline": confirmation_deadline.isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }).eq("id", matching_info_resp.data[0]["id"]).execute()
-        else:
-            supabase.table("user_matching_info").insert({
-                "user_id": user_id,
-                "matching_group_id": joined_group_id,
-                "confirmation_deadline": confirmation_deadline.isoformat()
-            }).execute()
-        
-        # 新增: 發送配對成功通知
-        try:
-            # 準備通知數據
-            notification_data = {
-                "type": "matching_confirmation",
-                "group_id": joined_group_id,
-                "deadline": confirmation_deadline.isoformat()
-            }
-            
-            # 格式化時間字符串
-            confirmation_deadline_str = confirmation_deadline.strftime('%a %H:%M')
-            
-            # 初始化通知服務
-            notification_service = NotificationService()
-            
-            # 發送通知
-            await notification_service.send_notification(
-                user_id=user_id,
-                title="找到了！",
-                body=f"成功找到聚餐夥伴，請在 {confirmation_deadline_str} 前確認",
-                data=notification_data
-            )
-            logger.info(f"成功發送配對通知到用戶 {user_id}")
-        except Exception as ne:
-            logger.error(f"發送通知給用戶 {user_id} 失敗: {str(ne)}")
+        if not update_success:
+            # 如果狀態更新失敗，可能需要一些回滾或錯誤處理邏輯
+            logger.error(f"未能成功更新用戶 {user_id} 加入組別 {joined_group_id} 的狀態")
+            # 暫時返回錯誤或讓用戶進入等待狀態？取決於業務需求
+            # 此處暫時維持原流程，但記錄錯誤
+
+        # 發送配對成功通知 (使用輔助函數)
+        notification_service = NotificationService(use_service_role=True) # 使用服務角色
+        await send_matching_notification(
+            notification_service, user_id, joined_group_id, confirmation_deadline
+        )
         
         # 返回成功加入組別的響應
         return {
@@ -246,8 +311,6 @@ async def join_matching(
         }
     else:
         # 如果沒有適合的組別
-        
-        # TODO: Join 的時候可以跟 waiting 的成員配對
         # 查找其他等待配對的用戶，嘗試組成新桌位
         waiting_user_ids, waiting_user_data, valid_waiting_count = await _get_waiting_users_data(supabase)
         
@@ -288,7 +351,7 @@ async def join_matching(
                     
                     if user_matched and user_group:
                         # 保存配對結果到數據庫
-                        notification_service = NotificationService()
+                        notification_service = NotificationService(use_service_role=True)
                         confirmation_deadline = datetime.now() + timedelta(hours=7)
                         
                         # 創建分組記錄
@@ -311,64 +374,21 @@ async def join_matching(
                         
                         logger.info(f"與等待中的用戶成功配對，創建新組別：{user_group}")
                         
-                        group_response = supabase.table("matching_groups").insert({
-                            "user_ids": user_group["user_ids"],
-                            "is_complete": user_group["is_complete"],
-                            "male_count": user_group["male_count"],
-                            "female_count": user_group["female_count"],
-                            "status": "waiting_confirmation",
-                            "school_only": is_school_only
-                        }).execute()
+                        group_id = await create_matching_group(supabase, user_group, is_school_only)
                         
-                        if group_response.data:
-                            group_id = group_response.data[0]["id"]
-                            
+                        if group_id:
                             # 更新所有用戶的狀態
                             for uid in user_group["user_ids"]:
-                                # 更新用戶狀態為等待確認
-                                supabase.table("user_status").update({
-                                    "status": "waiting_confirmation",
-                                    "updated_at": datetime.now().isoformat()
-                                }).eq("user_id", uid).execute()
-                                
-                                # 創建或更新配對信息
-                                matching_info_resp = supabase.table("user_matching_info") \
-                                    .select("id") \
-                                    .eq("user_id", uid) \
-                                    .execute()
-                                
-                                if matching_info_resp.data:
-                                    supabase.table("user_matching_info").update({
-                                        "matching_group_id": group_id,
-                                        "confirmation_deadline": confirmation_deadline.isoformat(),
-                                        "updated_at": datetime.now().isoformat()
-                                    }).eq("id", matching_info_resp.data[0]["id"]).execute()
-                                else:
-                                    supabase.table("user_matching_info").insert({
-                                        "user_id": uid,
-                                        "matching_group_id": group_id,
-                                        "confirmation_deadline": confirmation_deadline.isoformat()
-                                    }).execute()
-                                
-                                # 發送配對成功通知
-                                try:
-                                    notification_data = {
-                                        "type": "matching_confirmation",
-                                        "group_id": group_id,
-                                        "deadline": confirmation_deadline.isoformat()
-                                    }
-                                    
-                                    confirmation_deadline_str = confirmation_deadline.strftime('%a %H:%M')
-                                    
-                                    await notification_service.send_notification(
-                                        user_id=uid,
-                                        title="找到了！",
-                                        body=f"成功找到聚餐夥伴，請在 {confirmation_deadline_str} 前確認",
-                                        data=notification_data
+                                update_success = await update_user_status_to_confirmation(
+                                    supabase, uid, group_id, confirmation_deadline
+                                )
+                                if update_success:
+                                    # 發送配對成功通知
+                                    await send_matching_notification(
+                                        notification_service, uid, group_id, confirmation_deadline
                                     )
-                                    logger.info(f"成功發送配對通知到用戶 {uid}")
-                                except Exception as ne:
-                                    logger.error(f"發送通知給用戶 {uid} 失敗: {str(ne)}")
+                                else:
+                                    logger.warning(f"更新用戶 {uid} 加入新組別 {group_id} 的狀態失敗")
                             
                             # 嘗試為群組推薦餐廳
                             try:
@@ -383,6 +403,8 @@ async def join_matching(
                                 "group_id": group_id,
                                 "deadline": confirmation_deadline
                             }
+                        else:
+                            logger.error("創建新組別失敗，將用戶放入等待列表")
         
         # 如果無法立即配對，將用戶加入等待名單
         # 檢查或創建用戶狀態
@@ -689,15 +711,7 @@ async def _save_matching_groups_to_db(
     confirm_deadline: datetime
 ) -> Tuple[int, int]:
     """
-    將配對結果保存到數據庫，更新用戶狀態，發送通知
-    
-    Args:
-        supabase: Supabase客戶端
-        result_groups: 配對結果組別
-        notification_service: 通知服務
-        
-    Returns:
-        Tuple[int, int]: 返回 (成功創建的組別數, 配對的用戶總數)
+    將配對結果保存到數據庫，更新用戶狀態，發送通知 (已重構)
     """
     created_groups = 0
     total_matched_users = 0
@@ -724,80 +738,27 @@ async def _save_matching_groups_to_db(
                 
                 is_school_only = all_school_only
         
-        # 創建分組記錄
-        logger.info(f"創建組別: {group}, 校內專屬: {is_school_only}")
+        # 創建分組記錄 (使用輔助函數)
+        group_id = await create_matching_group(supabase, group, is_school_only)
         
-        group_response = supabase.table("matching_groups").insert({
-            "user_ids": group["user_ids"],
-            "is_complete": group["is_complete"],
-            "male_count": group["male_count"],
-            "female_count": group["female_count"],
-            "status": "waiting_confirmation",
-            "school_only": is_school_only
-        }).execute()
-        
-        if not group_response.data:
-            logger.error(f"創建組別失敗: {group_response.error}")
+        if not group_id:
+            logger.error(f"未能為用戶 {user_ids} 創建組別，跳過此組")
             continue
             
-        group_id = group_response.data[0]["id"]
         created_groups += 1
         total_matched_users += len(group["user_ids"])
         
-        # 更新用戶狀態
-        # 用戶需在七小時後確認
-        confirmation_deadline = confirm_deadline
-        
-        # 準備發送通知
-        notification_data = {
-            "type": "matching_confirmation",
-            "group_id": group_id,
-            "deadline": confirmation_deadline.isoformat()
-        }
-        
+        # 更新用戶狀態和發送通知 (使用輔助函數)
         for user_id in group["user_ids"]:
-            try:
-                # 更新用戶狀態為等待確認
-                supabase.table("user_status").update({
-                    "status": "waiting_confirmation",
-                    "updated_at": datetime.now().isoformat()
-                }).eq("user_id", user_id).eq("status", "waiting_matching").execute()
-                
-                # 創建或更新配對信息
-                matching_info_resp = supabase.table("user_matching_info") \
-                    .select("id") \
-                    .eq("user_id", user_id) \
-                    .execute()
-                
-                if matching_info_resp.data:
-                    supabase.table("user_matching_info").update({
-                        "matching_group_id": group_id,
-                        "confirmation_deadline": confirmation_deadline.isoformat(),
-                        "updated_at": datetime.now().isoformat()
-                    }).eq("id", matching_info_resp.data[0]["id"]).execute()
-                else:
-                    supabase.table("user_matching_info").insert({
-                        "user_id": user_id,
-                        "matching_group_id": group_id,
-                        "confirmation_deadline": confirmation_deadline.isoformat()
-                    }).execute()
-                
-                # 發送配對成功通知
-                try:
-                    # time format: 週三 13:00 PM
-                    confirmation_deadline_str = confirmation_deadline.strftime('%a %H:%M')
-                    await notification_service.send_notification(
-                        user_id=user_id,
-                        title="找到了！",
-                        body=f"成功找到聚餐夥伴，請在 {confirmation_deadline_str} 前確認",
-                        data=notification_data
-                    )
-                    logger.info(f"成功發送配對通知到用戶 {user_id}")
-                except Exception as ne:
-                    logger.error(f"發送通知給用戶 {user_id} 失敗: {str(ne)}")
-                    
-            except Exception as e:
-                logger.error(f"更新用戶 {user_id} 狀態失敗: {str(e)}")
+            update_success = await update_user_status_to_confirmation(
+                supabase, user_id, group_id, confirm_deadline
+            )
+            if update_success:
+                await send_matching_notification(
+                    notification_service, user_id, group_id, confirm_deadline
+                )
+            else:
+                 logger.warning(f"更新用戶 {user_id} 加入組別 {group_id} 的狀態失敗")
         
         # 為群組推薦餐廳
         try:
