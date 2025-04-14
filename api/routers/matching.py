@@ -247,6 +247,144 @@ async def join_matching(
     else:
         # 如果沒有適合的組別
         
+        # TODO: Join 的時候可以跟 waiting 的成員配對
+        # 查找其他等待配對的用戶，嘗試組成新桌位
+        waiting_user_ids, waiting_user_data, valid_waiting_count = await _get_waiting_users_data(supabase)
+        
+        # 將當前用戶添加到等待用戶數據中
+        if valid_waiting_count > 0:
+            waiting_user_data[user_id] = {
+                "gender": gender,
+                "personality_type": None,
+                "prefer_school_only": prefer_school_only
+            }
+            
+            # 獲取用戶的人格類型
+            personality_response = supabase.table("user_personality_results") \
+                .select("personality_type") \
+                .eq("user_id", user_id) \
+                .execute()
+                
+            if personality_response.data and len(personality_response.data) > 0:
+                waiting_user_data[user_id]["personality_type"] = personality_response.data[0].get("personality_type")
+                
+            # 如果等待用戶數 >= 3 (包括當前用戶)
+            if valid_waiting_count >= 2 and waiting_user_data[user_id]["personality_type"]:
+                logger.info(f"嘗試與等待中的用戶組成新桌位，等待用戶數：{valid_waiting_count}")
+                
+                # 使用現有的配對算法將用戶分組
+                matched_groups, remaining = await _match_users_into_groups(waiting_user_data)
+                
+                if matched_groups:
+                    # 檢查當前用戶是否在任何一個組中
+                    user_matched = False
+                    user_group = None
+                    
+                    for group in matched_groups:
+                        if user_id in group["user_ids"]:
+                            user_matched = True
+                            user_group = group
+                            break
+                    
+                    if user_matched and user_group:
+                        # 保存配對結果到數據庫
+                        notification_service = NotificationService()
+                        confirmation_deadline = datetime.now() + timedelta(hours=7)
+                        
+                        # 創建分組記錄
+                        is_school_only = prefer_school_only
+                        if user_group["user_ids"]:
+                            preference_response = supabase.table("user_matching_preferences") \
+                                .select("user_id, prefer_school_only") \
+                                .in_("user_id", user_group["user_ids"]) \
+                                .execute()
+                            
+                            # 如果所有用戶都是校內專屬配對，則設置群組為校內專屬
+                            if preference_response.data:
+                                all_school_only = True
+                                for pref in preference_response.data:
+                                    if not pref.get("prefer_school_only", False):
+                                        all_school_only = False
+                                        break
+                                
+                                is_school_only = all_school_only
+                        
+                        logger.info(f"與等待中的用戶成功配對，創建新組別：{user_group}")
+                        
+                        group_response = supabase.table("matching_groups").insert({
+                            "user_ids": user_group["user_ids"],
+                            "is_complete": user_group["is_complete"],
+                            "male_count": user_group["male_count"],
+                            "female_count": user_group["female_count"],
+                            "status": "waiting_confirmation",
+                            "school_only": is_school_only
+                        }).execute()
+                        
+                        if group_response.data:
+                            group_id = group_response.data[0]["id"]
+                            
+                            # 更新所有用戶的狀態
+                            for uid in user_group["user_ids"]:
+                                # 更新用戶狀態為等待確認
+                                supabase.table("user_status").update({
+                                    "status": "waiting_confirmation",
+                                    "updated_at": datetime.now().isoformat()
+                                }).eq("user_id", uid).execute()
+                                
+                                # 創建或更新配對信息
+                                matching_info_resp = supabase.table("user_matching_info") \
+                                    .select("id") \
+                                    .eq("user_id", uid) \
+                                    .execute()
+                                
+                                if matching_info_resp.data:
+                                    supabase.table("user_matching_info").update({
+                                        "matching_group_id": group_id,
+                                        "confirmation_deadline": confirmation_deadline.isoformat(),
+                                        "updated_at": datetime.now().isoformat()
+                                    }).eq("id", matching_info_resp.data[0]["id"]).execute()
+                                else:
+                                    supabase.table("user_matching_info").insert({
+                                        "user_id": uid,
+                                        "matching_group_id": group_id,
+                                        "confirmation_deadline": confirmation_deadline.isoformat()
+                                    }).execute()
+                                
+                                # 發送配對成功通知
+                                try:
+                                    notification_data = {
+                                        "type": "matching_confirmation",
+                                        "group_id": group_id,
+                                        "deadline": confirmation_deadline.isoformat()
+                                    }
+                                    
+                                    confirmation_deadline_str = confirmation_deadline.strftime('%a %H:%M')
+                                    
+                                    await notification_service.send_notification(
+                                        user_id=uid,
+                                        title="找到了！",
+                                        body=f"成功找到聚餐夥伴，請在 {confirmation_deadline_str} 前確認",
+                                        data=notification_data
+                                    )
+                                    logger.info(f"成功發送配對通知到用戶 {uid}")
+                                except Exception as ne:
+                                    logger.error(f"發送通知給用戶 {uid} 失敗: {str(ne)}")
+                            
+                            # 嘗試為群組推薦餐廳
+                            try:
+                                await recommend_restaurants_for_group(supabase, group_id, user_group["user_ids"])
+                            except Exception as e:
+                                logger.error(f"為群組 {group_id} 推薦餐廳時出錯: {str(e)}")
+                            
+                            # 返回配對成功的響應
+                            return {
+                                "status": "waiting_confirmation",
+                                "message": "您已被分配到桌位，請在七小時內確認參加",
+                                "group_id": group_id,
+                                "deadline": confirmation_deadline
+                            }
+        
+        # 如果無法立即配對，將用戶加入等待名單
         # 檢查或創建用戶狀態
         user_status_resp = supabase.table("user_status") \
             .select("id") \
