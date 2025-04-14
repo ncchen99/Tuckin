@@ -448,6 +448,7 @@ async def auto_form_groups(
     自動成桌任務（週三 06:00 AM 觸發）
     若等待名單中用戶數≥3人，自動組成新桌位
     此API僅限授權的Cron任務調用
+    [未來可能會視情況移除]
     """
     # 實際實現會將此邏輯放入背景任務
     background_tasks.add_task(process_auto_form_groups, supabase)
