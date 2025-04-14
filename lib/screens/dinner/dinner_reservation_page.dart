@@ -314,7 +314,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                                                 // // 延遲一下導航到配對狀態頁面
                                                 if (!mounted) return;
                                                 await Future.delayed(
-                                                  const Duration(seconds: 2),
+                                                  const Duration(seconds: 1),
                                                 );
                                                 await _navigateToMatchingStatus();
                                               }
