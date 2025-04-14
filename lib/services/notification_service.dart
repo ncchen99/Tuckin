@@ -134,12 +134,30 @@ class NotificationService {
         return false;
       }
 
-      // 保存token到Supabase（使用新的API方式）
-      await _supabaseService.client.from('user_device_tokens').upsert({
-        'user_id': currentUser.id,
-        'token': token,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
+      // 查詢用戶是否已有令牌記錄
+      final existingTokens = await _supabaseService.client
+          .from('user_device_tokens')
+          .select()
+          .eq('user_id', currentUser.id);
+
+      if (existingTokens != null && existingTokens.isNotEmpty) {
+        // 更新現有令牌
+        final existingTokenId = existingTokens[0]['id'];
+        await _supabaseService.client
+            .from('user_device_tokens')
+            .update({
+              'token': token,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', existingTokenId);
+      } else {
+        // 創建新令牌記錄
+        await _supabaseService.client.from('user_device_tokens').insert({
+          'user_id': currentUser.id,
+          'token': token,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      }
 
       debugPrint('FCM Token已成功保存到Supabase');
       return true;

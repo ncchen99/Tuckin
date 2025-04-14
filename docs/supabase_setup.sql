@@ -95,3 +95,22 @@ CREATE TRIGGER user_status_change_trigger
   AFTER UPDATE OR INSERT ON user_status
   FOR EACH ROW
   EXECUTE FUNCTION notify_status_change();
+
+-- 創建設備令牌管理觸發器函數
+CREATE OR REPLACE FUNCTION manage_user_device_tokens() RETURNS TRIGGER AS $$
+BEGIN
+  -- 刪除該用戶的其他裝置令牌（保留當前插入的令牌）
+  DELETE FROM user_device_tokens
+  WHERE user_id = NEW.user_id
+    AND id != NEW.id;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 綁定觸發器到 user_device_tokens 表
+DROP TRIGGER IF EXISTS user_device_tokens_manage_trigger ON user_device_tokens;
+CREATE TRIGGER user_device_tokens_manage_trigger
+  AFTER INSERT ON user_device_tokens
+  FOR EACH ROW
+  EXECUTE FUNCTION manage_user_device_tokens();

@@ -330,6 +330,28 @@ class DatabaseService {
     );
   }
 
+  /// 檢查用戶是否可以刪除帳號
+  ///
+  /// 如果用戶處於聚餐預約流程中（等待確認、等待其他用戶、等待出席），則不允許刪除帳號
+  /// 返回 true 表示可以刪除，false 表示不能刪除
+  Future<bool> canDeleteAccount(String userId) async {
+    return _apiService.handleRequest(
+      request: () async {
+        final status = await getUserStatus(userId);
+
+        // 這些狀態表示用戶正在聚餐預約流程中
+        List<String> restrictedStatuses = [
+          'waiting_confirmation',
+          'waiting_other_users',
+          'waiting_attendance',
+        ];
+
+        // 如果用戶狀態在限制列表中，則不能刪除帳號
+        return !restrictedStatuses.contains(status);
+      },
+    );
+  }
+
   /// 獲取用戶配對偏好
   ///
   /// [userId] 用戶 ID

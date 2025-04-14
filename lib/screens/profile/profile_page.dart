@@ -449,6 +449,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 width: 110.w,
                                 height: 55.h,
                                 onPressed: () async {
+                                  // 設置刪除中狀態
                                   setState(() {
                                     _isDeletingAccount = true;
                                   });
@@ -458,6 +459,35 @@ class _ProfilePageState extends State<ProfilePage> {
                                     final currentUser =
                                         await _authService.getCurrentUser();
                                     if (currentUser != null) {
+                                      // 檢查用戶是否可以刪除帳號
+                                      final canDelete = await _databaseService
+                                          .canDeleteAccount(currentUser.id);
+
+                                      if (!canDelete) {
+                                        // 如果不能刪除，顯示提示消息
+                                        setState(() {
+                                          _isDeletingAccount = false;
+                                        });
+
+                                        if (mounted) {
+                                          Navigator.of(context).pop(); // 關閉對話框
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                '您目前正在聚餐流程中，無法刪除帳號',
+                                                style: const TextStyle(
+                                                  fontFamily: 'OtsutomeFont',
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        return;
+                                      }
+
+                                      // 可以刪除帳號，繼續原來的刪除流程
                                       await _databaseService.deleteUser(
                                         currentUser.id,
                                       );
