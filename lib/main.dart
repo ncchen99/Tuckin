@@ -272,6 +272,9 @@ class _MyAppState extends State<MyApp> {
   // 添加狀態標記，表示正在測試網絡
   bool _isTestingNetwork = false;
 
+  // 添加生命週期觀察者變數
+  final _lifecycleEventHandler = _LifecycleEventHandler();
+
   @override
   void initState() {
     super.initState();
@@ -279,6 +282,21 @@ class _MyAppState extends State<MyApp> {
     _checkConnectivity();
     _setupConnectivityListener();
     _setupErrorListener();
+
+    // 添加生命週期監聽，在應用程式恢復前台時清除通知
+    WidgetsBinding.instance.addObserver(_lifecycleEventHandler);
+
+    // 在應用啟動時清除通知
+    _clearNotificationsOnLaunch();
+  }
+
+  // 清除啟動時的通知
+  Future<void> _clearNotificationsOnLaunch() async {
+    try {
+      await NotificationService().clearAllNotifications();
+    } catch (e) {
+      debugPrint('清除啟動時通知錯誤: $e');
+    }
   }
 
   @override
@@ -287,6 +305,10 @@ class _MyAppState extends State<MyApp> {
     _errorHandler.dispose();
     // 在應用關閉時銷毀 RealtimeService
     RealtimeService().dispose();
+
+    // 移除生命週期觀察者
+    WidgetsBinding.instance.removeObserver(_lifecycleEventHandler);
+
     super.dispose();
   }
 
@@ -652,5 +674,16 @@ class _MyAppState extends State<MyApp> {
         debugShowCheckedModeBanner: false,
       ),
     );
+  }
+}
+
+// 創建生命週期監聽器類，用於處理應用程式恢復前台時的邏輯
+class _LifecycleEventHandler extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 應用恢復前台時清除通知
+      NotificationService().clearAllNotifications();
+    }
   }
 }

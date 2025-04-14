@@ -41,6 +41,9 @@ class NotificationService {
       // 初始化本地通知
       await _initializeLocalNotifications();
 
+      // 清除所有現有通知
+      await clearAllNotifications();
+
       // 設置 token 刷新監聽
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
         debugPrint('FCM Token 已更新: $newToken');
@@ -230,6 +233,25 @@ class NotificationService {
         ),
         payload: modifiedData.toString(),
       );
+    }
+  }
+
+  // 清除所有通知
+  Future<void> clearAllNotifications() async {
+    try {
+      await _localNotifications.cancelAll();
+      debugPrint('所有本地通知已清除');
+
+      // 清除 Firebase 的通知 (僅限 Android)
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+            alert: false,
+            badge: false,
+            sound: false,
+          );
+      debugPrint('Firebase 通知設置已更新');
+    } catch (e) {
+      debugPrint('清除通知錯誤: $e');
     }
   }
 }
