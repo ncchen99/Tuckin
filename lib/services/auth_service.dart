@@ -19,6 +19,9 @@ class AuthService {
   final ApiService _apiService = ApiService();
   final ErrorHandler _errorHandler = ErrorHandler();
 
+  // Google 登入實例
+  GoogleSignIn? _googleSignIn;
+
   // 初始化認證服務
   Future<void> initialize() async {
     try {
@@ -65,14 +68,14 @@ class AuthService {
       }
 
       // 使用谷歌登入
-      final GoogleSignIn googleSignIn = GoogleSignIn(
+      _googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
         clientId: androidClientId,
         serverClientId: webClientId,
       );
 
       // 啟動 Google 登入流程
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await _googleSignIn!.signIn();
 
       if (googleUser == null) {
         // 用戶取消登入
@@ -135,6 +138,13 @@ class AuthService {
   // 登出
   Future<void> signOut() async {
     try {
+      // 登出 Google 賬號
+      if (_googleSignIn != null) {
+        await _googleSignIn!.disconnect();
+        debugPrint('AuthService: Google 賬號已登出');
+      }
+
+      // 登出 Supabase
       await _supabaseService.auth.signOut();
       debugPrint('AuthService: 用戶已成功登出');
     } catch (e) {
