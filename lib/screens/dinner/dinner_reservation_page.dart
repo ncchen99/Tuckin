@@ -6,6 +6,8 @@ import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/matching_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'dart:async'; // <--- 新增導入
+import 'package:flutter/rendering.dart'; // <--- 新增導入
 
 // 頁面階段狀態
 enum PageStage {
@@ -21,7 +23,8 @@ class DinnerReservationPage extends StatefulWidget {
   State<DinnerReservationPage> createState() => _DinnerReservationPageState();
 }
 
-class _DinnerReservationPageState extends State<DinnerReservationPage> {
+class _DinnerReservationPageState extends State<DinnerReservationPage>
+    with WidgetsBindingObserver {
   // 是否僅限成大學生參與
   bool _onlyNckuStudents = true;
   // 控制提示框顯示
@@ -38,6 +41,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
   final NavigationService _navigationService = NavigationService();
   final MatchingService _matchingService = MatchingService();
   String _username = ''; // 用戶名稱
+  // 添加一個計時器來處理整點更新
+  Timer? _hourlyTimer; // <--- 新增計時器變數
 
   // 下次聚餐日期
   late DateTime _nextDinnerDate;
@@ -94,7 +99,52 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     _calculateDates();
     _loadUserPreferences();
     _checkUserEmail();
+    _scheduleHourlyUpdate(); // <--- 啟動計時器調度
+    WidgetsBinding.instance.addObserver(this); // <--- 註冊 observer
   }
+
+  // <--- 新增 didChangeAppLifecycleState 方法
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // 應用程式回到前景時，重新計算日期和階段
+      debugPrint('應用程式回到前景：重新計算日期和階段...');
+      setState(() {
+        _calculateDates();
+      });
+      // 重新安排計時器
+      _scheduleHourlyUpdate();
+    }
+  }
+
+  // 安排下一次整點更新
+  void _scheduleHourlyUpdate() {
+    final now = DateTime.now();
+    // 計算到下一個整點的時間
+    final nextHour = DateTime(now.year, now.month, now.day, now.hour + 1);
+    final durationUntilNextHour = nextHour.difference(now);
+
+    // 取消任何現有的計時器
+    _hourlyTimer?.cancel();
+
+    // 設定一個新的計時器，在下一個整點觸發
+    _hourlyTimer = Timer(durationUntilNextHour, () {
+      // 確保 widget 仍然存在
+      if (mounted) {
+        debugPrint('整點觸發：重新計算日期和階段...');
+        // 重新計算日期和階段，並更新 UI
+        setState(() {
+          _calculateDates();
+        });
+        // 再次安排下一次更新
+        _scheduleHourlyUpdate();
+      }
+    });
+    debugPrint(
+      '已安排下次整點更新於: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(nextHour)} (延遲: ${durationUntilNextHour.inMinutes} 分鐘)',
+    );
+  } // <--- 新增計時器調度方法
 
   // 檢查用戶email是否為校內email
   Future<void> _checkUserEmail() async {
@@ -778,5 +828,13 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
         ],
       ),
     );
+  }
+
+  // <--- 新增 dispose 方法
+  @override
+  void dispose() {
+    _hourlyTimer?.cancel(); // 在 widget 銷毀時取消計時器
+    WidgetsBinding.instance.removeObserver(this); // <--- 移除 observer
+    super.dispose();
   }
 }
