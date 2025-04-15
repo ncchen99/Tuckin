@@ -29,7 +29,7 @@ class ApiService {
   static const Duration defaultTimeout = Duration(seconds: 10);
 
   // 後端API基礎URL
-  final String baseUrl = 'https://tuckin-backend.example.com';
+  final String baseUrl = 'https://tuckin-backend.example.com/api';
 
   // 通用請求頭
   Map<String, String> get headers => {

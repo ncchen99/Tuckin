@@ -31,14 +31,26 @@ class _AttendanceConfirmationPageState
   @override
   void initState() {
     super.initState();
-    _loadDinnerInfo();
-    // 使用延遲來確保頁面完全渲染後才設置為掛載狀態
+    // 延遲加載，確保能獲取到路由參數
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() {
           _isPageMounted = true;
         });
         debugPrint('AttendanceConfirmationPage 完全渲染');
+
+        // 嘗試從路由參數獲取截止時間
+        final args =
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        if (args != null && args.containsKey('deadline')) {
+          setState(() {
+            _confirmDeadline = args['deadline'] as DateTime?;
+          });
+          debugPrint('從路由參數獲取截止時間: $_confirmDeadline');
+        }
+
+        // 加載聚餐信息
+        _loadDinnerInfo();
       }
     });
   }
@@ -61,15 +73,22 @@ class _AttendanceConfirmationPageState
           return;
         }
 
-        // 這裡模擬獲取聚餐資訊，實際應從資料庫獲取
-        // 在真實情境中應當有專門的API來獲取這些資訊
+        // 若confirmDeadline仍為null（沒有從路由參數獲取到），設置一個默認值
+        if (_confirmDeadline == null) {
+          // 設定默認值（現在時間加上7小時）
+          final DateTime now = DateTime.now();
+          setState(() {
+            _confirmDeadline = now.add(const Duration(hours: 7));
+          });
+          debugPrint('未從路由參數獲取到期限，使用默認值: $_confirmDeadline');
+        }
+
+        // 獲取聚餐日期
         final DateTime now = DateTime.now();
         final DateTime dinnerTime = now.add(const Duration(days: 1));
-        final DateTime confirmDeadline = now.add(const Duration(hours: 2));
 
         setState(() {
           _dinnerTime = dinnerTime;
-          _confirmDeadline = confirmDeadline;
           _isLoading = false;
         });
 
