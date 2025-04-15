@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 class ApiError implements Exception {
   final String message;
@@ -29,13 +32,19 @@ class ApiService {
   static const Duration defaultTimeout = Duration(seconds: 10);
 
   // 後端API基礎URL
-  final String baseUrl = 'https://tuckin-backend.example.com/api';
+  final String baseUrl = 'https://tuckin-api-c6943d8e20da.herokuapp.com/api';
+  // kDebugMode
+  //     ? 'http://10.0.2.2:8000/api' // Debug 模式下，模擬器連接本地主機的 URL
+  //     : 'https://tuckin-api-c6943d8e20da.herokuapp.com/api'; // Release 模式下的生產 URL
 
   // 通用請求頭
   Map<String, String> get headers => {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
+
+  // 儲存 Token 的 Key
+  final String _tokenKey = 'auth_token';
 
   /// 包裝 API 請求並處理錯誤
   Future<T> handleRequest<T>({

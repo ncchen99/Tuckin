@@ -7,4 +7,4 @@ firebase-admin==6.2.0
 requests==2.31.0
 python-multipart==0.0.6
 boto3==1.28.45
-gunicorn==21.2.0 
+gunicorn>=23.0.0

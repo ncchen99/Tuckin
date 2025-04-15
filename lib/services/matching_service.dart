@@ -55,7 +55,7 @@ class MatchingService {
 
   /// 用戶參加聚餐配對
   Future<JoinMatchingResponse> joinMatching() async {
-    const String endpoint = '/api/matching/join'; // API端點路徑
+    const String endpoint = '/matching/join'; // API端點路徑
     // 注意：確保ApiService中的baseUrl是正確的後端地址
     final Uri url = Uri.parse('${_apiService.baseUrl}$endpoint');
 
@@ -81,31 +81,33 @@ class MatchingService {
               'Authorization': 'Bearer $token', // 添加Authorization頭
             },
             // 後端目前不需要body，如果需要，在這裡添加
-            // body: jsonEncode(JoinMatchingRequest(/* ... */).toJson()),
+            body: jsonEncode({}), // 添加空的JSON body
           );
 
           // 檢查HTTP狀態碼
           if (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300) {
+            // 強制使用UTF-8解碼
+            final String decodedBody = utf8.decode(httpResponse.bodyBytes);
             // 解碼響應體
             final Map<String, dynamic> responseData = jsonDecode(
-              httpResponse.body,
+              decodedBody, // 使用解碼後的字串
             );
             return JoinMatchingResponse.fromJson(responseData);
           } else {
             // 處理非2xx的狀態碼
             debugPrint('加入配對失敗，狀態碼: ${httpResponse.statusCode}');
-            debugPrint('回應內容: ${httpResponse.body}');
+            // 強制使用UTF-8解碼
+            final String decodedBody = utf8.decode(httpResponse.bodyBytes);
+            debugPrint('回應內容 (UTF-8解碼後): $decodedBody');
             // 嘗試解析錯誤信息
             String errorMessage = '加入配對失敗 (${httpResponse.statusCode})';
             try {
-              final errorData = jsonDecode(httpResponse.body);
+              final errorData = jsonDecode(decodedBody);
               errorMessage = errorData['detail'] ?? errorMessage;
             } catch (_) {
               // 如果無法解析JSON，使用原始body或通用錯誤
               errorMessage =
-                  httpResponse.body.isNotEmpty
-                      ? httpResponse.body
-                      : errorMessage;
+                  decodedBody.isNotEmpty ? decodedBody : errorMessage;
             }
             throw ApiError(
               message: errorMessage,
@@ -114,7 +116,7 @@ class MatchingService {
           }
         },
         // 可以為這個特定請求設置不同的超時時間
-        // timeout: const Duration(seconds: 15),
+        timeout: const Duration(seconds: 30),
       );
 
       return result;

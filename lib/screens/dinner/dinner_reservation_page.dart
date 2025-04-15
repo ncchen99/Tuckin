@@ -35,6 +35,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   bool _isProcessing = false;
   // 是否為校內email
   bool _isSchoolEmail = false;
+  // 添加一個狀態來控制"正在尋找中"的提示框 (新增)
+  bool _showSearchingTip = false;
   // 添加服務
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
@@ -376,7 +378,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         break;
       case PageStage.join:
         _buttonText = '參加';
-        _descriptionText = '本週聚餐在$_weekdayText舉行，點擊參加立即配對';
+        _descriptionText = '本週聚餐在$_weekdayText舉行，立即點擊參加！';
         break;
       case PageStage.nextWeek:
         _buttonText = '預約';
@@ -502,10 +504,30 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
           break;
 
         case PageStage.join:
+          // 顯示正在尋找中的提示 (修改)
+          if (mounted) {
+            setState(() {
+              _showSearchingTip = true;
+            });
+          }
+
+          // 儲存用戶的配對偏好
+          await _databaseService.updateUserMatchingPreference(
+            currentUser.id,
+            _isSchoolEmail ? _onlyNckuStudents : false,
+          );
+
           // 參加邏輯 - 呼叫後端API
           final response = await _matchingService.joinMatching();
 
           if (!mounted) return;
+
+          // 隱藏提示框 (新增)
+          if (mounted) {
+            setState(() {
+              _showSearchingTip = false;
+            });
+          }
 
           // 根據API回應進行導航
           if (response.status == 'waiting_confirmation' &&
@@ -516,12 +538,13 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
               deadline: response.deadline,
             );
           } else if (response.status == 'waiting_matching') {
+            print('伺服器回應訊息: ${response.message}');
             // 進入等待配對狀態
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
                   response.message,
-                  style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
+                  style: TextStyle(fontFamily: 'OtsutomeFont'),
                 ),
               ),
             );
@@ -583,7 +606,10 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                               SizedBox(height: 20.h),
                               // 標題
                               Text(
-                                '預約聚餐',
+                                _currentStage == PageStage.reserve ||
+                                        _currentStage == PageStage.nextWeek
+                                    ? '預約聚餐'
+                                    : '參加聚餐',
                                 style: TextStyle(
                                   fontSize: 24.sp,
                                   fontFamily: 'OtsutomeFont',
@@ -676,14 +702,25 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                 // 右上角歡迎提示框 - 只對新用戶顯示
                 if (_showWelcomeTip && _isNewUser && _username.isNotEmpty)
                   Positioned(
-                    top: 70.h, // 調整位置，確保在HeaderBar下方
+                    top: 18.h,
                     right: 20.w,
                     child: InfoTipBox(
-                      message: '嗨囉 $_username！\n每次相遇都是生命中的美好！',
+                      message: '嗨囉 $_username！',
                       show: _showWelcomeTip,
                       onHide: () {
                         // 提示框完全隱藏後的回調
                       },
+                    ),
+                  ),
+                // 顯示 "正在尋找中..." 提示框 (新增)
+                if (_showSearchingTip)
+                  Positioned(
+                    top: 18.h, // 與歡迎提示框相同位置或自訂
+                    right: 20.w, // 與歡迎提示框相同位置或自訂
+                    child: InfoTipBox(
+                      message: '正在尋找中...',
+                      show: _showSearchingTip,
+                      onHide: () {}, // 不需要特殊處理
                     ),
                   ),
               ],

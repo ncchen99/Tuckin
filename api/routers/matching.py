@@ -331,8 +331,8 @@ async def join_matching(
             if personality_response.data and len(personality_response.data) > 0:
                 waiting_user_data[user_id]["personality_type"] = personality_response.data[0].get("personality_type")
                 
-            # 如果等待用戶數 >= 3 (包括當前用戶)
-            if valid_waiting_count >= 2 and waiting_user_data[user_id]["personality_type"]:
+            # 如果等待用戶數 >= 4 (包括當前用戶)
+            if valid_waiting_count >= 3 and waiting_user_data[user_id]["personality_type"]:
                 logger.info(f"嘗試與等待中的用戶組成新桌位，等待用戶數：{valid_waiting_count}")
                 
                 # 使用現有的配對算法將用戶分組
@@ -433,8 +433,8 @@ async def join_matching(
         
         # 返回加入等待名單的響應
     return {
-            "status": "waiting_matching",
-        "message": "您已加入聚餐配對等待名單",
+        "status": "waiting_matching",
+        "message": "您已加入聚餐等待名單",
         "group_id": None,
         "deadline": None
     }
@@ -448,7 +448,6 @@ async def auto_form_groups(
     自動成桌任務（週三 06:00 AM 觸發）
     若等待名單中用戶數≥3人，自動組成新桌位
     此API僅限授權的Cron任務調用
-    [未來可能會視情況移除]
     """
     # 實際實現會將此邏輯放入背景任務
     background_tasks.add_task(process_auto_form_groups, supabase)
