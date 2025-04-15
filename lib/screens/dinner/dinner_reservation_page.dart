@@ -74,9 +74,6 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     // 判斷當前週是單數週還是雙數週
     _isSingleWeek = weekNumber % 2 == 1;
 
-    // 設定本週聚餐日是星期一還是星期四
-    _weekdayText = _isSingleWeek ? '星期一' : '星期四';
-
     // 計算本週的聚餐日期 (先計算本週的開始日期，然後加上對應的天數)
     final int targetWeekday =
         _isSingleWeek ? DateTime.monday : DateTime.thursday;
@@ -92,8 +89,19 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     // 本週的目標聚餐日
     DateTime thisWeekTarget = thisWeekSunday.add(Duration(days: targetWeekday));
 
+    // 計算下一週的週數
+    final int nextWeekNumber = weekNumber + 1;
+    // 判斷下一週是單數週還是雙數週
+    final bool isNextWeekSingle = nextWeekNumber % 2 == 1;
+    // 設定下一週的目標聚餐日是星期一還是星期四
+    final int nextTargetWeekday =
+        isNextWeekSingle ? DateTime.monday : DateTime.thursday;
+    // 下一週的星期日
+    final DateTime nextWeekSunday = thisWeekSunday.add(const Duration(days: 7));
     // 下週的目標聚餐日
-    DateTime nextWeekTarget = thisWeekTarget.add(const Duration(days: 7));
+    DateTime nextWeekTarget = nextWeekSunday.add(
+      Duration(days: nextTargetWeekday),
+    );
 
     // 判斷是否已經過了本週的聚餐日，或者距離聚餐日不足2天
     // 用絕對時間來比較，而不只是日期，這樣可以更精確
@@ -107,6 +115,17 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     } else {
       // 否則預約本週聚餐
       _nextDinnerDate = thisWeekTarget;
+    }
+
+    // 根據最終確定的 _nextDinnerDate 來設定星期幾文字
+    if (_nextDinnerDate.weekday == DateTime.monday) {
+      _weekdayText = '星期一';
+    } else if (_nextDinnerDate.weekday == DateTime.thursday) {
+      _weekdayText = '星期四';
+    } else {
+      // 處理潛在錯誤，雖然正常情況下不應發生
+      _weekdayText = '未知';
+      debugPrint('錯誤：計算出的聚餐日既不是星期一也不是星期四: $_nextDinnerDate');
     }
 
     // 既然都是未來日期，所以一定可以預約
@@ -237,7 +256,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                               SizedBox(height: 20.h),
                               // 標題
                               Text(
-                                '下次聚餐時間',
+                                '預約聚餐',
                                 style: TextStyle(
                                   fontSize: 24.sp,
                                   fontFamily: 'OtsutomeFont',
@@ -248,7 +267,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                               SizedBox(height: 10.h),
                               // 說明文字
                               Text(
-                                '這次的活動在星期${_isSingleWeek ? "一" : "四"}舉行，歡迎預約參加',
+                                '下次活動在$_weekdayText舉行，歡迎預約參加',
                                 style: TextStyle(
                                   fontSize: 16.sp,
                                   fontFamily: 'OtsutomeFont',
@@ -258,15 +277,20 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
                               SizedBox(height: 25.h),
 
                               // 日期卡片（單周星期一或雙周星期四）
-                              _buildDateCard(
-                                context,
-                                _weekdayText,
-                                _isSingleWeek
-                                    ? 'assets/images/icon/mon.png'
-                                    : 'assets/images/icon/thu.png',
-                                '晚間 7:00',
-                                DateFormat('MM/dd').format(_nextDinnerDate),
-                              ),
+                              () {
+                                // 使用 IIFE (Immediately Invoked Function Expression) 來計算 iconPath
+                                String iconPath =
+                                    _nextDinnerDate.weekday == DateTime.monday
+                                        ? 'assets/images/icon/mon.png'
+                                        : 'assets/images/icon/thu.png';
+                                return _buildDateCard(
+                                  context,
+                                  _weekdayText,
+                                  iconPath,
+                                  '晚間 7:00',
+                                  DateFormat('MM/dd').format(_nextDinnerDate),
+                                );
+                              }(), // 立即調用此函數
 
                               SizedBox(height: 60.h),
 
