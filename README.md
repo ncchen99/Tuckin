@@ -1,4 +1,5 @@
-# ![Tuckin Logo](docs/images/logo-32.png) Tuckin 
+
+<img src="docs/images/tuckin-wide.png" alt="drawing" width="200"/>
 
 
 > 我們相信——每一次真誠的相遇，都是生命中值得珍藏的片段。於是，我們打造了 **Tuckin**，一個讓你在日常之中重新感受到連結與溫度的聚餐平臺。
