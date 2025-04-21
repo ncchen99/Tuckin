@@ -1,8 +1,22 @@
+<p align="center">
+<b>每一次的相遇，都是生命中值得珍藏的片段</b>
+</p>
+<p align="center">
+我們打造了 <b>Tuckin</b>，一個讓你在日常之中重新感受到連結與溫度的聚餐平臺
 
-<img src="docs/images/tuckin-wide.png" alt="drawing" width="200"/>
+</p>
 
+<br>
 
-> 我們相信——每一次真誠的相遇，都是生命中值得珍藏的片段。於是，我們打造了 **Tuckin**，一個讓你在日常之中重新感受到連結與溫度的聚餐平臺。
+<p align="center">
+  <img width="300" src="docs/images/tuckin-wide.png">
+  
+</p>
+
+<br>
+
+---
+
 
 Tuckin 所創造的，不只是聚餐的機會，而是一種讓生活有節奏地喘口氣、重新找回自己感覺的方式。我們用一餐飯的時間，給你一個小小的出口——說說話，認識人，也認識自己。
 
