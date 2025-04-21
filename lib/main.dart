@@ -17,6 +17,8 @@ import 'package:firebase_core/firebase_core.dart';
 // 添加導入IO庫用於網絡請求
 import 'package:http/http.dart' as http; // 添加HTTP包用於網絡請求
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:provider/provider.dart'; // 導入 Provider 套件
+import 'package:tuckin/services/user_status_service.dart'; // 導入 UserStatusService
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -539,139 +541,144 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     debugPrint('MyApp: 構建主應用，初始路由為: $initialRoute');
 
-    return ErrorHandlerProvider(
-      errorHandler: _errorHandler,
-      child: MaterialApp(
-        navigatorKey: navigatorKey, // 添加全局導航鍵
-        title: 'Tuckin',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-          scaffoldBackgroundColor: Colors.transparent,
-        ),
-        builder: (context, child) {
-          sizeConfig.init(context);
+    return MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => UserStatusService())],
+      child: ErrorHandlerProvider(
+        errorHandler: _errorHandler,
+        child: MaterialApp(
+          navigatorKey: navigatorKey,
+          title: 'Tuckin',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+            scaffoldBackgroundColor: Colors.transparent,
+          ),
+          builder: (context, child) {
+            sizeConfig.init(context);
 
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: const TextScaler.linear(1.0),
-              devicePixelRatio: 1.0,
-            ),
-            child: Stack(
-              children: [
-                SplashScreen(
-                  statusCheckDelay: 300,
-                  child: child ?? const SizedBox(),
-                ),
-                // 利用 Overlay 來顯示錯誤畫面，確保完全覆蓋
-                if (_isOffline ||
-                    (_errorHandler.hasError && _errorHandler.isNetworkError))
-                  ModalBarrier(
-                    dismissible: false,
-                    color: const Color.fromARGB(255, 222, 222, 222),
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(1.0),
+                devicePixelRatio: 1.0,
+              ),
+              child: Stack(
+                children: [
+                  SplashScreen(
+                    statusCheckDelay: 300,
+                    child: child ?? const SizedBox(),
                   ),
-                if (_isOffline ||
-                    (_errorHandler.hasError && _errorHandler.isNetworkError))
-                  Material(
-                    type: MaterialType.transparency,
-                    child: ErrorScreen(
-                      message:
-                          _isOffline
-                              ? '請檢查您的網路連線並重試'
-                              : (_errorHandler.errorMessage ?? '網絡連接錯誤'),
-                      onRetry: () {
-                        // 使用新的處理函數處理網絡重試邏輯
-                        _handleNetworkRetry(context);
-                      },
-                      isServerError: false,
-                      showButton: false, // 不顯示按鈕
+                  // 利用 Overlay 來顯示錯誤畫面，確保完全覆蓋
+                  if (_isOffline ||
+                      (_errorHandler.hasError && _errorHandler.isNetworkError))
+                    ModalBarrier(
+                      dismissible: false,
+                      color: const Color.fromARGB(255, 222, 222, 222),
                     ),
-                  ),
-                // 顯示其他錯誤
-                if (_errorHandler.hasError &&
-                    !_errorHandler.isNetworkError &&
-                    !_isOffline)
-                  ModalBarrier(
-                    dismissible: false,
-                    color: const Color.fromARGB(255, 222, 222, 222),
-                  ),
-                if (_errorHandler.hasError &&
-                    !_errorHandler.isNetworkError &&
-                    !_isOffline)
-                  Material(
-                    type: MaterialType.transparency,
-                    child: ErrorScreen(
-                      message: _errorHandler.errorMessage ?? '發生未知錯誤',
-                      onRetry: () {
-                        _errorHandler.clearError();
-                        // 避免使用 Navigator，而是通過狀態更新來隱藏錯誤畫面
-                        setState(() {});
-                      },
-                      isServerError: _errorHandler.isServerError,
+                  if (_isOffline ||
+                      (_errorHandler.hasError && _errorHandler.isNetworkError))
+                    Material(
+                      type: MaterialType.transparency,
+                      child: ErrorScreen(
+                        message:
+                            _isOffline
+                                ? '請檢查您的網路連線並重試'
+                                : (_errorHandler.errorMessage ?? '網絡連接錯誤'),
+                        onRetry: () {
+                          // 使用新的處理函數處理網絡重試邏輯
+                          _handleNetworkRetry(context);
+                        },
+                        isServerError: false,
+                        showButton: false, // 不顯示按鈕
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          );
-        },
-        navigatorObservers: [routeObserver],
-        initialRoute: initialRoute,
-        routes: {
-          // 初始頁面
-          '/': (context) => const WelcomeScreen(),
+                  // 顯示其他錯誤
+                  if (_errorHandler.hasError &&
+                      !_errorHandler.isNetworkError &&
+                      !_isOffline)
+                    ModalBarrier(
+                      dismissible: false,
+                      color: const Color.fromARGB(255, 222, 222, 222),
+                    ),
+                  if (_errorHandler.hasError &&
+                      !_errorHandler.isNetworkError &&
+                      !_isOffline)
+                    Material(
+                      type: MaterialType.transparency,
+                      child: ErrorScreen(
+                        message: _errorHandler.errorMessage ?? '發生未知錯誤',
+                        onRetry: () {
+                          _errorHandler.clearError();
+                          // 避免使用 Navigator，而是通過狀態更新來隱藏錯誤畫面
+                          setState(() {});
+                        },
+                        isServerError: _errorHandler.isServerError,
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+          navigatorObservers: [routeObserver],
+          initialRoute: initialRoute,
+          routes: {
+            // 初始頁面
+            '/': (context) => const WelcomeScreen(),
 
-          // 用戶引導頁面
-          '/login': (context) => const LoginPage(),
-          '/profile_setup': (context) => const ProfileSetupPage(),
-          '/food_preference': (context) => const FoodPreferencePage(),
-          '/personality_test': (context) => const PersonalityTestPage(),
+            // 用戶引導頁面
+            '/login': (context) => const LoginPage(),
+            '/profile_setup': (context) => const ProfileSetupPage(),
+            '/food_preference': (context) => const FoodPreferencePage(),
+            '/personality_test': (context) => const PersonalityTestPage(),
 
-          // 主流程頁面
-          '/home': (context) => const HomePage(),
-          '/dinner_reservation': (context) => const DinnerReservationPage(),
-          '/matching_status': (context) => const MatchingStatusPage(),
-          '/attendance_confirmation':
-              (context) => const AttendanceConfirmationPage(),
-          '/restaurant_selection': (context) => const RestaurantSelectionPage(),
-          '/restaurant_reservation':
-              (context) => const RestaurantReservationPage(),
-          '/dinner_info': (context) => const DinnerInfoPage(),
-          '/dinner_rating': (context) => const RatingPage(),
+            // 主流程頁面
+            '/home': (context) => const HomePage(),
+            '/dinner_reservation': (context) => const DinnerReservationPage(),
+            '/matching_status': (context) => const MatchingStatusPage(),
+            '/attendance_confirmation':
+                (context) => const AttendanceConfirmationPage(),
+            '/restaurant_selection':
+                (context) => const RestaurantSelectionPage(),
+            '/restaurant_reservation':
+                (context) => const RestaurantReservationPage(),
+            '/dinner_info': (context) => const DinnerInfoPage(),
+            '/dinner_rating': (context) => const RatingPage(),
 
-          // 個人資料與設定頁面
-          '/profile': (context) => const ProfilePage(),
+            // 個人資料與設定頁面
+            '/profile': (context) => const ProfilePage(),
 
-          // 狀態提示頁面
-          '/confirmation_timeout': (context) => const ConfirmationTimeoutPage(),
-          '/low_attendance': (context) => const LowAttendancePage(),
+            // 狀態提示頁面
+            '/confirmation_timeout':
+                (context) => const ConfirmationTimeoutPage(),
+            '/low_attendance': (context) => const LowAttendancePage(),
 
-          // 輔助頁面路由
-          // '/notifications': (context) => const NotificationsPage(),
-          // '/user_settings': (context) => const UserSettingsPage(),
-          // '/user_profile': (context) => const UserProfilePage(),
-          // '/help_faq': (context) => const HelpFaqPage(),
-        },
-        onGenerateRoute: (settings) {
-          debugPrint('正在產生路由: ${settings.name}');
+            // 輔助頁面路由
+            // '/notifications': (context) => const NotificationsPage(),
+            // '/user_settings': (context) => const UserSettingsPage(),
+            // '/user_profile': (context) => const UserProfilePage(),
+            // '/help_faq': (context) => const HelpFaqPage(),
+          },
+          onGenerateRoute: (settings) {
+            debugPrint('正在產生路由: ${settings.name}');
 
-          final uri = Uri.parse(settings.name ?? '/');
+            final uri = Uri.parse(settings.name ?? '/');
 
-          if (uri.pathSegments.length >= 2) {
-            if (uri.pathSegments[0] == 'dinner_info') {
-              final id = uri.pathSegments[1];
-              // 返回帶有ID參數的晚餐資訊頁面
-              // return MaterialPageRoute(
-              //   builder: (context) => DinnerInfoPage(dinnerId: id),
-              // );
+            if (uri.pathSegments.length >= 2) {
+              if (uri.pathSegments[0] == 'dinner_info') {
+                final id = uri.pathSegments[1];
+                // 返回帶有ID參數的晚餐資訊頁面
+                // return MaterialPageRoute(
+                //   builder: (context) => DinnerInfoPage(dinnerId: id),
+                // );
+              }
             }
-          }
 
-          return MaterialPageRoute(
-            builder:
-                (context) =>
-                    const Scaffold(body: Center(child: Text('404 - 頁面不存在'))),
-          );
-        },
-        debugShowCheckedModeBanner: false,
+            return MaterialPageRoute(
+              builder:
+                  (context) =>
+                      const Scaffold(body: Center(child: Text('404 - 頁面不存在'))),
+            );
+          },
+          debugShowCheckedModeBanner: false,
+        ),
       ),
     );
   }

@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'dart:async'; // <--- 新增導入
 import 'package:flutter/rendering.dart'; // <--- 新增導入
+import 'package:tuckin/services/user_status_service.dart'; // <-- 引入 UserStatusService
+import 'package:provider/provider.dart'; // <-- 引入 Provider
 
 // 頁面階段狀態
 enum PageStage {
@@ -481,6 +483,15 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         throw Exception('用戶未登入');
       }
 
+      // 在處理任何操作前，先儲存預計的聚餐時間 (修改)
+      // 使用 Provider 獲取 UserStatusService 實例
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
+      );
+      userStatusService.updateStatus(confirmedDinnerTime: _nextDinnerTime);
+      debugPrint('儲存聚餐時間到 UserStatusService: $_nextDinnerTime');
+
       switch (_currentStage) {
         case PageStage.reserve:
         case PageStage.nextWeek:
@@ -533,10 +544,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
           if (response.status == 'waiting_confirmation' &&
               response.deadline != null) {
             // 成功加入桌位，導航到確認出席頁面
-            _navigationService.navigateToAttendanceConfirmation(
-              context,
-              deadline: response.deadline,
-            );
+            // 更新 UserStatusService (修改)
+            userStatusService.updateStatus(replyDeadline: response.deadline);
+            _navigationService.navigateToAttendanceConfirmation(context);
           } else if (response.status == 'waiting_matching') {
             print('伺服器回應訊息: ${response.message}');
             // 進入等待配對狀態

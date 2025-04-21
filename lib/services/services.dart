@@ -11,3 +11,4 @@ export 'restaurant_service.dart';
 export 'supabase_service.dart';
 export 'realtime_service.dart';
 export 'matching_service.dart';
+export 'user_status_service.dart';

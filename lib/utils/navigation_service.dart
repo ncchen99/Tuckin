@@ -352,14 +352,8 @@ class NavigationService {
   }
 
   /// 導航到出席確認頁面
-  void navigateToAttendanceConfirmation(
-    BuildContext context, {
-    DateTime? deadline,
-  }) {
-    Navigator.of(context).pushReplacementNamed(
-      '/attendance_confirmation',
-      arguments: {'deadline': deadline},
-    );
+  void navigateToAttendanceConfirmation(BuildContext context) {
+    Navigator.of(context).pushReplacementNamed('/attendance_confirmation');
   }
 
   /// 導航到餐廳選擇頁面

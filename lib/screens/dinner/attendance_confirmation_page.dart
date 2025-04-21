@@ -4,6 +4,8 @@ import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart'; // 包含 NavigationService
 import 'dart:async';
+import 'package:tuckin/services/user_status_service.dart'; // <-- 引入 UserStatusService
+import 'package:provider/provider.dart'; // <-- 引入 Provider
 
 class AttendanceConfirmationPage extends StatefulWidget {
   const AttendanceConfirmationPage({super.key});
@@ -40,6 +42,7 @@ class _AttendanceConfirmationPageState
         debugPrint('AttendanceConfirmationPage 完全渲染');
 
         // 嘗試從路由參數獲取截止時間
+        /* // <-- 移除從路由參數獲取 deadline 的邏輯
         final args =
             ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         if (args != null && args.containsKey('deadline')) {
@@ -48,6 +51,17 @@ class _AttendanceConfirmationPageState
           });
           debugPrint('從路由參數獲取截止時間: $_confirmDeadline');
         }
+        */
+
+        // 從 UserStatusService 獲取截止時間 (修改)
+        final userStatusService = Provider.of<UserStatusService>(
+          context,
+          listen: false,
+        );
+        setState(() {
+          _confirmDeadline = userStatusService.replyDeadline;
+        });
+        debugPrint('從 UserStatusService 獲取截止時間: $_confirmDeadline');
 
         // 加載聚餐信息
         _loadDinnerInfo();
@@ -83,12 +97,24 @@ class _AttendanceConfirmationPageState
           debugPrint('未從路由參數獲取到期限，使用默認值: $_confirmDeadline');
         }
 
-        // 獲取聚餐日期
-        final DateTime now = DateTime.now();
-        final DateTime dinnerTime = now.add(const Duration(days: 1));
+        // 從 UserStatusService 獲取聚餐日期 (修改)
+        final userStatusService = Provider.of<UserStatusService>(
+          context,
+          listen: false,
+        );
+        final DateTime? dinnerTime = userStatusService.confirmedDinnerTime;
+        if (dinnerTime == null) {
+          // 如果無法獲取時間，則記錄錯誤並使用預設值
+          debugPrint(
+            '警告：無法從 UserStatusService 獲取 confirmedDinnerTime，使用當前時間+1天',
+          );
+          final DateTime now = DateTime.now();
+          _dinnerTime = now.add(const Duration(days: 1));
+        } else {
+          _dinnerTime = dinnerTime;
+        }
 
         setState(() {
-          _dinnerTime = dinnerTime;
           _isLoading = false;
         });
 
