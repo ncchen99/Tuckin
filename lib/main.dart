@@ -107,10 +107,20 @@ Future<bool> _initializeServices(ErrorHandler errorHandler) async {
         isServerError: false,
         isNetworkError: true,
         onRetry: () async {
-          try {
-            await _initializeServices(errorHandler);
-          } catch (retryError) {
-            debugPrint('重試初始化服務錯誤: $retryError');
+          // 網絡重試邏輯...
+          debugPrint('用戶點擊重試按鈕，重新測試網絡連接...');
+          bool retryNetworkConnected = await _testNetworkConnection();
+          if (retryNetworkConnected) {
+            debugPrint('網絡連接已恢復，繼續應用流程');
+            errorHandler.clearError();
+            bool servicesInitialized = await _initializeServices(errorHandler);
+            if (servicesInitialized) {
+              initialRoute = await _determineInitialRoute();
+              await _initializeNotificationService();
+              runApp(MyApp(errorHandler: errorHandler));
+            }
+          } else {
+            debugPrint('網絡連接仍然不可用');
           }
         },
       );
@@ -129,11 +139,18 @@ Future<bool> _initializeServices(ErrorHandler errorHandler) async {
 // 確定初始路由的函數
 Future<String> _determineInitialRoute() async {
   try {
+    debugPrint('_determineInitialRoute: 開始獲取初始路由');
     String route = await NavigationService().determineInitialRoute();
-    debugPrint('設置初始路由為: $route');
+    debugPrint('_determineInitialRoute: 設置初始路由為: $route');
+
+    // 添加全局初始路由變量的賦值
+    initialRoute = route;
+    debugPrint('_determineInitialRoute: 已將全局 initialRoute 設置為 $initialRoute');
+
     return route;
   } catch (e) {
-    debugPrint('確定初始路由出錯: $e');
+    debugPrint('_determineInitialRoute: 確定初始路由出錯: $e');
+    debugPrintStack(label: '初始路由確定錯誤堆疊');
     return '/';
   }
 }
@@ -157,36 +174,50 @@ Future<void> _initializeNotificationService() async {
 }
 
 void main() async {
-  // 保留原生啟動畫面
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-  // 設置固定方向，防止方向改變導致佈局變化
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  // 一開始先顯示 LoadingScreen，包裹在 MaterialApp 中確保有正確的 Directionality
+  runApp(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: LoadingScreen(
+        status: '正在啟動應用...',
+        displayDuration: 500, // 延長顯示時間為 0.5 秒
+        onLoadingComplete: () async {
+          // 在 LoadingScreen 顯示時，進行所有初始化操作
+          await _initializeApp();
+        },
+      ),
+      theme: ThemeData(scaffoldBackgroundColor: Colors.white),
+    ),
+  );
 
-  // 這個標誌用於追蹤初始化是否成功
+  // 立即移除原生啟動畫面，這樣就能看到 LoadingScreen
+  FlutterNativeSplash.remove();
+
+  // 設置固定方向
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+}
+
+// 將應用初始化邏輯提取到單獨函數中
+Future<void> _initializeApp() async {
+  final errorHandler = ErrorHandler();
   bool initSuccess = false;
 
-  // 創建 ErrorHandler 實例
-  final errorHandler = ErrorHandler();
-
   try {
-    // 加載環境變數
     await dotenv.load(fileName: '.env');
     debugPrint('環境變數加載成功。變數數量: ${dotenv.env.length}');
     initSuccess = true;
   } catch (e) {
     debugPrint('環境變數加載錯誤: $e');
-    // 繼續執行，但使用默認值
   }
 
-  // 檢查網絡連接是否可用
   bool isNetworkConnected = false;
   try {
     debugPrint('正在測試網絡連接...');
     isNetworkConnected = await _testNetworkConnection();
     debugPrint('網絡連接測試結果: ${isNetworkConnected ? '成功' : '失敗'}');
-
     if (!isNetworkConnected) {
       debugPrint('網絡連接測試失敗，顯示錯誤訊息');
       errorHandler.showError(
@@ -194,32 +225,7 @@ void main() async {
         isServerError: false,
         isNetworkError: true,
         onRetry: () async {
-          // 重新測試網絡連接
-          debugPrint('用戶點擊重試按鈕，重新測試網絡連接...');
-          bool retryNetworkConnected = await _testNetworkConnection();
-
-          if (retryNetworkConnected) {
-            // 如果網絡連接恢復，清除錯誤並繼續應用流程
-            debugPrint('網絡連接已恢復，繼續應用流程');
-            errorHandler.clearError();
-
-            // 初始化服務
-            bool servicesInitialized = await _initializeServices(errorHandler);
-
-            if (servicesInitialized) {
-              // 繼續加載應用
-              initialRoute = await _determineInitialRoute();
-
-              // 初始化通知服務
-              await _initializeNotificationService();
-
-              // 重新加載主應用
-              runApp(MyApp(errorHandler: errorHandler));
-            }
-          } else {
-            // 如果網絡仍然不可用，保持錯誤狀態
-            debugPrint('網絡連接仍然不可用');
-          }
+          // 網絡重試邏輯...
         },
       );
     }
@@ -228,33 +234,34 @@ void main() async {
     isNetworkConnected = false;
   }
 
-  // 只有在網絡連接可用時才初始化服務
   if (isNetworkConnected) {
     await _initializeServices(errorHandler);
   }
 
-  // 初始化 Firebase
   try {
     await Firebase.initializeApp();
     debugPrint('Firebase 初始化成功');
   } catch (e) {
     debugPrint('Firebase 初始化錯誤: $e');
-    // 繼續執行，因為部分功能可能仍然可用
+    debugPrintStack(label: 'Firebase 初始化錯誤堆疊');
   }
 
-  // 只有在前面步驟成功的情況下才嘗試確定初始路由
+  // 重要：在決定初始路由之前不要構建主應用
   if (initSuccess) {
+    // 獲取初始路由
     initialRoute = await _determineInitialRoute();
     await _initializeNotificationService();
+
+    debugPrint('所有初始化完成，開始運行主應用 - 初始路由為: $initialRoute');
+
+    // 確保在所有準備工作完成後才運行主應用
+    runApp(MyApp(errorHandler: errorHandler));
   } else {
     debugPrint('初始化未成功，使用默認路由: /');
     initialRoute = '/';
+    // 即使初始化失敗，也運行主應用以顯示錯誤訊息
+    runApp(MyApp(errorHandler: errorHandler));
   }
-
-  runApp(MyApp(errorHandler: errorHandler));
-
-  // 移除原生啟動畫面
-  FlutterNativeSplash.remove();
 }
 
 class MyApp extends StatefulWidget {
@@ -273,6 +280,8 @@ class _MyAppState extends State<MyApp> {
   StreamSubscription<bool>? _errorSubscription;
   // 添加狀態標記，表示正在測試網絡
   bool _isTestingNetwork = false;
+  // 添加標記，表示是否是首次構建
+  bool _isFirstBuild = true;
 
   // 添加生命週期觀察者變數
   final _lifecycleEventHandler = _LifecycleEventHandler();
@@ -539,7 +548,17 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('MyApp: 構建主應用，初始路由為: $initialRoute');
+    if (_isFirstBuild) {
+      debugPrint('MyApp.build: 首次構建，使用已設置的初始路由: $initialRoute');
+      _isFirstBuild = false;
+    } else {
+      debugPrint('MyApp.build: 非首次構建，保持當前狀態');
+    }
+
+    debugPrint('MyApp.build: 構建主應用，全局初始路由為: $initialRoute');
+    debugPrint(
+      'MyApp.build: 是否為離線狀態: $_isOffline, 是否有錯誤: ${_errorHandler.hasError}',
+    );
 
     return MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => UserStatusService())],
@@ -562,10 +581,8 @@ class _MyAppState extends State<MyApp> {
               ),
               child: Stack(
                 children: [
-                  SplashScreen(
-                    statusCheckDelay: 300,
-                    child: child ?? const SizedBox(),
-                  ),
+                  // 直接顯示 child，不再包 SplashScreen
+                  child ?? const SizedBox(),
                   // 利用 Overlay 來顯示錯誤畫面，確保完全覆蓋
                   if (_isOffline ||
                       (_errorHandler.hasError && _errorHandler.isNetworkError))
