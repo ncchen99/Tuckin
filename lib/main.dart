@@ -561,7 +561,15 @@ class _MyAppState extends State<MyApp> {
     );
 
     return MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => UserStatusService())],
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) {
+            final service = UserStatusService();
+            return service;
+          },
+          lazy: false, // 立即創建，不等到第一次訪問時才創建
+        ),
+      ],
       child: ErrorHandlerProvider(
         errorHandler: _errorHandler,
         child: MaterialApp(

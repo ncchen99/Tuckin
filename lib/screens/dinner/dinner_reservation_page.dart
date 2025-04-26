@@ -30,8 +30,6 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   bool _isProcessing = false;
   // 是否為校內email
   bool _isSchoolEmail = false;
-  // 添加一個狀態來控制"正在尋找中"的提示框
-  bool _showSearchingTip = false;
   // 添加服務
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
@@ -53,7 +51,12 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   void initState() {
     super.initState();
     _checkIfNewUser();
-    _calculateDates();
+    // 確保 Provider 中的數據加載完成後再計算日期
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _calculateDates();
+      }
+    });
     _loadUserPreferences();
     _checkUserEmail();
     _scheduleHourlyUpdate(); // 啟動計時器調度
@@ -131,11 +134,26 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         userStatus: userStatus,
       );
 
-      // 檢查用戶狀態（如果是booking狀態且在參加階段，顯示參加按鈕）
-      await _checkUserStateForJoinPhase();
-
       // 設定按鈕文字和說明文字
       _updateTextsBasedOnStage();
+
+      // 使用 Provider 將聚餐時間和取消截止日期儲存到 UserStatusService 中
+      if (mounted) {
+        final userStatusService = Provider.of<UserStatusService>(
+          context,
+          listen: false,
+        );
+        userStatusService.updateStatus(
+          confirmedDinnerTime: _dinnerTimeInfo!.nextDinnerTime,
+          cancelDeadline: _dinnerTimeInfo!.cancelDeadline,
+        );
+        debugPrint(
+          '儲存聚餐時間到 UserStatusService: ${_dinnerTimeInfo!.nextDinnerTime}',
+        );
+        debugPrint(
+          '儲存取消截止時間到 UserStatusService: ${_dinnerTimeInfo!.cancelDeadline}',
+        );
+      }
 
       // 強制刷新UI
       if (mounted) {
@@ -146,46 +164,12 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
     }
   }
 
-  // 根據用戶狀態確定是否顯示「參加」按鈕
-  Future<void> _checkUserStateForJoinPhase() async {
-    // 如果當前是參加階段
-    if (_dinnerTimeInfo!.currentStage == DinnerPageStage.join) {
-      try {
-        final currentUser = await _authService.getCurrentUser();
-        if (currentUser != null) {
-          final userStatus = await _databaseService.getUserStatus(
-            currentUser.id,
-          );
-          // 如果用戶狀態不是booking，則應該顯示下週聚餐
-          if (userStatus != 'booking') {
-            _dinnerTimeInfo = DinnerTimeInfo(
-              nextDinnerDate: _dinnerTimeInfo!.nextDinnerDate,
-              nextDinnerTime: _dinnerTimeInfo!.nextDinnerTime,
-              isSingleWeek: _dinnerTimeInfo!.isSingleWeek,
-              weekdayText: _dinnerTimeInfo!.weekdayText,
-              currentStage: DinnerPageStage.nextWeek, // 更改為下週階段
-              cancelDeadline: _dinnerTimeInfo!.cancelDeadline,
-              joinPhaseStart: _dinnerTimeInfo!.joinPhaseStart,
-              joinPhaseEnd: _dinnerTimeInfo!.joinPhaseEnd,
-            );
-          }
-        }
-      } catch (error) {
-        debugPrint('檢查用戶狀態錯誤: $error');
-      }
-    }
-  }
-
   // 更新按鈕文字和說明文字
   void _updateTextsBasedOnStage() {
     switch (_dinnerTimeInfo!.currentStage) {
       case DinnerPageStage.reserve:
         _buttonText = '預約';
         _descriptionText = '下次活動在${_dinnerTimeInfo!.weekdayText}舉行，歡迎預約參加';
-        break;
-      case DinnerPageStage.join:
-        _buttonText = '參加';
-        _descriptionText = '本週聚餐在${_dinnerTimeInfo!.weekdayText}舉行，立即點擊參加！';
         break;
       case DinnerPageStage.nextWeek:
         _buttonText = '預約';
@@ -288,96 +272,38 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         throw Exception('用戶未登入');
       }
 
-      // 在處理任何操作前，先儲存預計的聚餐時間
+      // 在處理任何操作前，獲取 UserStatusService 實例
       // 使用 Provider 獲取 UserStatusService 實例
       final userStatusService = Provider.of<UserStatusService>(
         context,
         listen: false,
       );
+
+      // 只更新聚餐時間，不覆蓋其他值
       userStatusService.updateStatus(
         confirmedDinnerTime: _dinnerTimeInfo!.nextDinnerTime,
       );
-      debugPrint(
-        '儲存聚餐時間到 UserStatusService: ${_dinnerTimeInfo!.nextDinnerTime}',
+      debugPrint('確認聚餐時間: ${_dinnerTimeInfo!.nextDinnerTime}');
+
+      // 無論是哪種階段，都使用相同的預約邏輯
+      // 儲存用戶的配對偏好
+      await _databaseService.updateUserMatchingPreference(
+        currentUser.id,
+        _isSchoolEmail ? _onlyNckuStudents : false,
       );
 
-      switch (_dinnerTimeInfo!.currentStage) {
-        case DinnerPageStage.reserve:
-        case DinnerPageStage.nextWeek:
-          // 預約邏輯 - 同原本的邏輯
-          // 儲存用戶的配對偏好
-          await _databaseService.updateUserMatchingPreference(
-            currentUser.id,
-            _isSchoolEmail ? _onlyNckuStudents : false,
-          );
+      // 更新用戶狀態為等待配對階段
+      await _databaseService.updateUserStatus(
+        currentUser.id,
+        'waiting_matching',
+      );
 
-          // 更新用戶狀態為等待配對階段
-          await _databaseService.updateUserStatus(
-            currentUser.id,
-            'waiting_matching',
-          );
-
-          // 延遲一下導航到配對狀態頁面
-          if (!mounted) return;
-          await Future.delayed(const Duration(seconds: 1));
-          await _navigateToMatchingStatus();
-          break;
-
-        case DinnerPageStage.join:
-          // 顯示正在尋找中的提示
-          if (mounted) {
-            setState(() {
-              _showSearchingTip = true;
-            });
-          }
-
-          // 儲存用戶的配對偏好
-          await _databaseService.updateUserMatchingPreference(
-            currentUser.id,
-            _isSchoolEmail ? _onlyNckuStudents : false,
-          );
-
-          // 參加邏輯 - 呼叫後端API
-          final response = await _matchingService.joinMatching();
-
-          if (!mounted) return;
-
-          // 隱藏提示框
-          if (mounted) {
-            setState(() {
-              _showSearchingTip = false;
-            });
-          }
-
-          // 根據API回應進行導航
-          if (response.status == 'waiting_restaurant' &&
-              response.deadline != null) {
-            // 成功加入桌位，導航到確認出席頁面
-            // 更新 UserStatusService
-            userStatusService.updateStatus(replyDeadline: response.deadline);
-            _navigationService.navigateToAttendanceConfirmation(context);
-          } else if (response.status == 'waiting_matching') {
-            print('伺服器回應訊息: ${response.message}');
-            // 進入等待配對狀態
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  response.message,
-                  style: TextStyle(fontFamily: 'OtsutomeFont'),
-                ),
-              ),
-            );
-            await _navigateToMatchingStatus();
-          } else {
-            // 其他狀態，直接導航到對應頁面
-            await _navigateToMatchingStatus();
-          }
-          break;
-      }
+      // 延遲一下導航到配對狀態頁面
+      if (!mounted) return;
+      await Future.delayed(const Duration(seconds: 1));
+      await _navigateToMatchingStatus();
     } catch (e) {
-      debugPrint(
-        '${_dinnerTimeInfo!.currentStage == DinnerPageStage.join ? "參加" : "預約"}時出錯: $e',
-      );
+      debugPrint('預約時出錯: $e');
       // 出錯時恢復狀態
       if (mounted) {
         setState(() {
@@ -386,7 +312,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${_dinnerTimeInfo!.currentStage == DinnerPageStage.join ? "參加" : "預約"}失敗: $e',
+              '預約失敗: $e',
               style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
             ),
           ),
@@ -430,12 +356,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                               SizedBox(height: 20.h),
                               // 標題
                               Text(
-                                _dinnerTimeInfo!.currentStage ==
-                                            DinnerPageStage.reserve ||
-                                        _dinnerTimeInfo!.currentStage ==
-                                            DinnerPageStage.nextWeek
-                                    ? '預約聚餐'
-                                    : '參加聚餐',
+                                '預約聚餐',
                                 style: TextStyle(
                                   fontSize: 24.sp,
                                   fontFamily: 'OtsutomeFont',
@@ -543,17 +464,6 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                       onHide: () {
                         // 提示框完全隱藏後的回調
                       },
-                    ),
-                  ),
-                // 顯示 "正在尋找中..." 提示框
-                if (_showSearchingTip)
-                  Positioned(
-                    top: 18.h, // 與歡迎提示框相同位置或自訂
-                    right: 20.w, // 與歡迎提示框相同位置或自訂
-                    child: InfoTipBox(
-                      message: '正在尋找中...',
-                      show: _showSearchingTip,
-                      onHide: () {}, // 不需要特殊處理
                     ),
                   ),
               ],
