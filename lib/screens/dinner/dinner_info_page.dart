@@ -167,6 +167,28 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     }
   }
 
+  // 在 _DinnerInfoPageState 類中添加此輔助方法，用於獲取星期的簡短表示
+  String _getWeekdayShort(int weekday) {
+    switch (weekday) {
+      case DateTime.monday:
+        return '一';
+      case DateTime.tuesday:
+        return '二';
+      case DateTime.wednesday:
+        return '三';
+      case DateTime.thursday:
+        return '四';
+      case DateTime.friday:
+        return '五';
+      case DateTime.saturday:
+        return '六';
+      case DateTime.sunday:
+        return '日';
+      default:
+        return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 獲取 UserStatusService 以便在 UI 中使用
@@ -213,12 +235,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     if (_userStatus == 'waiting_other_users') {
       content = Column(
         children: [
-          SizedBox(height: 60.h),
+          SizedBox(height: 40.h),
 
           // 提示文字
           Center(
             child: Text(
-              '正在等待大家選擇餐廳',
+              '等待大家選擇餐廳歐',
               style: TextStyle(
                 fontSize: 24.sp,
                 fontFamily: 'OtsutomeFont',
@@ -262,14 +284,17 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             ),
           ),
 
-          SizedBox(height: 70.h),
+          SizedBox(height: 40.h),
 
-          // 聚餐時間顯示
+          // 聚餐時間顯示卡片 - 使用與 dinner_reservation_page 相同的風格
           Center(
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 15.h),
+              // 移除固定寬度，使用內容自適應寬度
+              // width: MediaQuery.of(context).size.width - 48.w,
+              margin: EdgeInsets.symmetric(horizontal: 24.w),
+              padding: EdgeInsets.symmetric(vertical: 20.h, horizontal: 15.w),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(15.r),
                 boxShadow: [
                   BoxShadow(
@@ -279,27 +304,81 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                   ),
                 ],
               ),
-              child: Column(
-                children: [
-                  Text(
-                    '聚餐日期時間',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
-                      fontWeight: FontWeight.bold,
+              child: IntrinsicWidth(
+                // 使用 IntrinsicWidth 讓容器寬度適應內容
+                child: Row(
+                  mainAxisSize: MainAxisSize.min, // 設置為最小寬度
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // 左側 - 時間圖標及陰影
+                    SizedBox(
+                      width: 75.w,
+                      height: 75.h,
+                      child: Stack(
+                        clipBehavior: Clip.none, // 允許陰影超出容器範圍
+                        children: [
+                          // 底部陰影
+                          Positioned(
+                            left: 0,
+                            top: 3.h,
+                            child: Image.asset(
+                              dinnerTime != null &&
+                                      dinnerTime.weekday == DateTime.monday
+                                  ? 'assets/images/icon/mon.png'
+                                  : 'assets/images/icon/thu.png',
+                              width: 75.w,
+                              height: 75.h,
+                              color: Colors.black.withOpacity(0.4),
+                              colorBlendMode: BlendMode.srcIn,
+                            ),
+                          ),
+                          // 主圖標
+                          Image.asset(
+                            dinnerTime != null &&
+                                    dinnerTime.weekday == DateTime.monday
+                                ? 'assets/images/icon/mon.png'
+                                : 'assets/images/icon/thu.png',
+                            width: 75.w,
+                            height: 75.h,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 10.h),
-                  Text(
-                    dinnerTimeFormatted,
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF23456B),
+
+                    SizedBox(width: 10.w),
+
+                    // 右側 - 增加垂直排列以容納標題和時間
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 聚餐時間標題
+                        Text(
+                          "聚餐時間：",
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontFamily: 'OtsutomeFont',
+                            color: const Color(0xFF666666),
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+                        // 單行顯示日期和時間信息
+                        Text(
+                          dinnerTime != null
+                              ? '${dinnerTime.month}月${dinnerTime.day}日（${_getWeekdayShort(dinnerTime.weekday)}）${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}'
+                              : '-- 月 -- 日（-）--:--',
+                          style: TextStyle(
+                            fontSize: 18.sp,
+                            fontFamily: 'OtsutomeFont',
+                            color: const Color(0xFF23456B),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    SizedBox(width: 10.w),
+                  ],
+                ),
               ),
             ),
           ),
