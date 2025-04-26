@@ -5,6 +5,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/supabase_service.dart';
 import 'package:tuckin/utils/index.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter/foundation.dart';
 
 /// 通知服務，處理推送通知相關邏輯
 class NotificationService {
@@ -15,14 +18,22 @@ class NotificationService {
 
   // 服務實例
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications =
-      FlutterLocalNotificationsPlugin();
+  late FlutterLocalNotificationsPlugin _localNotifications;
   final DatabaseService _databaseService = DatabaseService();
   final SupabaseService _supabaseService = SupabaseService();
   final NavigationService _navigationService = NavigationService();
 
   // 註冊全局導航上下文
   GlobalKey<NavigatorState>? _navigatorKey;
+
+  // 定義通知頻道
+  static const AndroidNotificationChannel _reservationChannel =
+      AndroidNotificationChannel(
+        'reservation_channel',
+        '預約提醒',
+        description: '用於顯示晚餐預約的提醒通知',
+        importance: Importance.max,
+      );
 
   // 初始化通知服務
   Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
@@ -41,7 +52,7 @@ class NotificationService {
       await _requestPermission();
 
       // 初始化本地通知
-      await _initializeLocalNotifications();
+      await _initNotifications();
 
       // 清除所有現有通知
       await clearAllNotifications();
@@ -93,34 +104,36 @@ class NotificationService {
   }
 
   // 初始化本地通知
-  Future<void> _initializeLocalNotifications() async {
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@drawable/notification_icon');
-
-    const InitializationSettings initSettings = InitializationSettings(
-      android: androidSettings,
-    );
-
+  Future<void> _initNotifications() async {
+    _localNotifications = FlutterLocalNotificationsPlugin();
     await _localNotifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        _handleLocalNotificationClick(response.payload);
-      },
+      InitializationSettings(
+        android: AndroidInitializationSettings('@drawable/notification_icon'),
+      ),
     );
 
     // 創建通知頻道
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'tuckin_notification_channel',
-      'TuckIn 通知',
-      description: '用於接收聚餐相關通知',
-      importance: Importance.high,
-    );
+    await _createNotificationChannels();
+  }
 
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(channel);
+  // 創建所有需要的通知頻道
+  Future<void> _createNotificationChannels() async {
+    try {
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      if (androidPlugin != null) {
+        await androidPlugin.createNotificationChannel(_reservationChannel);
+        debugPrint('通知頻道創建成功: ${_reservationChannel.id}');
+      } else {
+        debugPrint('無法獲取Android通知插件實例');
+      }
+    } catch (e) {
+      debugPrint('創建通知頻道時出錯: $e');
+    }
   }
 
   // 保存 FCM token 到 Supabase
@@ -256,6 +269,267 @@ class NotificationService {
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
       debugPrint('清除通知錯誤: $e');
+    }
+  }
+
+  // 排程本地通知
+  Future<void> scheduleNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledDate,
+    String? payload,
+    String channelId = 'tuckin_notification_channel',
+    String channelName = 'TuckIn 通知',
+    String channelDescription = '用於接收聚餐相關通知',
+  }) async {
+    try {
+      debugPrint('開始排程通知，ID: $id，時間: ${scheduledDate.toString()}');
+
+      // 確保通知頻道已創建
+      final AndroidNotificationChannel channel = AndroidNotificationChannel(
+        channelId,
+        channelName,
+        description: channelDescription,
+        importance: Importance.max,
+      );
+
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      if (androidPlugin != null) {
+        await androidPlugin.createNotificationChannel(channel);
+        debugPrint('已為排程通知創建頻道: ${channel.id}');
+      } else {
+        debugPrint('無法獲取Android通知插件實例');
+      }
+
+      final androidPlatformChannelSpecifics = AndroidNotificationDetails(
+        channelId,
+        channelName,
+        channelDescription: channelDescription,
+        importance: Importance.max,
+        priority: Priority.high,
+        icon: '@drawable/notification_icon',
+        showWhen: true,
+        color: const Color(0xFFB33D1C),
+      );
+
+      final platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+      );
+
+      final tz.TZDateTime tzScheduledDate = tz.TZDateTime.from(
+        scheduledDate,
+        tz.local,
+      );
+
+      debugPrint('排程通知時間（本地）: ${scheduledDate.toString()}');
+      debugPrint('排程通知時間（時區轉換後）: ${tzScheduledDate.toString()}');
+
+      // 檢查設備 API 版本並嘗試排程
+      try {
+        // 嘗試使用精確鬧鐘
+        await _localNotifications.zonedSchedule(
+          id,
+          title,
+          body,
+          tzScheduledDate,
+          platformChannelSpecifics,
+          androidAllowWhileIdle: true,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: payload,
+        );
+
+        debugPrint('成功排程精確通知，ID: $id，時間: $scheduledDate');
+        debugPrint('通知詳情 - 標題: $title, 內容: $body');
+
+        // 不再同時使用備用通知，僅記錄成功
+        debugPrint('首選通知機制成功，不使用備用通知');
+      } catch (e) {
+        debugPrint('精確排程通知失敗: $e，嘗試使用備用通知機制');
+
+        // 只有在精確通知失敗時，才使用備用通知機制
+        if (scheduledDate.isAfter(DateTime.now())) {
+          _scheduleBackupNotification(
+            id: id, // 使用相同ID，因為主通知沒有成功
+            title: title,
+            body: body,
+            scheduledDate: scheduledDate,
+            platformChannelSpecifics: platformChannelSpecifics,
+            payload: payload,
+          );
+        } else {
+          // 如果時間已經過了，則立即顯示通知
+          try {
+            await _localNotifications.show(
+              id,
+              title,
+              body,
+              platformChannelSpecifics,
+              payload: payload,
+            );
+            debugPrint('已發送即時通知，因為排程時間已過');
+          } catch (showError) {
+            debugPrint('發送即時通知失敗: $showError');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('排程通知錯誤: $e');
+    }
+  }
+
+  // 使用延遲而非精確排程的備用通知方法
+  void _scheduleBackupNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledDate,
+    required NotificationDetails platformChannelSpecifics,
+    String? payload,
+  }) {
+    if (scheduledDate.isAfter(DateTime.now())) {
+      final difference = scheduledDate.difference(DateTime.now());
+      debugPrint('設置備用延遲通知，將在 ${difference.inMinutes} 分鐘後顯示（非精確排程）');
+
+      // 使用延遲而非精確排程
+      Future.delayed(difference, () async {
+        try {
+          await _localNotifications.show(
+            id,
+            title,
+            body,
+            platformChannelSpecifics,
+            payload: payload,
+          );
+          debugPrint('備用延遲通知已觸發，ID: $id');
+        } catch (e) {
+          debugPrint('備用延遲通知失敗: $e');
+        }
+      });
+    } else {
+      debugPrint('排程時間已過，不設置備用延遲通知');
+    }
+  }
+
+  // 取消特定通知
+  Future<void> cancelNotification(int id) async {
+    try {
+      await _localNotifications.cancel(id);
+      debugPrint('已取消通知，ID: $id');
+    } catch (e) {
+      debugPrint('取消通知錯誤: $e');
+    }
+  }
+
+  Future<void> scheduleReservationReminder({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledTime,
+  }) async {
+    try {
+      debugPrint('開始排程預約提醒通知，ID: $id，時間: ${scheduledTime.toString()}');
+
+      // 確保通知頻道已創建
+      const AndroidNotificationChannel channel = AndroidNotificationChannel(
+        'reservation_channel',
+        '預約提醒',
+        description: '用於顯示晚餐預約的提醒通知',
+        importance: Importance.max,
+      );
+
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      if (androidPlugin != null) {
+        await androidPlugin.createNotificationChannel(channel);
+        debugPrint('已為預約提醒通知創建頻道: ${channel.id}');
+      } else {
+        debugPrint('無法獲取Android通知插件實例');
+      }
+
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+          AndroidNotificationDetails(
+            'reservation_channel',
+            '預約提醒',
+            channelDescription: '用於顯示晚餐預約的提醒通知',
+            importance: Importance.max,
+            priority: Priority.high,
+            showWhen: true,
+            icon: '@drawable/notification_icon',
+            color: Color(0xFFB33D1C),
+          );
+
+      const NotificationDetails platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+      );
+
+      final tz.TZDateTime tzScheduledDate = tz.TZDateTime.from(
+        scheduledTime,
+        tz.local,
+      );
+
+      debugPrint('排程預約提醒時間（本地）: ${scheduledTime.toString()}');
+      debugPrint('排程預約提醒時間（時區轉換後）: ${tzScheduledDate.toString()}');
+
+      try {
+        // 嘗試使用精確鬧鐘
+        await _localNotifications.zonedSchedule(
+          id,
+          title,
+          body,
+          tzScheduledDate,
+          platformChannelSpecifics,
+          androidAllowWhileIdle: true,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+
+        debugPrint('成功排程精確預約提醒通知，ID: $id，時間: $scheduledTime');
+        debugPrint('通知詳情 - 標題: $title, 內容: $body');
+
+        // 不再同時使用備用通知，僅記錄成功
+        debugPrint('首選通知機制成功，不使用備用通知');
+      } catch (e) {
+        debugPrint('精確排程預約提醒通知失敗: $e，嘗試使用備用通知機制');
+
+        // 只有在精確通知失敗時，才使用備用通知機制
+        if (scheduledTime.isAfter(DateTime.now())) {
+          _scheduleBackupNotification(
+            id: id, // 使用相同ID，因為主通知沒有成功
+            title: title,
+            body: body,
+            scheduledDate: scheduledTime,
+            platformChannelSpecifics: platformChannelSpecifics,
+          );
+        } else {
+          // 如果時間已經過了，則立即顯示通知
+          try {
+            await _localNotifications.show(
+              id,
+              title,
+              body,
+              platformChannelSpecifics,
+            );
+            debugPrint('已發送即時預約提醒通知，因為排程時間已過');
+          } catch (showError) {
+            debugPrint('發送即時預約提醒通知失敗: $showError');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('排程預約提醒通知整體錯誤: $e');
     }
   }
 }

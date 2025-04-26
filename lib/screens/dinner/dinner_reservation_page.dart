@@ -4,12 +4,13 @@ import 'package:tuckin/utils/index.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/matching_service.dart';
+import 'package:tuckin/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
-import 'package:flutter/rendering.dart';
 import 'package:tuckin/services/user_status_service.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class DinnerReservationPage extends StatefulWidget {
   const DinnerReservationPage({super.key});
@@ -46,6 +47,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   late String _buttonText;
   // 說明文字
   late String _descriptionText;
+
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final NotificationService _notificationService = NotificationService();
 
   @override
   void initState() {
@@ -298,6 +302,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         'waiting_matching',
       );
 
+      // 排程聚餐提醒通知 - 在取消期限前12小時提醒
+      await _scheduleDinnerReminder();
+
       // 延遲一下導航到配對狀態頁面
       if (!mounted) return;
       await Future.delayed(const Duration(seconds: 1));
@@ -315,6 +322,105 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
               '預約失敗: $e',
               style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
             ),
+          ),
+        );
+      }
+    }
+  }
+
+  // 排程聚餐提醒通知
+  Future<void> _scheduleDinnerReminder() async {
+    try {
+      // 確保取消截止時間存在
+      if (_dinnerTimeInfo?.cancelDeadline == null) {
+        debugPrint('無法設置提醒通知：取消截止時間未定義');
+        return;
+      }
+
+      // 計算提醒時間（取消截止時間前12小時）
+      DateTime reminderTime = _dinnerTimeInfo!.cancelDeadline.subtract(
+        const Duration(hours: 12),
+      );
+      final DateTime now = DateTime.now();
+
+      // 如果提醒時間已經過去，則使用當前時間和取消截止時間的中間點
+      if (reminderTime.isBefore(now)) {
+        debugPrint('原提醒時間已過，計算新的提醒時間');
+
+        // 確保取消截止時間還未到
+        if (_dinnerTimeInfo!.cancelDeadline.isBefore(now)) {
+          debugPrint('取消截止時間也已過，不設置通知');
+          return;
+        }
+
+        // 計算當前時間到取消截止時間的中間點
+        final int totalMinutes =
+            _dinnerTimeInfo!.cancelDeadline.difference(now).inMinutes;
+        final int halfwayMinutes = totalMinutes ~/ 2;
+
+        // 如果剩餘時間太短（少於10分鐘），則設為5分鐘後
+        if (halfwayMinutes < 10) {
+          reminderTime = now.add(const Duration(minutes: 5));
+          debugPrint('剩餘時間較短，設置為5分鐘後提醒');
+        } else {
+          reminderTime = now.add(Duration(minutes: halfwayMinutes));
+          debugPrint('設置為當前時間和截止時間的中間點提醒: $halfwayMinutes 分鐘後');
+        }
+      }
+
+      debugPrint(
+        '設置聚餐提醒通知，提醒時間: ${DateFormat('yyyy-MM-dd HH:mm').format(reminderTime)}',
+      );
+
+      // 設置通知ID，使用聚餐時間的哈希碼確保唯一性和可重複性（用於取消）
+      final int notificationId =
+          _dinnerTimeInfo!.nextDinnerTime.millisecondsSinceEpoch.hashCode;
+
+      // 在生產環境中：如果已經在測試時間內，使用3分鐘後的時間作為測試
+      final DateTime actualReminderTime =
+          reminderTime.isBefore(DateTime.now().add(const Duration(minutes: 3)))
+              ? DateTime.now().add(const Duration(minutes: 3))
+              : reminderTime;
+
+      if (actualReminderTime != reminderTime) {
+        debugPrint('提醒時間太近，調整為3分鐘後');
+      }
+
+      // 使用 NotificationService 排程通知
+      await NotificationService().scheduleReservationReminder(
+        id: notificationId,
+        title: '聚餐提醒',
+        body: '您已報名這週的聚餐活動，如果不方便參加，請立即開啟APP取消',
+        scheduledTime: actualReminderTime,
+      );
+
+      // 儲存通知ID到SharedPreferences，用於後續可能的取消
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('dinner_reminder_notification_id', notificationId);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '將會在 ${DateFormat('MM/dd HH:mm').format(actualReminderTime)} 提醒您確認參加',
+            style: TextStyle(fontSize: 15.sp, fontFamily: 'OtsutomeFont'),
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      debugPrint('聚餐提醒通知已成功排程，ID: $notificationId');
+    } catch (e) {
+      debugPrint('設置聚餐提醒通知失敗: $e');
+
+      // 显示错误提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '設定提醒功能暫時無法使用，但您的預約已成功',
+              style: TextStyle(fontSize: 15.sp, fontFamily: 'OtsutomeFont'),
+            ),
+            duration: const Duration(seconds: 3),
           ),
         );
       }

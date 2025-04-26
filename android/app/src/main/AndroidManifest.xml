@@ -40,7 +40,7 @@
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/ic_launcher_background" />
 
-            <!-- 添加 Firebase 消息服務 -->
+        <!-- 添加 Firebase 消息服務 -->
         <service
             android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService"
             android:exported="false">
@@ -48,6 +48,17 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+        
+        <!-- 註冊通知接收器 -->
+        <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" android:exported="false" />
+        <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
     </application>
     
     <!-- 添加網絡權限，許多API需要這個權限 -->
@@ -56,6 +67,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 添加查詢所有包的權限（用於URL_LAUNCHER） -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- 添加精確鬧鐘權限（Android 12+） -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- 添加開機自啟動權限 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     
     
     <!-- Required to query activities that can process text, see:

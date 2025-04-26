@@ -4,6 +4,9 @@ import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:tuckin/services/notification_service.dart';
 
 class MatchingStatusPage extends StatefulWidget {
   const MatchingStatusPage({super.key});
@@ -117,6 +120,9 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
         _isCancelling = true; // 開始取消操作，顯示loading
       });
 
+      // 取消排程的提醒通知
+      await _cancelDinnerReminderNotification();
+
       final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         // 更新用戶狀態為預約階段
@@ -144,6 +150,31 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
           ),
         );
       }
+    }
+  }
+
+  // 取消排程的提醒通知
+  Future<void> _cancelDinnerReminderNotification() async {
+    try {
+      // 從 SharedPreferences 取得通知 ID
+      final prefs = await SharedPreferences.getInstance();
+      final notificationId = prefs.getInt('dinner_reminder_notification_id');
+
+      if (notificationId != null) {
+        debugPrint('取消聚餐提醒通知，ID: $notificationId');
+
+        // 使用 NotificationService 取消通知
+        await NotificationService().cancelNotification(notificationId);
+
+        // 清除存儲的通知 ID
+        await prefs.remove('dinner_reminder_notification_id');
+
+        debugPrint('聚餐提醒通知已成功取消');
+      } else {
+        debugPrint('沒有找到要取消的聚餐提醒通知ID');
+      }
+    } catch (e) {
+      debugPrint('取消聚餐提醒通知時出錯: $e');
     }
   }
 

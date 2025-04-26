@@ -19,6 +19,10 @@ import 'package:http/http.dart' as http; // 添加HTTP包用於網絡請求
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart'; // 導入 Provider 套件
 import 'package:tuckin/services/user_status_service.dart'; // 導入 UserStatusService
+// 導入時區相關包
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -173,16 +177,38 @@ Future<void> _initializeNotificationService() async {
   }
 }
 
+// 初始化時區設置
+Future<void> _initializeTimeZone() async {
+  try {
+    debugPrint('初始化時區...');
+    tz.initializeTimeZones();
+    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    debugPrint('成功初始化時區: $timeZoneName');
+  } catch (e) {
+    debugPrint('初始化時區錯誤: $e');
+    // 使用一個默認時區作為備用
+    try {
+      tz.setLocalLocation(tz.getLocation('Asia/Taipei'));
+    } catch (_) {
+      // 如果無法設置任何時區，則不阻止程序繼續運行
+    }
+  }
+}
+
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  // 初始化時區
+  await _initializeTimeZone();
 
   // 一開始先顯示 LoadingScreen，包裹在 MaterialApp 中確保有正確的 Directionality
   runApp(
     MaterialApp(
       debugShowCheckedModeBanner: false,
       home: LoadingScreen(
-        status: '正在啟動應用...',
+        status: '正在初始化...',
         displayDuration: 500, // 延長顯示時間為 0.5 秒
         onLoadingComplete: () async {
           // 在 LoadingScreen 顯示時，進行所有初始化操作
