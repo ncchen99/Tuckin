@@ -13,3 +13,6 @@ export 'responsive_widget.dart';
 
 // 導出導航服務
 export 'navigation_service.dart';
+
+// 導出聚餐時間工具
+export 'dinner_time_utils.dart';

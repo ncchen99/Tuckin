@@ -20,11 +20,14 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
   bool _isCancelling = false; // 追蹤取消預約操作的狀態
   String _userStatus = 'waiting_matching'; // 預設為等待配對狀態
   bool _isPageMounted = false; // 追蹤頁面是否完全掛載
+  String _cancelDeadlineText = ''; // 取消截止時間文字
 
   @override
   void initState() {
     super.initState();
     _loadUserStatus();
+    // 計算取消截止時間文字
+    _calculateCancelDeadlineText();
     // 使用延遲來確保頁面完全渲染後才設置為掛載狀態
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -40,6 +43,17 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
   void dispose() {
     _isPageMounted = false;
     super.dispose();
+  }
+
+  // 計算取消截止時間文字
+  void _calculateCancelDeadlineText() {
+    // 獲取聚餐時間信息
+    final dinnerTimeInfo = DinnerTimeUtils.calculateDinnerTimeInfo();
+    setState(() {
+      _cancelDeadlineText = DinnerTimeUtils.getCancelDeadlineText(
+        dinnerTimeInfo.nextDinnerDate,
+      );
+    });
   }
 
   Future<void> _loadUserStatus() async {
@@ -64,8 +78,6 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
             if (status == 'booking') {
               debugPrint('用戶處於預約階段，導向到預約頁面');
               _navigationService.navigateToDinnerReservation(context);
-            } else if (status == 'waiting_confirmation') {
-              _navigationService.navigateToAttendanceConfirmation(context);
             } else if (status == 'waiting_restaurant') {
               _navigationService.navigateToRestaurantSelection(context);
             } else if (status == 'waiting_dinner') {
@@ -257,7 +269,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                           child: Text(
                             _userStatus == 'matching_failed'
                                 ? '沒有找到一起吃飯的朋友'
-                                : '找到再跟你說',
+                                : _cancelDeadlineText, // 使用動態計算的取消截止時間文字
                             style: TextStyle(
                               fontSize: 20.sp,
                               fontFamily: 'OtsutomeFont',

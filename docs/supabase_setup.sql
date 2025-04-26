@@ -68,19 +68,19 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- 創建狀態變更觸發器函數
 CREATE OR REPLACE FUNCTION notify_status_change() RETURNS TRIGGER AS $$
 BEGIN
-  -- 檢查是否變更為 waiting_confirmation 狀態
-  IF NEW.status = 'waiting_confirmation' AND 
-     (OLD.status IS NULL OR OLD.status <> 'waiting_confirmation') THEN
+  -- 檢查是否變更為 waiting_restaurant 狀態
+  IF NEW.status = 'waiting_restaurant' AND 
+     (OLD.status IS NULL OR OLD.status <> 'waiting_restaurant') THEN
     
     -- 調用發送通知函數
     PERFORM send_push_notification(
       NEW.user_id,
       '聚餐邀請！',
-      '我們已找到朋友！請確認是否參加聚餐',
+      '我們已找到朋友！請選擇餐廳',
       jsonb_build_object(
         'type', 'attendance_confirmation',
-        'status', 'waiting_confirmation',
-        'screen', '/attendance_confirmation'
+        'status', 'waiting_restaurant',
+        'screen', '/restaurant_selection'
       )
     );
   END IF;

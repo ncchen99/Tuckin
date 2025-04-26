@@ -6,17 +6,10 @@ import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/matching_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-import 'dart:async'; // <--- 新增導入
-import 'package:flutter/rendering.dart'; // <--- 新增導入
-import 'package:tuckin/services/user_status_service.dart'; // <-- 引入 UserStatusService
-import 'package:provider/provider.dart'; // <-- 引入 Provider
-
-// 頁面階段狀態
-enum PageStage {
-  reserve, // 預約階段
-  join, // 參加階段 (週二6:00至週三6:00)
-  nextWeek, // 顯示下週聚餐
-}
+import 'dart:async';
+import 'package:flutter/rendering.dart';
+import 'package:tuckin/services/user_status_service.dart';
+import 'package:provider/provider.dart';
 
 class DinnerReservationPage extends StatefulWidget {
   const DinnerReservationPage({super.key});
@@ -37,7 +30,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   bool _isProcessing = false;
   // 是否為校內email
   bool _isSchoolEmail = false;
-  // 添加一個狀態來控制"正在尋找中"的提示框 (新增)
+  // 添加一個狀態來控制"正在尋找中"的提示框
   bool _showSearchingTip = false;
   // 添加服務
   final AuthService _authService = AuthService();
@@ -46,55 +39,15 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   final MatchingService _matchingService = MatchingService();
   String _username = ''; // 用戶名稱
   // 添加一個計時器來處理整點更新
-  Timer? _hourlyTimer; // <--- 新增計時器變數
+  Timer? _hourlyTimer;
 
-  // 下次聚餐日期
-  late DateTime _nextDinnerDate;
-  // 聚餐時間
-  late DateTime _nextDinnerTime;
-  // 是否為單周（顯示星期一）
-  late bool _isSingleWeek;
-  // 顯示星期幾文字
-  late String _weekdayText;
+  // 使用DinnerTimeInfo存儲聚餐時間信息
+  DinnerTimeInfo? _dinnerTimeInfo;
 
-  // 當前頁面階段
-  late PageStage _currentStage;
   // 按鈕文字
   late String _buttonText;
   // 說明文字
   late String _descriptionText;
-
-  // Helper function to calculate ISO 8601 week number
-  int _getIsoWeekNumber(DateTime date) {
-    int dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays + 1;
-    int dayOfWeek = date.weekday; // Monday = 1, Sunday = 7
-
-    // Formula based on ISO 8601 standard
-    int weekNumber = ((dayOfYear - dayOfWeek + 10) / 7).floor();
-
-    if (weekNumber < 1) {
-      // Belongs to the last week of the previous year.
-      DateTime lastDayOfPrevYear = DateTime(date.year - 1, 12, 31);
-      return _getIsoWeekNumber(
-        lastDayOfPrevYear,
-      ); // Recurse for previous year's last week
-    } else if (weekNumber == 53) {
-      // Check if it should actually be week 1 of the next year.
-      // This happens if Jan 1 of next year is a Monday, Tuesday, Wednesday, or Thursday.
-      DateTime jan1NextYear = DateTime(date.year + 1, 1, 1);
-      if (jan1NextYear.weekday >= DateTime.monday &&
-          jan1NextYear.weekday <= DateTime.thursday) {
-        // It's week 1 of the next year.
-        return 1;
-      } else {
-        // It's genuinely week 53.
-        return 53;
-      }
-    } else {
-      // It's a regular week number (1-52).
-      return weekNumber;
-    }
-  }
 
   @override
   void initState() {
@@ -103,11 +56,10 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
     _calculateDates();
     _loadUserPreferences();
     _checkUserEmail();
-    _scheduleHourlyUpdate(); // <--- 啟動計時器調度
-    WidgetsBinding.instance.addObserver(this); // <--- 註冊 observer
+    _scheduleHourlyUpdate(); // 啟動計時器調度
+    WidgetsBinding.instance.addObserver(this); // 註冊 observer
   }
 
-  // <--- 新增 didChangeAppLifecycleState 方法
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -148,7 +100,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
     debugPrint(
       '已安排下次整點更新於: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(nextHour)} (延遲: ${durationUntilNextHour.inMinutes} 分鐘)',
     );
-  } // <--- 新增計時器調度方法
+  }
 
   // 檢查用戶email是否為校內email
   Future<void> _checkUserEmail() async {
@@ -164,225 +116,78 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
     }
   }
 
-  // 計算日期並決定當前階段
-  void _calculateDates() {
-    final now = DateTime.now();
-    final currentDay = now.weekday;
-
-    // 計算當前是第幾週（使用 ISO 8601 標準）
-    final int weekNumber = _getIsoWeekNumber(now);
-    // final int weekNumber =
-    //     (now.difference(DateTime(now.year, 1, 1)).inDays / 7).floor() + 1;
-
-    // 判斷當前週是單數週還是雙數週
-    _isSingleWeek = weekNumber % 2 == 1;
-
-    // 計算本週的聚餐日期 (先計算本週的開始日期，然後加上對應的天數)
-    final int targetWeekday =
-        _isSingleWeek ? DateTime.monday : DateTime.thursday;
-
-    // 計算本週日期 (回到本週日，然後加上目標天數)
-    // 先計算到本週日的天數 (週日是7，週一是1，所以用7減週幾)
-    int daysToSunday =
-        currentDay == DateTime.sunday ? 0 : (DateTime.sunday - currentDay);
-
-    // 本週日的日期
-    DateTime thisWeekSunday = now.subtract(Duration(days: 7 - daysToSunday));
-
-    // 本週的目標聚餐日
-    DateTime thisWeekTarget = thisWeekSunday.add(Duration(days: targetWeekday));
-
-    // 計算下一週的週數
-    final int nextWeekNumber = weekNumber + 1;
-    // 判斷下一週是單數週還是雙數週
-    final bool isNextWeekSingle = nextWeekNumber % 2 == 1;
-    // 設定下一週的目標聚餐日是星期一還是星期四
-    final int nextTargetWeekday =
-        isNextWeekSingle ? DateTime.monday : DateTime.thursday;
-    // 下一週的星期日
-    final DateTime nextWeekSunday = thisWeekSunday.add(const Duration(days: 7));
-    // 下週的目標聚餐日
-    DateTime nextWeekTarget = nextWeekSunday.add(
-      Duration(days: nextTargetWeekday),
-    );
-
-    // 計算下下週的目標聚餐日
-    final int afterNextWeekNumber = weekNumber + 2;
-    final bool isAfterNextWeekSingle = afterNextWeekNumber % 2 == 1;
-    final int afterNextTargetWeekday =
-        isAfterNextWeekSingle ? DateTime.monday : DateTime.thursday;
-    final DateTime afterNextWeekSunday = thisWeekSunday.add(
-      const Duration(days: 14),
-    );
-    DateTime afterNextWeekTarget = afterNextWeekSunday.add(
-      Duration(days: afterNextTargetWeekday),
-    );
-
-    // 先計算本週的聚餐日期
-    final DateTime currentWeekTarget = thisWeekSunday.add(
-      Duration(days: targetWeekday),
-    );
-
-    // 先決定要顯示的聚餐日期（這週、下週或下下週）
-    // 如果距離聚餐時間小於37小時（聚餐在晚上7點，小於37小時相當於聚餐日前一天的早上6點以後）
-    DateTime dinnerDateTime = DateTime(
-      currentWeekTarget.year,
-      currentWeekTarget.month,
-      currentWeekTarget.day,
-      19, // 聚餐時間：晚上7點
-      0,
-    );
-    Duration timeUntilDinner = dinnerDateTime.difference(now);
-
-    // 計算下週聚餐的時間
-    DateTime nextDinnerDateTime = DateTime(
-      nextWeekTarget.year,
-      nextWeekTarget.month,
-      nextWeekTarget.day,
-      19, // 聚餐時間：晚上7點
-      0,
-    );
-    Duration timeUntilNextDinner = nextDinnerDateTime.difference(now);
-
-    // 決定要顯示哪一週的聚餐
-    if (now.isAfter(currentWeekTarget) || timeUntilDinner.inHours < 37) {
-      // 已經過了本週聚餐或距離本週聚餐時間小於37小時
-
-      if (now.isAfter(nextWeekTarget) || timeUntilNextDinner.inHours < 37) {
-        // 如果下週聚餐也已經過了或時間也太接近，則顯示下下週聚餐
-        _nextDinnerDate = afterNextWeekTarget;
-        debugPrint('選擇下下週聚餐，因為本週和下週聚餐時間太近，使用下下週週日計算參加階段時間');
-        debugPrint(
-          '下下週聚餐日期的週日: ${DateFormat('yyyy-MM-dd').format(afterNextWeekSunday)}',
-        );
-      } else {
-        // 顯示下週聚餐
-        _nextDinnerDate = nextWeekTarget;
-        debugPrint('選擇下週聚餐，因為本週聚餐時間太近，使用下週週日計算參加階段時間');
-        debugPrint(
-          '下週聚餐日期的週日: ${DateFormat('yyyy-MM-dd').format(nextWeekSunday)}',
-        );
+  // 使用DinnerTimeUtils計算日期並決定當前階段
+  void _calculateDates() async {
+    try {
+      // 獲取當前用戶的狀態
+      String? userStatus;
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser != null) {
+        userStatus = await _databaseService.getUserStatus(currentUser.id);
       }
-    } else {
-      // 顯示本週聚餐
-      _nextDinnerDate = currentWeekTarget;
-      debugPrint('選擇本週聚餐，使用本週週日計算參加階段時間');
-      debugPrint(
-        '本週聚餐日期的週日: ${DateFormat('yyyy-MM-dd').format(thisWeekSunday)}',
+
+      // 使用DinnerTimeUtils計算聚餐時間信息
+      _dinnerTimeInfo = DinnerTimeUtils.calculateDinnerTimeInfo(
+        userStatus: userStatus,
       );
+
+      // 檢查用戶狀態（如果是booking狀態且在參加階段，顯示參加按鈕）
+      await _checkUserStateForJoinPhase();
+
+      // 設定按鈕文字和說明文字
+      _updateTextsBasedOnStage();
+
+      // 強制刷新UI
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (error) {
+      debugPrint('計算日期錯誤: $error');
     }
-
-    // 計算聚餐時間
-
-    _nextDinnerTime = DateTime(
-      _nextDinnerDate.year,
-      _nextDinnerDate.month,
-      _nextDinnerDate.day,
-      19, // 聚餐時間：晚上7點
-      0,
-    );
-
-    // 根據選定的聚餐日期計算參加階段的開始時間和結束時間
-    DateTime joinPhaseStart = _nextDinnerTime.subtract(
-      const Duration(hours: 61),
-    );
-    DateTime joinPhaseEnd = _nextDinnerTime.subtract(const Duration(hours: 37));
-
-    // 接著判斷是否在參加階段
-    if (now.isAfter(joinPhaseStart) && now.isBefore(joinPhaseEnd)) {
-      // 處於參加階段
-      _currentStage = PageStage.join;
-    } else {
-      // 正常預約階段
-      _currentStage = PageStage.reserve;
-    }
-
-    // 檢查用戶狀態（如果是booking狀態且在參加階段，顯示參加按鈕）
-    _checkUserStateForJoinPhase();
-
-    // 根據最終確定的 _nextDinnerDate 來設定星期幾文字
-    if (_nextDinnerDate.weekday == DateTime.monday) {
-      _weekdayText = '星期一';
-    } else if (_nextDinnerDate.weekday == DateTime.thursday) {
-      _weekdayText = '星期四';
-    } else {
-      // 處理潛在錯誤，雖然正常情況下不應發生
-      _weekdayText = '未知';
-      debugPrint('錯誤：計算出的聚餐日既不是星期一也不是星期四: $_nextDinnerDate');
-    }
-
-    // 設定按鈕文字和說明文字
-    _updateTextsBasedOnStage();
-
-    // 調試輸出
-    debugPrint('當前週數: $weekNumber (${_isSingleWeek ? "單週" : "雙週"})');
-    debugPrint('當前星期幾: $currentDay');
-    debugPrint('當前階段: $_currentStage');
-
-    // Helper function to get weekday text
-    String getWeekdayText(DateTime date) {
-      if (date.weekday == DateTime.monday) return '星期一';
-      if (date.weekday == DateTime.thursday) return '星期四';
-      return '未知';
-    }
-
-    debugPrint(
-      '本週目標聚餐日: ${DateFormat('yyyy-MM-dd').format(thisWeekTarget)} (${getWeekdayText(thisWeekTarget)})',
-    );
-    debugPrint(
-      '下週目標聚餐日: ${DateFormat('yyyy-MM-dd').format(nextWeekTarget)} (${getWeekdayText(nextWeekTarget)})',
-    );
-    debugPrint(
-      '下下週目標聚餐日: ${DateFormat('yyyy-MM-dd').format(afterNextWeekTarget)} (${getWeekdayText(afterNextWeekTarget)})',
-    );
-    debugPrint(
-      '選擇的聚餐日期: ${DateFormat('yyyy-MM-dd').format(_nextDinnerDate)} (${getWeekdayText(_nextDinnerDate)})',
-    );
-    debugPrint(
-      '參加階段開始: ${DateFormat('yyyy-MM-dd HH:mm').format(joinPhaseStart)}',
-    );
-    debugPrint(
-      '參加階段結束: ${DateFormat('yyyy-MM-dd HH:mm').format(joinPhaseEnd)}',
-    );
   }
 
   // 根據用戶狀態確定是否顯示「參加」按鈕
   Future<void> _checkUserStateForJoinPhase() async {
-    if (_currentStage == PageStage.join) {
+    // 如果當前是參加階段
+    if (_dinnerTimeInfo!.currentStage == DinnerPageStage.join) {
       try {
         final currentUser = await _authService.getCurrentUser();
         if (currentUser != null) {
           final userStatus = await _databaseService.getUserStatus(
             currentUser.id,
           );
-          // 如果用戶狀態是booking，則可以參加
-          if (userStatus == 'booking') {
-            _currentStage = PageStage.join;
-          } else {
-            // 用戶已經在其他階段，顯示下週聚餐
-            _currentStage = PageStage.nextWeek;
+          // 如果用戶狀態不是booking，則應該顯示下週聚餐
+          if (userStatus != 'booking') {
+            _dinnerTimeInfo = DinnerTimeInfo(
+              nextDinnerDate: _dinnerTimeInfo!.nextDinnerDate,
+              nextDinnerTime: _dinnerTimeInfo!.nextDinnerTime,
+              isSingleWeek: _dinnerTimeInfo!.isSingleWeek,
+              weekdayText: _dinnerTimeInfo!.weekdayText,
+              currentStage: DinnerPageStage.nextWeek, // 更改為下週階段
+              cancelDeadline: _dinnerTimeInfo!.cancelDeadline,
+              joinPhaseStart: _dinnerTimeInfo!.joinPhaseStart,
+              joinPhaseEnd: _dinnerTimeInfo!.joinPhaseEnd,
+            );
           }
         }
       } catch (error) {
         debugPrint('檢查用戶狀態錯誤: $error');
-        // 發生錯誤時，假設為預約階段
-        _currentStage = PageStage.reserve;
       }
     }
   }
 
   // 更新按鈕文字和說明文字
   void _updateTextsBasedOnStage() {
-    switch (_currentStage) {
-      case PageStage.reserve:
+    switch (_dinnerTimeInfo!.currentStage) {
+      case DinnerPageStage.reserve:
         _buttonText = '預約';
-        _descriptionText = '下次活動在$_weekdayText舉行，歡迎預約參加';
+        _descriptionText = '下次活動在${_dinnerTimeInfo!.weekdayText}舉行，歡迎預約參加';
         break;
-      case PageStage.join:
+      case DinnerPageStage.join:
         _buttonText = '參加';
-        _descriptionText = '本週聚餐在$_weekdayText舉行，立即點擊參加！';
+        _descriptionText = '本週聚餐在${_dinnerTimeInfo!.weekdayText}舉行，立即點擊參加！';
         break;
-      case PageStage.nextWeek:
+      case DinnerPageStage.nextWeek:
         _buttonText = '預約';
         _descriptionText = '本週聚餐預約已結束，您可以預約下週聚餐';
         break;
@@ -483,18 +288,22 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         throw Exception('用戶未登入');
       }
 
-      // 在處理任何操作前，先儲存預計的聚餐時間 (修改)
+      // 在處理任何操作前，先儲存預計的聚餐時間
       // 使用 Provider 獲取 UserStatusService 實例
       final userStatusService = Provider.of<UserStatusService>(
         context,
         listen: false,
       );
-      userStatusService.updateStatus(confirmedDinnerTime: _nextDinnerTime);
-      debugPrint('儲存聚餐時間到 UserStatusService: $_nextDinnerTime');
+      userStatusService.updateStatus(
+        confirmedDinnerTime: _dinnerTimeInfo!.nextDinnerTime,
+      );
+      debugPrint(
+        '儲存聚餐時間到 UserStatusService: ${_dinnerTimeInfo!.nextDinnerTime}',
+      );
 
-      switch (_currentStage) {
-        case PageStage.reserve:
-        case PageStage.nextWeek:
+      switch (_dinnerTimeInfo!.currentStage) {
+        case DinnerPageStage.reserve:
+        case DinnerPageStage.nextWeek:
           // 預約邏輯 - 同原本的邏輯
           // 儲存用戶的配對偏好
           await _databaseService.updateUserMatchingPreference(
@@ -514,8 +323,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
           await _navigateToMatchingStatus();
           break;
 
-        case PageStage.join:
-          // 顯示正在尋找中的提示 (修改)
+        case DinnerPageStage.join:
+          // 顯示正在尋找中的提示
           if (mounted) {
             setState(() {
               _showSearchingTip = true;
@@ -533,7 +342,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
 
           if (!mounted) return;
 
-          // 隱藏提示框 (新增)
+          // 隱藏提示框
           if (mounted) {
             setState(() {
               _showSearchingTip = false;
@@ -541,10 +350,10 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
           }
 
           // 根據API回應進行導航
-          if (response.status == 'waiting_confirmation' &&
+          if (response.status == 'waiting_restaurant' &&
               response.deadline != null) {
             // 成功加入桌位，導航到確認出席頁面
-            // 更新 UserStatusService (修改)
+            // 更新 UserStatusService
             userStatusService.updateStatus(replyDeadline: response.deadline);
             _navigationService.navigateToAttendanceConfirmation(context);
           } else if (response.status == 'waiting_matching') {
@@ -566,7 +375,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
           break;
       }
     } catch (e) {
-      debugPrint('${_currentStage == PageStage.join ? "參加" : "預約"}時出錯: $e');
+      debugPrint(
+        '${_dinnerTimeInfo!.currentStage == DinnerPageStage.join ? "參加" : "預約"}時出錯: $e',
+      );
       // 出錯時恢復狀態
       if (mounted) {
         setState(() {
@@ -575,7 +386,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${_currentStage == PageStage.join ? "參加" : "預約"}失敗: $e',
+              '${_dinnerTimeInfo!.currentStage == DinnerPageStage.join ? "參加" : "預約"}失敗: $e',
               style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
             ),
           ),
@@ -586,6 +397,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
 
   @override
   Widget build(BuildContext context) {
+    if (_dinnerTimeInfo == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return WillPopScope(
       onWillPop: () async {
         return false; // 禁用返回按鈕
@@ -616,8 +430,10 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                               SizedBox(height: 20.h),
                               // 標題
                               Text(
-                                _currentStage == PageStage.reserve ||
-                                        _currentStage == PageStage.nextWeek
+                                _dinnerTimeInfo!.currentStage ==
+                                            DinnerPageStage.reserve ||
+                                        _dinnerTimeInfo!.currentStage ==
+                                            DinnerPageStage.nextWeek
                                     ? '預約聚餐'
                                     : '參加聚餐',
                                 style: TextStyle(
@@ -643,15 +459,18 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                               () {
                                 // 使用 IIFE (Immediately Invoked Function Expression) 來計算 iconPath
                                 String iconPath =
-                                    _nextDinnerDate.weekday == DateTime.monday
+                                    _dinnerTimeInfo!.nextDinnerDate.weekday ==
+                                            DateTime.monday
                                         ? 'assets/images/icon/mon.png'
                                         : 'assets/images/icon/thu.png';
                                 return _buildDateCard(
                                   context,
-                                  _weekdayText,
+                                  _dinnerTimeInfo!.weekdayText,
                                   iconPath,
-                                  '晚間 7:00',
-                                  DateFormat('MM/dd').format(_nextDinnerDate),
+                                  '19:00',
+                                  DateFormat(
+                                    'MM/dd',
+                                  ).format(_dinnerTimeInfo!.nextDinnerDate),
                                 );
                               }(), // 立即調用此函數
 
@@ -674,17 +493,21 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                                           height: 70.h,
                                           onPressed: _handleButtonClick,
                                           isEnabled:
-                                              _currentStage !=
-                                                  PageStage.nextWeek ||
-                                              _nextDinnerDate.isAfter(
-                                                DateTime.now(),
-                                              ), // 如果是nextWeek階段且已過下週日期，則禁用
+                                              _dinnerTimeInfo!.currentStage !=
+                                                  DinnerPageStage.nextWeek ||
+                                              _dinnerTimeInfo!.nextDinnerDate
+                                                  .isAfter(
+                                                    DateTime.now(),
+                                                  ), // 如果是nextWeek階段且已過下週日期，則禁用
                                         ),
                               ),
 
                               // 顯示預約狀態提示（如果不能預約）
-                              if (_currentStage == PageStage.nextWeek &&
-                                  !_nextDinnerDate.isAfter(DateTime.now()))
+                              if (_dinnerTimeInfo!.currentStage ==
+                                      DinnerPageStage.nextWeek &&
+                                  !_dinnerTimeInfo!.nextDinnerDate.isAfter(
+                                    DateTime.now(),
+                                  ))
                                 Padding(
                                   padding: EdgeInsets.only(top: 15.h),
                                   child: Center(
@@ -722,7 +545,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                       },
                     ),
                   ),
-                // 顯示 "正在尋找中..." 提示框 (新增)
+                // 顯示 "正在尋找中..." 提示框
                 if (_showSearchingTip)
                   Positioned(
                     top: 18.h, // 與歡迎提示框相同位置或自訂
@@ -877,11 +700,10 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
     );
   }
 
-  // <--- 新增 dispose 方法
   @override
   void dispose() {
     _hourlyTimer?.cancel(); // 在 widget 銷毀時取消計時器
-    WidgetsBinding.instance.removeObserver(this); // <--- 移除 observer
+    WidgetsBinding.instance.removeObserver(this); // 移除 observer
     super.dispose();
   }
 }

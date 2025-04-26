@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/supabase_service.dart';
+import 'package:tuckin/utils/index.dart';
 
 /// 通知服務，處理推送通知相關邏輯
 class NotificationService {
@@ -18,6 +19,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   final DatabaseService _databaseService = DatabaseService();
   final SupabaseService _supabaseService = SupabaseService();
+  final NavigationService _navigationService = NavigationService();
 
   // 註冊全局導航上下文
   GlobalKey<NavigatorState>? _navigatorKey;
@@ -176,9 +178,9 @@ class NotificationService {
 
     // 檢查是否是確認出席通知
     if (message.data['type'] == 'attendance_confirmation' ||
-        message.data['status'] == 'waiting_confirmation') {
-      // 導航到確認出席頁面
-      _navigateToAttendanceConfirmation();
+        message.data['status'] == 'waiting_restaurant') {
+      // 導航到餐廳選擇頁面
+      _navigateToRestaurantSelection();
     }
   }
 
@@ -189,17 +191,19 @@ class NotificationService {
 
       // 解析 payload
       if (payload.contains('attendance_confirmation') ||
-          payload.contains('waiting_confirmation')) {
-        // 導航到確認出席頁面
-        _navigateToAttendanceConfirmation();
+          payload.contains('waiting_restaurant')) {
+        // 導航到餐廳選擇頁面
+        _navigateToRestaurantSelection();
       }
     }
   }
 
-  // 導航到確認出席頁面
-  void _navigateToAttendanceConfirmation() {
+  // 導航到餐廳選擇頁面
+  void _navigateToRestaurantSelection() {
     if (_navigatorKey?.currentState != null) {
-      _navigatorKey!.currentState!.pushNamed('/attendance_confirmation');
+      _navigationService.navigateToRestaurantSelection(
+        _navigatorKey!.currentContext!,
+      );
     }
   }
 

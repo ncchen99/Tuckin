@@ -51,7 +51,7 @@ CHECK (status IN (
     'initial', -- 初始狀態
     'booking', -- 預約階段
     'waiting_matching', -- 等待配對階段
-    'waiting_confirmation', -- 等待確認階段
+    'waiting_restaurant', -- 等待餐廳確認階段
     'waiting_other_users', -- 等待其他用戶階段
     'waiting_attendance', -- 等待出席階段
     'matching_failed', -- 配對失敗階段

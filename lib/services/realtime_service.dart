@@ -313,15 +313,9 @@ class RealtimeService with WidgetsBindingObserver {
           _navigateIfNotCurrent(navigator, '/matching_status');
           break;
 
-        case 'waiting_confirmation':
-          // 等待確認階段，應該在等待確認頁面
-          // 如果用戶已經在餐廳選擇頁面，則不需要導航
-          if (currentRoute == '/restaurant_selection' ||
-              currentRoute == '/restaurant_reservation') {
-            debugPrint('RealtimeService: 用戶已在餐廳選擇頁面，不需要重新導航');
-          } else {
-            _navigateIfNotCurrent(navigator, '/attendance_confirmation');
-          }
+        case 'waiting_restaurant':
+          // 等待餐廳確認階段，應該在餐廳選擇頁面
+          _navigateIfNotCurrent(navigator, '/restaurant_selection');
           break;
 
         case 'waiting_other_users':

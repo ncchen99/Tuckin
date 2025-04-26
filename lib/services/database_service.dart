@@ -341,7 +341,7 @@ class DatabaseService {
 
         // 這些狀態表示用戶正在聚餐預約流程中
         List<String> restrictedStatuses = [
-          'waiting_confirmation',
+          'waiting_restaurant',
           'waiting_other_users',
           'waiting_attendance',
         ];

@@ -112,6 +112,7 @@ flutter:
     - assets/images/avatar/profile/
     - assets/images/dish/
     - assets/images/illustrate/
+    - assets/images/frame/
     - assets/fonts/
     - assets/video/
     - .env

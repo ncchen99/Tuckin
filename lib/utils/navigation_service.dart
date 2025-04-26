@@ -117,8 +117,6 @@ class NavigationService {
       case 'waiting_matching':
       case 'matching_failed':
         return '/matching_status';
-      case 'waiting_confirmation':
-        return '/attendance_confirmation';
       case 'waiting_restaurant':
         return '/restaurant_selection';
       case 'waiting_other_users':

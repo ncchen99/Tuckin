@@ -81,8 +81,8 @@ class _AttendanceConfirmationPageState
       final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         final status = await _databaseService.getUserStatus(currentUser.id);
-        if (status != 'waiting_confirmation') {
-          debugPrint('用戶狀態不是等待確認: $status，導向到適當頁面');
+        if (status != 'waiting_restaurant') {
+          debugPrint('用戶狀態不是等待餐廳確認: $status，導向到適當頁面');
           _redirectBasedOnStatus(status);
           return;
         }
