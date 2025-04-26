@@ -394,6 +394,10 @@ def _find_best_group(remaining_ids_set: set, user_data: Dict[str, Dict[str, Any]
     if len(remaining_ids_set) < target_size:
         return None, remaining_ids_set
 
+    # 當用戶數量大於50時，使用啟發式算法
+    if len(remaining_ids_set) > 50:
+        return _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, target_size)
+
     best_group = None
     best_score = (-1, -1, -1) # (性別分, 個性分, size)
 
@@ -427,6 +431,136 @@ def _find_best_group(remaining_ids_set: set, user_data: Dict[str, Dict[str, Any]
         # 如果迭代完所有組合（或達到上限）都沒找到，返回 None
         # 這理論上只在人數不足時發生
         return None, remaining_ids_set
+
+def _find_best_group_heuristic(remaining_ids_set: set, user_data: Dict[str, Dict[str, Any]], categorized_users: defaultdict, target_size: int) -> Tuple[Optional[List[str]], set]:
+    """
+    大規模用戶的啟發式最佳組查找算法
+    策略：
+    1. 根據性別將用戶分組
+    2. 根據個性類型進一步分組
+    3. 優先從同一個性類型中選擇用戶，同時平衡性別比例
+    """
+    remaining_ids = list(remaining_ids_set)
+    
+    # 按性別和個性類型分類用戶
+    males = []
+    females = []
+    for uid in remaining_ids:
+        if user_data[uid]['gender'] == 'male':
+            males.append(uid)
+        else:
+            females.append(uid)
+    
+    # 根據目標組大小計算理想的性別比例
+    ideal_male_count = target_size // 2
+    ideal_female_count = target_size - ideal_male_count
+    
+    # 檢查是否有足夠的男性和女性
+    if len(males) < ideal_male_count or len(females) < ideal_female_count:
+        # 如果一種性別不足，調整比例
+        if len(males) < ideal_male_count:
+            ideal_male_count = min(len(males), target_size - 1)
+            ideal_female_count = target_size - ideal_male_count
+        else:
+            ideal_female_count = min(len(females), target_size - 1)
+            ideal_male_count = target_size - ideal_female_count
+    
+    # 按個性類型分組
+    male_by_type = {}
+    female_by_type = {}
+    
+    for uid in males:
+        p_type = user_data[uid]['personality_type']
+        if p_type not in male_by_type:
+            male_by_type[p_type] = []
+        male_by_type[p_type].append(uid)
+    
+    for uid in females:
+        p_type = user_data[uid]['personality_type']
+        if p_type not in female_by_type:
+            female_by_type[p_type] = []
+        female_by_type[p_type].append(uid)
+    
+    # 嘗試找到具有相同個性類型的用戶組
+    best_group = []
+    common_types = set(male_by_type.keys()).intersection(set(female_by_type.keys()))
+    
+    # 優先選擇個性類型最多的組合
+    if common_types:
+        # 按數量排序類型
+        sorted_types = sorted(common_types, 
+                             key=lambda t: len(male_by_type[t]) + len(female_by_type[t]), 
+                             reverse=True)
+        
+        # 從最多的類型開始選擇
+        selected_type = sorted_types[0]
+        
+        # 選擇所需數量的男性和女性
+        selected_males = male_by_type[selected_type][:ideal_male_count]
+        selected_females = female_by_type[selected_type][:ideal_female_count]
+        
+        # 如果選擇的用戶不足，從其他類型中補充
+        while len(selected_males) < ideal_male_count and len(males) > len(selected_males):
+            for t in sorted_types[1:]:
+                if t in male_by_type and male_by_type[t]:
+                    selected_males.append(male_by_type[t].pop(0))
+                    if len(selected_males) >= ideal_male_count:
+                        break
+            
+            # 如果仍不足，從未考慮的類型中選擇
+            if len(selected_males) < ideal_male_count:
+                for t in set(male_by_type.keys()) - common_types:
+                    if male_by_type[t]:
+                        selected_males.append(male_by_type[t].pop(0))
+                        if len(selected_males) >= ideal_male_count:
+                            break
+            
+            # 如果所有類型都檢查過了但仍不足
+            if len(selected_males) < ideal_male_count:
+                # 使用隨機選擇
+                remaining_males = list(set(males) - set(selected_males))
+                if remaining_males:
+                    selected_males.append(random.choice(remaining_males))
+                else:
+                    break
+        
+        # 對女性也執行相同的邏輯
+        while len(selected_females) < ideal_female_count and len(females) > len(selected_females):
+            for t in sorted_types[1:]:
+                if t in female_by_type and female_by_type[t]:
+                    selected_females.append(female_by_type[t].pop(0))
+                    if len(selected_females) >= ideal_female_count:
+                        break
+            
+            if len(selected_females) < ideal_female_count:
+                for t in set(female_by_type.keys()) - common_types:
+                    if female_by_type[t]:
+                        selected_females.append(female_by_type[t].pop(0))
+                        if len(selected_females) >= ideal_female_count:
+                            break
+            
+            if len(selected_females) < ideal_female_count:
+                remaining_females = list(set(females) - set(selected_females))
+                if remaining_females:
+                    selected_females.append(random.choice(remaining_females))
+                else:
+                    break
+        
+        best_group = selected_males + selected_females
+    else:
+        # 如果沒有共同的類型，隨機選擇
+        random.shuffle(males)
+        random.shuffle(females)
+        best_group = males[:ideal_male_count] + females[:ideal_female_count]
+    
+    # 如果人數不足，返回None
+    if len(best_group) < target_size:
+        return None, remaining_ids_set
+    
+    # 更新剩餘用戶ID集合
+    remaining_ids_set -= set(best_group)
+    
+    return best_group, remaining_ids_set
 
 def _create_group_dict(user_ids: List[str], user_data: Dict[str, Dict[str, Any]], is_school_only: bool) -> Dict:
     """

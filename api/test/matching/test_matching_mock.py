@@ -6,6 +6,9 @@ import json
 from datetime import datetime
 import logging
 from collections import Counter
+import time  # 添加計時功能
+import cProfile  # 添加性能分析功能
+from collections import defaultdict
 
 # 添加父級目錄到路徑，以便導入模組
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -48,7 +51,7 @@ class MockDBGroup:
         self.male_count = male_count
         self.female_count = female_count
         self.is_complete = len(user_ids) == 4
-        self.status = "waiting_confirmation"
+        self.status = "waiting_restaurant"
         self.created_at = datetime.now()
 
 class MockDatabase:
@@ -211,12 +214,12 @@ def process_batch_matching():
             
             # 更新用戶狀態
         for user_id in user_ids:
-            mock_db.update_user_status(user_id, "waiting_confirmation")
+            mock_db.update_user_status(user_id, "waiting_restaurant")
             matched_user_count += 1
     
     # 計算待配對和已配對的用戶數
     waiting_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_matching")
-    matched_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_confirmation")
+    matched_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_restaurant")
     failed_count = sum(1 for user in mock_db.users.values() if user.status == "matching_failed")
     
     logger.info(f"配對後狀態: 待配對用戶: {waiting_count}, 已配對用戶: {matched_count}, 配對失敗: {failed_count}")
@@ -251,11 +254,20 @@ def _match_users_into_groups(user_data):
     remaining_user_ids = set(user_data.keys())
     result_groups = []
     
+    # 按性別和個性類型分類用戶（這是為了與 matching.py 中的函數匹配）
+    categorized_users = defaultdict(lambda: defaultdict(list))
+    for user_id in remaining_user_ids:
+        data = user_data[user_id]
+        gender = data.get('gender')
+        p_type = data.get('personality_type')
+        if gender and p_type:
+            categorized_users[gender][p_type].append(user_id)
+    
     # 特殊情況處理 N=6, 7, 11
     if total_users == 6:
         logger.info(f"處理特殊情況 N=6：組成兩個 3 人組")
-        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 3)
-        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 3)
+        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
         
         if group1: result_groups.append(_create_group_dict(group1, user_data))
         if group2: result_groups.append(_create_group_dict(group2, user_data))
@@ -263,8 +275,8 @@ def _match_users_into_groups(user_data):
         
     elif total_users == 7:
         logger.info(f"處理特殊情況 N=7：組成一個 4 人組和一個 3 人組")
-        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 4)
-        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 3)
+        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
+        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
         
         if group4: result_groups.append(_create_group_dict(group4, user_data))
         if group3: result_groups.append(_create_group_dict(group3, user_data))
@@ -272,9 +284,9 @@ def _match_users_into_groups(user_data):
         
     elif total_users == 11:
         logger.info(f"處理特殊情況 N=11：組成兩個 4 人組和一個 3 人組")
-        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 4)
-        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 4)
-        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 3)
+        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
+        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
+        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
         
         if group1: result_groups.append(_create_group_dict(group1, user_data))
         if group2: result_groups.append(_create_group_dict(group2, user_data))
@@ -308,7 +320,7 @@ def _match_users_into_groups(user_data):
         elif total_users == 7:  # 已處理
             pass
         elif total_users == 3:  # 如果總數恰好是3, 需要組成一個3人組
-            group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 3)
+            group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
             if group3: result_groups.append(_create_group_dict(group3, user_data))
             return result_groups
     else:
@@ -323,7 +335,7 @@ def _match_users_into_groups(user_data):
             logger.error("邏輯錯誤：剩餘用戶不足以組成計劃的 4 人組")
             break
             
-        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 4)
+        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
         
         if group4:
             result_groups.append(_create_group_dict(group4, user_data))
@@ -344,7 +356,7 @@ def _match_users_into_groups(user_data):
             logger.error("邏輯錯誤：剩餘用戶不足以組成計劃的 5 人組")
             break
             
-        group5, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, 5)
+        group5, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 5)
         
         if group5:
             result_groups.append(_create_group_dict(group5, user_data))
@@ -401,13 +413,18 @@ def _calculate_group_score(group_ids, user_data):
     
     return (gender_score, personality_score, size)
 
-def _find_best_group(remaining_ids_set, user_data, target_size):
+def _find_best_group(remaining_ids_set, user_data, categorized_users, target_size):
     """
     從剩餘用戶中找到最佳的組（基於性別和個性）
+    對於大規模用戶，使用啟發式方法而不是窮舉所有可能組合
     返回 (找到的組ID列表 或 None, 更新後的剩餘用戶ID集合)
     """
     if len(remaining_ids_set) < target_size:
         return None, remaining_ids_set
+    
+    # 針對大規模用戶進行優化
+    if len(remaining_ids_set) > 100:
+        return _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, target_size)
     
     best_group = None
     best_score = (-1, -1, -1)  # (性別分, 個性分, size)
@@ -441,6 +458,136 @@ def _find_best_group(remaining_ids_set, user_data, target_size):
         # 如果迭代完所有組合（或達到上限）都沒找到，返回 None
         # 這理論上只在人數不足時發生
         return None, remaining_ids_set
+
+def _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, target_size):
+    """
+    大規模用戶的啟發式最佳組查找算法
+    策略：
+    1. 根據性別將用戶分組
+    2. 根據個性類型進一步分組
+    3. 優先從同一個性類型中選擇用戶，同時平衡性別比例
+    """
+    remaining_ids = list(remaining_ids_set)
+    
+    # 按性別和個性類型分類用戶
+    males = []
+    females = []
+    for uid in remaining_ids:
+        if user_data[uid]['gender'] == 'male':
+            males.append(uid)
+        else:
+            females.append(uid)
+    
+    # 根據目標組大小計算理想的性別比例
+    ideal_male_count = target_size // 2
+    ideal_female_count = target_size - ideal_male_count
+    
+    # 檢查是否有足夠的男性和女性
+    if len(males) < ideal_male_count or len(females) < ideal_female_count:
+        # 如果一種性別不足，調整比例
+        if len(males) < ideal_male_count:
+            ideal_male_count = min(len(males), target_size - 1)
+            ideal_female_count = target_size - ideal_male_count
+        else:
+            ideal_female_count = min(len(females), target_size - 1)
+            ideal_male_count = target_size - ideal_female_count
+    
+    # 按個性類型分組
+    male_by_type = {}
+    female_by_type = {}
+    
+    for uid in males:
+        p_type = user_data[uid]['personality_type']
+        if p_type not in male_by_type:
+            male_by_type[p_type] = []
+        male_by_type[p_type].append(uid)
+    
+    for uid in females:
+        p_type = user_data[uid]['personality_type']
+        if p_type not in female_by_type:
+            female_by_type[p_type] = []
+        female_by_type[p_type].append(uid)
+    
+    # 嘗試找到具有相同個性類型的用戶組
+    best_group = []
+    common_types = set(male_by_type.keys()).intersection(set(female_by_type.keys()))
+    
+    # 優先選擇個性類型最多的組合
+    if common_types:
+        # 按數量排序類型
+        sorted_types = sorted(common_types, 
+                             key=lambda t: len(male_by_type[t]) + len(female_by_type[t]), 
+                             reverse=True)
+        
+        # 從最多的類型開始選擇
+        selected_type = sorted_types[0]
+        
+        # 選擇所需數量的男性和女性
+        selected_males = male_by_type[selected_type][:ideal_male_count]
+        selected_females = female_by_type[selected_type][:ideal_female_count]
+        
+        # 如果選擇的用戶不足，從其他類型中補充
+        while len(selected_males) < ideal_male_count and len(males) > len(selected_males):
+            for t in sorted_types[1:]:
+                if t in male_by_type and male_by_type[t]:
+                    selected_males.append(male_by_type[t].pop(0))
+                    if len(selected_males) >= ideal_male_count:
+                        break
+            
+            # 如果仍不足，從未考慮的類型中選擇
+            if len(selected_males) < ideal_male_count:
+                for t in set(male_by_type.keys()) - common_types:
+                    if male_by_type[t]:
+                        selected_males.append(male_by_type[t].pop(0))
+                        if len(selected_males) >= ideal_male_count:
+                            break
+            
+            # 如果所有類型都檢查過了但仍不足
+            if len(selected_males) < ideal_male_count:
+                # 使用隨機選擇
+                remaining_males = list(set(males) - set(selected_males))
+                if remaining_males:
+                    selected_males.append(random.choice(remaining_males))
+                else:
+                    break
+        
+        # 對女性也執行相同的邏輯
+        while len(selected_females) < ideal_female_count and len(females) > len(selected_females):
+            for t in sorted_types[1:]:
+                if t in female_by_type and female_by_type[t]:
+                    selected_females.append(female_by_type[t].pop(0))
+                    if len(selected_females) >= ideal_female_count:
+                        break
+            
+            if len(selected_females) < ideal_female_count:
+                for t in set(female_by_type.keys()) - common_types:
+                    if female_by_type[t]:
+                        selected_females.append(female_by_type[t].pop(0))
+                        if len(selected_females) >= ideal_female_count:
+                            break
+            
+            if len(selected_females) < ideal_female_count:
+                remaining_females = list(set(females) - set(selected_females))
+                if remaining_females:
+                    selected_females.append(random.choice(remaining_females))
+                else:
+                    break
+        
+        best_group = selected_males + selected_females
+    else:
+        # 如果沒有共同的類型，隨機選擇
+        random.shuffle(males)
+        random.shuffle(females)
+        best_group = males[:ideal_male_count] + females[:ideal_female_count]
+    
+    # 如果人數不足，返回None
+    if len(best_group) < target_size:
+        return None, remaining_ids_set
+    
+    # 更新剩餘用戶ID集合
+    remaining_ids_set -= set(best_group)
+    
+    return best_group, remaining_ids_set
 
 def _create_group_dict(user_ids, user_data):
     """
@@ -527,12 +674,12 @@ def verify_matching_results():
             logger.info(f"  組 {group.id} 是3人組，男性{member_genders['male']}人，女性{member_genders['female']}人")
     
     # 獲取用戶狀態統計
-    waiting_confirmation_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_confirmation")
+    waiting_restaurant_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_restaurant")
     waiting_matching_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_matching")
     matching_failed_count = sum(1 for user in mock_db.users.values() if user.status == "matching_failed")
     
     logger.info(f"用戶狀態統計:")
-    logger.info(f"  等待確認: {waiting_confirmation_count}")
+    logger.info(f"  等待餐廳選擇: {waiting_restaurant_count}")
     logger.info(f"  等待配對: {waiting_matching_count}")
     logger.info(f"  配對失敗: {matching_failed_count}")
     
@@ -743,17 +890,17 @@ def test_scenario_5():
     # 分析型: 2男2女
     for i in range(2):
         user = MockDBUser(str(uuid.uuid4()), "male", "分析型", f"分析型男{i+1}")
-    mock_db.add_user(user)
+        mock_db.add_user(user)
     for i in range(2):
         user = MockDBUser(str(uuid.uuid4()), "female", "分析型", f"分析型女{i+1}")
-    mock_db.add_user(user)
+        mock_db.add_user(user)
     
     # 功能型: 1男2女
     user = MockDBUser(str(uuid.uuid4()), "male", "功能型", "功能型男1")
     mock_db.add_user(user)
     for i in range(2):
         user = MockDBUser(str(uuid.uuid4()), "female", "功能型", f"功能型女{i+1}")
-    mock_db.add_user(user)
+        mock_db.add_user(user)
     
     # 執行配對
     process_batch_matching()
@@ -784,10 +931,10 @@ def test_scenario_6():
     # 分析型: 2男2女
     for i in range(2):
         user = MockDBUser(str(uuid.uuid4()), "male", "分析型", f"分析型男{i+1}")
-    mock_db.add_user(user)
+        mock_db.add_user(user)
     for i in range(2):
         user = MockDBUser(str(uuid.uuid4()), "female", "分析型", f"分析型女{i+1}")
-    mock_db.add_user(user)
+        mock_db.add_user(user)
     
     # 功能型: 1男1女
     user = MockDBUser(str(uuid.uuid4()), "male", "功能型", "功能型男1")
@@ -874,7 +1021,7 @@ def test_scenario_8():
     # 功能型: 2男2女
     for i in range(2):
         user = MockDBUser(str(uuid.uuid4()), "male", "功能型", f"功能型男{i+1}")
-    mock_db.add_user(user)
+        mock_db.add_user(user)
     for i in range(2):
         user = MockDBUser(str(uuid.uuid4()), "female", "功能型", f"功能型女{i+1}")
         mock_db.add_user(user)
@@ -896,6 +1043,157 @@ def test_scenario_8():
     
     logger.info("場景8測試完成")
 
+def test_scenario_9():
+    """場景9: 大規模用戶配對性能測試 - 200位用戶，測量性能並確保依然是最佳解"""
+    logger.info("========== 測試場景9: 大規模用戶配對性能測試 (200位用戶) ==========")
+    
+    # 清空模擬數據庫
+    mock_db.users = {}
+    mock_db.groups = []
+    
+    # 創建200位測試用戶，確保性別平衡且個性類型分佈均勻
+    user_count = 200
+    logger.info(f"開始創建 {user_count} 位測試用戶...")
+    
+    # 均勻分配性別和個性類型
+    for i in range(user_count):
+        personality_type = PERSONALITY_TYPES[i % len(PERSONALITY_TYPES)]
+        gender = GENDERS[i % 2]
+        
+        user = MockDBUser(
+            user_id=str(uuid.uuid4()),
+            gender=gender,
+            personality_type=personality_type,
+            nickname=f"用戶{i+1}"
+        )
+        mock_db.add_user(user)
+    
+    # 確認用戶創建情況
+    male_count = sum(1 for user in mock_db.users.values() if user.gender == 'male')
+    female_count = sum(1 for user in mock_db.users.values() if user.gender == 'female')
+    
+    personality_counts = {p_type: 0 for p_type in PERSONALITY_TYPES}
+    for user in mock_db.users.values():
+        personality_counts[user.personality_type] += 1
+    
+    logger.info(f"用戶創建完成:")
+    logger.info(f"總人數: {len(mock_db.users)}")
+    logger.info(f"性別分佈: 男性 {male_count}, 女性 {female_count}")
+    for p_type, count in personality_counts.items():
+        logger.info(f"{p_type}: {count} 人")
+    
+    # 執行配對並計時
+    logger.info("開始執行配對算法，計時開始...")
+    start_time = time.time()
+    
+    # 執行配對
+    matching_result = process_batch_matching()
+    
+    end_time = time.time()
+    execution_time = end_time - start_time
+    
+    logger.info(f"配對算法執行完成，耗時: {execution_time:.4f} 秒")
+    logger.info(f"配對結果: {matching_result}")
+    
+    # 驗證配對結果
+    logger.info("驗證配對結果...")
+    groups = mock_db.get_all_groups()
+    
+    # 計算組的數量
+    logger.info(f"形成的組數: {len(groups)}")
+    
+    # 計算不同規模組的數量
+    group_sizes = [len(group.user_ids) for group in groups]
+    size_counter = Counter(group_sizes)
+    for size, count in sorted(size_counter.items()):
+        logger.info(f"{size}人組: {count}個")
+    
+    # 計算性別平衡情況
+    gender_balance_scores = []
+    personality_similarity_scores = []
+    
+    for group in groups:
+        member_genders = {"male": 0, "female": 0}
+        member_personalities = {}
+        
+        for user_id in group.user_ids:
+            user = mock_db.users[user_id]
+            member_genders[user.gender] += 1
+            
+            p_type = user.personality_type
+            member_personalities[p_type] = member_personalities.get(p_type, 0) + 1
+        
+        # 計算性別平衡分數 (0-1，越接近0.5越平衡)
+        gender_ratio = member_genders["male"] / len(group.user_ids)
+        gender_balance = abs(0.5 - gender_ratio)  # 0表示完美平衡(1:1)，0.5表示全是同一性別
+        gender_balance_scores.append(gender_balance)
+        
+        # 計算個性相似度 (最多的個性類型佔比)
+        max_personality_count = max(member_personalities.values())
+        personality_similarity = max_personality_count / len(group.user_ids)
+        personality_similarity_scores.append(personality_similarity)
+    
+    # 計算平均分數
+    avg_gender_balance = sum(gender_balance_scores) / len(gender_balance_scores) if gender_balance_scores else 0
+    avg_personality_similarity = sum(personality_similarity_scores) / len(personality_similarity_scores) if personality_similarity_scores else 0
+    
+    logger.info(f"性別平衡度評分 (越接近0越好): {avg_gender_balance:.4f}")
+    logger.info(f"個性相似度評分 (越接近1越好): {avg_personality_similarity:.4f}")
+    
+    # 檢查是否所有用戶都被分配
+    matched_users = sum(len(group.user_ids) for group in groups)
+    logger.info(f"已配對用戶: {matched_users}/{user_count}")
+    
+    if matched_users != user_count:
+        logger.warning(f"有 {user_count - matched_users} 位用戶未被配對")
+    
+    # 分析用戶狀態
+    waiting_restaurant_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_restaurant")
+    waiting_matching_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_matching")
+    matching_failed_count = sum(1 for user in mock_db.users.values() if user.status == "matching_failed")
+    
+    logger.info(f"用戶狀態分析:")
+    logger.info(f"  等待餐廳選擇: {waiting_restaurant_count}")
+    logger.info(f"  等待配對: {waiting_matching_count}")
+    logger.info(f"  配對失敗: {matching_failed_count}")
+    
+    logger.info("場景9測試完成")
+    
+    return execution_time, len(groups), avg_gender_balance, avg_personality_similarity
+
+def test_performance_profiling():
+    """執行性能分析，找出配對算法中的性能瓶頸"""
+    logger.info("========== 配對算法性能分析 ==========")
+    
+    # 清空模擬數據庫
+    mock_db.users = {}
+    mock_db.groups = []
+    
+    # 創建100位測試用戶
+    user_count = 100
+    for i in range(user_count):
+        personality_type = PERSONALITY_TYPES[i % len(PERSONALITY_TYPES)]
+        gender = GENDERS[i % 2]
+        
+        user = MockDBUser(
+            user_id=str(uuid.uuid4()),
+            gender=gender,
+            personality_type=personality_type,
+            nickname=f"用戶{i+1}"
+        )
+        mock_db.add_user(user)
+    
+    # 使用cProfile進行性能分析
+    logger.info(f"開始性能分析，對 {user_count} 位用戶執行配對...")
+    profile_filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "matching_profile.stats")
+    
+    cProfile.run('process_batch_matching()', profile_filename)
+    
+    logger.info(f"性能分析完成，結果已保存到 {profile_filename}")
+    logger.info("可使用以下命令查看分析結果: python -m pstats matching_profile.stats")
+    
+    logger.info("性能分析測試完成")
+
 def run_all_tests():
     """運行所有測試"""
     logger.info("開始運行所有配對測試...")
@@ -913,7 +1211,26 @@ def run_all_tests():
     test_scenario_7()  # 11人特殊情況
     test_scenario_8()  # 5人組的情況
     
+    # 運行大規模用戶測試
+    execution_time, groups_count, gender_balance, personality_similarity = test_scenario_9()  # 200位用戶性能測試
+    
+    logger.info("\n========== 大規模測試結果摘要 ==========")
+    logger.info(f"200位用戶配對耗時: {execution_time:.4f} 秒")
+    logger.info(f"形成組數: {groups_count}")
+    logger.info(f"性別平衡度: {gender_balance:.4f} (越接近0越好)")
+    logger.info(f"個性相似度: {personality_similarity:.4f} (越接近1越好)")
+    
+    # 運行性能分析
+    test_performance_profiling()
+    
     logger.info("所有測試完成")
 
 if __name__ == "__main__":
-    run_all_tests() 
+    # 運行所有測試
+    run_all_tests()
+    
+    # 如果只想運行大規模測試
+    # test_scenario_9()
+    
+    # 如果只想進行性能分析
+    # test_performance_profiling() 
