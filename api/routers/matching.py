@@ -5,6 +5,8 @@ import random
 from datetime import datetime, timedelta
 import logging
 from collections import Counter
+import itertools
+from collections import defaultdict
 
 from schemas.matching import (
     JoinMatchingRequest, JoinMatchingResponse, 
@@ -19,19 +21,19 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # 新增輔助函數，提取重複邏輯
-async def update_user_status_to_confirmation(
+async def update_user_status_to_restaurant(
     supabase: Client, 
     user_id: str, 
     group_id: str, 
     confirmation_deadline: datetime
 ) -> bool:
     """
-    將用戶狀態更新為等待確認，並創建或更新配對信息
+    將用戶狀態更新為等待選擇餐廳，並創建或更新配對信息
     """
     try:
-        # 更新用戶狀態為等待確認
+        # 更新用戶狀態為等待選擇餐廳
         status_update_resp = supabase.table("user_status").update({
-            "status": "waiting_confirmation",
+            "status": "waiting_restaurant",
             "updated_at": datetime.now().isoformat()
         }).eq("user_id", user_id).execute()
         
@@ -63,6 +65,32 @@ async def update_user_status_to_confirmation(
         logger.error(f"更新用戶 {user_id} 狀態或配對信息失敗: {str(e)}")
         return False
 
+async def update_user_status_to_failed(supabase: Client, user_id: str) -> bool:
+    """
+    將用戶狀態更新為配對失敗。
+    """
+    try:
+        status_update_resp = supabase.table("user_status").update({
+            "status": "matching_failed",
+            "updated_at": datetime.now().isoformat()
+        }).eq("user_id", user_id).execute()
+        
+        if not status_update_resp.data:
+            logger.warning(f"更新用戶 {user_id} 狀態為 matching_failed 失敗或用戶狀態不存在")
+            return False
+        
+        # 清除可能存在的舊配對信息
+        supabase.table("user_matching_info") \
+            .delete() \
+            .eq("user_id", user_id) \
+            .execute()
+            
+        logger.info(f"成功更新用戶 {user_id} 狀態為 matching_failed")
+        return True
+    except Exception as e:
+        logger.error(f"更新用戶 {user_id} 狀態為 matching_failed 失敗: {str(e)}")
+        return False
+
 async def send_matching_notification(
     notification_service: NotificationService,
     user_id: str,
@@ -75,19 +103,16 @@ async def send_matching_notification(
     try:
         # 準備通知數據
         notification_data = {
-            "type": "matching_confirmation",
+            "type": "matching_restaurant",
             "group_id": group_id,
             "deadline": deadline.isoformat()
         }
-        
-        # 格式化時間字符串
-        confirmation_deadline_str = deadline.strftime('%a %H:%M')
-        
+                
         # 發送通知
         await notification_service.send_notification(
             user_id=user_id,
             title="找到了！",
-            body=f"成功找到聚餐夥伴，請在 {confirmation_deadline_str} 前確認",
+            body=f"成功找到聚餐夥伴，請在明天 6:00 前選擇餐廳",
             data=notification_data
         )
         logger.info(f"成功發送配對通知到用戶 {user_id}")
@@ -112,7 +137,7 @@ async def create_matching_group(
             "is_complete": user_group["is_complete"],
             "male_count": user_group["male_count"],
             "female_count": user_group["female_count"],
-            "status": "waiting_confirmation",
+            "status": "waiting_restaurant",
             "school_only": is_school_only
         }).execute()
         
@@ -141,568 +166,281 @@ async def batch_matching(
         "success": True, 
         "message": "批量配對任務已啟動",
         "matched_groups": None,
-        "remaining_users": None
-    }
-
-@router.post("/join", response_model=JoinMatchingResponse)
-async def join_matching(
-    request: JoinMatchingRequest,
-    supabase: Client = Depends(get_supabase_service),
-    current_user = Depends(get_current_user)
-):
-    """
-    用戶參加聚餐配對
-    嘗試將用戶補入不足4人的桌位或嘗試與等待中的用戶組成新桌位，否則進入等待名單
-    """
-    # 使用JWT令牌中的用戶ID
-    user_id = current_user.user.id
-    
-    # 1. 檢查用戶是否已在等待或已配對
-    status_response = supabase.table("user_status_extended") \
-        .select("id, user_id, status, group_id, confirmation_deadline") \
-        .eq("user_id", user_id) \
-        .execute()
-    
-    # 如果用戶已有狀態記錄且正在進行中
-    if status_response.data:
-        user_status = status_response.data[0]
-        current_status = user_status["status"]
-        
-        # 如果用戶已在等待或已配對，返回當前狀態
-        if current_status in ["waiting_matching", "waiting_confirmation", "waiting_other_users"]:
-            return {
-                "status": current_status,
-                "message": f"您已在{current_status}狀態中",
-                "group_id": user_status.get("group_id"),
-                "deadline": user_status.get("confirmation_deadline")
-            }
-    
-    # 2. 獲取用戶的配對偏好
-    preference_response = supabase.table("user_matching_preferences") \
-        .select("prefer_school_only") \
-        .eq("user_id", user_id) \
-        .execute()
-    
-    prefer_school_only = False
-    if preference_response.data and len(preference_response.data) > 0:
-        prefer_school_only = preference_response.data[0].get("prefer_school_only", False)
-    
-    # 3. 查找不足4人的桌位
-    incomplete_groups_query = supabase.table("matching_groups") \
-        .select("id, user_ids, male_count, female_count, is_complete, school_only") \
-        .eq("is_complete", False) \
-        .eq("status", "waiting_confirmation")
-    
-    # 如果用戶只願意與校內同學配對，則只查找校內專屬的組別
-    if prefer_school_only:
-        incomplete_groups_query = incomplete_groups_query.eq("school_only", True)
-    
-    # 執行查詢
-    incomplete_groups_response = incomplete_groups_query.execute()
-    
-    # 4. 獲取用戶個人資料（性別）
-    profile_response = supabase.table("user_profiles") \
-        .select("gender") \
-        .eq("user_id", user_id) \
-        .execute()
-    
-    if not profile_response.data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="無法獲取用戶個人資料"
-        )
-    
-    gender = profile_response.data[0]["gender"]
-    
-    # 5. 查找適合的不完整組別
-    joined_group = None
-    joined_group_id = None
-    
-    if incomplete_groups_response.data:
-        # 計算加入後性別比例最平衡的群組
-        best_group = None
-        best_balance_score = float('inf')  # 較小的分數表示更平衡
-        
-        for group in incomplete_groups_response.data:
-            user_ids = group["user_ids"] or []
-            group_id = group["id"]
-            
-            # 檢查用戶是否已在該組
-            if user_id in user_ids:
-                # 用戶已在此組，直接返回已加入的狀態
-                return {
-                    "status": "waiting_confirmation",
-                    "message": "您已加入該聚餐小組",
-                    "group_id": group_id,
-                    "deadline": None  # 需要從資料庫查詢
-                }
-            
-            # 計算加入後的性別比例
-            male_count = group["male_count"] + (1 if gender == "male" else 0)
-            female_count = group["female_count"] + (1 if gender == "female" else 0)
-            total_count = len(user_ids) + 1
-            
-            # 計算性別平衡分數 (|男性比例-50%| 越接近0越平衡)
-            if total_count > 0:
-                male_percentage = (male_count / total_count) * 100
-                balance_score = abs(male_percentage - 50)
-                
-                # 如果找到更平衡的群組，更新最佳選擇
-                if balance_score < best_balance_score:
-                    best_balance_score = balance_score
-                    best_group = group
-        
-        # 使用選出的最佳群組
-        if best_group:
-            group = best_group
-            group_id = group["id"]
-            user_ids = group["user_ids"] or []  # 確保是列表
-            
-            # 更新組別信息
-            user_ids.append(user_id)
-            is_complete = len(user_ids) >= 4
-            male_count = group["male_count"] + (1 if gender == "male" else 0)
-            female_count = group["female_count"] + (1 if gender == "female" else 0)
-            
-            # 更新組別
-            update_group_resp = supabase.table("matching_groups").update({
-                "user_ids": user_ids,
-                "is_complete": is_complete,
-                "male_count": male_count,
-                "female_count": female_count,
-                "updated_at": datetime.now().isoformat()
-            }).eq("id", group_id).execute()
-
-            if update_group_resp.data:
-                joined_group = True
-                joined_group_id = group_id
-            else:
-                logger.error(f"更新組別 {group_id} 失敗: {update_group_resp.error}")
-                # 可能需要處理更新失敗的情況，例如將用戶放入等待列表
-    
-    # 6. 更新用戶狀態
-    if joined_group and joined_group_id:
-        # 用戶需在七小時內確認
-        confirmation_deadline = datetime.now() + timedelta(hours=7)
-        
-        # 更新用戶狀態和配對信息 (使用輔助函數)
-        update_success = await update_user_status_to_confirmation(
-            supabase, user_id, joined_group_id, confirmation_deadline
-        )
-        
-        if not update_success:
-            # 如果狀態更新失敗，可能需要一些回滾或錯誤處理邏輯
-            logger.error(f"未能成功更新用戶 {user_id} 加入組別 {joined_group_id} 的狀態")
-            # 暫時返回錯誤或讓用戶進入等待狀態？取決於業務需求
-            # 此處暫時維持原流程，但記錄錯誤
-
-        # 發送配對成功通知 (使用輔助函數)
-        notification_service = NotificationService(use_service_role=True) # 使用服務角色
-        await send_matching_notification(
-            notification_service, user_id, joined_group_id, confirmation_deadline
-        )
-        
-        # 返回成功加入組別的響應
-        return {
-            "status": "waiting_confirmation",
-            "message": "您已被分配到桌位，請在七小時內確認參加",
-            "group_id": joined_group_id,
-            "deadline": confirmation_deadline
-        }
-    else:
-        # 如果沒有適合的組別
-        # 查找其他等待配對的用戶，嘗試組成新桌位
-        waiting_user_ids, waiting_user_data, valid_waiting_count = await _get_waiting_users_data(supabase)
-        
-        # 將當前用戶添加到等待用戶數據中
-        if valid_waiting_count > 0:
-            waiting_user_data[user_id] = {
-                "gender": gender,
-                "personality_type": None,
-                "prefer_school_only": prefer_school_only
-            }
-            
-            # 獲取用戶的人格類型
-            personality_response = supabase.table("user_personality_results") \
-                .select("personality_type") \
-                .eq("user_id", user_id) \
-                .execute()
-                
-            if personality_response.data and len(personality_response.data) > 0:
-                waiting_user_data[user_id]["personality_type"] = personality_response.data[0].get("personality_type")
-                
-            # 如果等待用戶數 >= 4 (包括當前用戶)
-            if valid_waiting_count >= 3 and waiting_user_data[user_id]["personality_type"]:
-                logger.info(f"嘗試與等待中的用戶組成新桌位，等待用戶數：{valid_waiting_count}")
-                
-                # 使用現有的配對算法將用戶分組
-                matched_groups, remaining = await _match_users_into_groups(waiting_user_data)
-                
-                if matched_groups:
-                    # 檢查當前用戶是否在任何一個組中
-                    user_matched = False
-                    user_group = None
-                    
-                    for group in matched_groups:
-                        if user_id in group["user_ids"]:
-                            user_matched = True
-                            user_group = group
-                            break
-                    
-                    if user_matched and user_group:
-                        # 保存配對結果到數據庫
-                        notification_service = NotificationService(use_service_role=True)
-                        confirmation_deadline = datetime.now() + timedelta(hours=7)
-                        
-                        # 創建分組記錄
-                        is_school_only = prefer_school_only
-                        if user_group["user_ids"]:
-                            preference_response = supabase.table("user_matching_preferences") \
-                                .select("user_id, prefer_school_only") \
-                                .in_("user_id", user_group["user_ids"]) \
-                                .execute()
-                            
-                            # 如果所有用戶都是校內專屬配對，則設置群組為校內專屬
-                            if preference_response.data:
-                                all_school_only = True
-                                for pref in preference_response.data:
-                                    if not pref.get("prefer_school_only", False):
-                                        all_school_only = False
-                                        break
-                                
-                                is_school_only = all_school_only
-                        
-                        logger.info(f"與等待中的用戶成功配對，創建新組別：{user_group}")
-                        
-                        group_id = await create_matching_group(supabase, user_group, is_school_only)
-                        
-                        if group_id:
-                            # 更新所有用戶的狀態
-                            for uid in user_group["user_ids"]:
-                                update_success = await update_user_status_to_confirmation(
-                                    supabase, uid, group_id, confirmation_deadline
-                                )
-                                if update_success:
-                                    # 發送配對成功通知
-                                    await send_matching_notification(
-                                        notification_service, uid, group_id, confirmation_deadline
-                                    )
-                                else:
-                                    logger.warning(f"更新用戶 {uid} 加入新組別 {group_id} 的狀態失敗")
-                            
-                            # 嘗試為群組推薦餐廳
-                            try:
-                                await recommend_restaurants_for_group(supabase, group_id, user_group["user_ids"])
-                            except Exception as e:
-                                logger.error(f"為群組 {group_id} 推薦餐廳時出錯: {str(e)}")
-                            
-                            # 返回配對成功的響應
-                            return {
-                                "status": "waiting_confirmation",
-                                "message": "您已被分配到桌位，請在七小時內確認參加",
-                                "group_id": group_id,
-                                "deadline": confirmation_deadline
-                            }
-                        else:
-                            logger.error("創建新組別失敗，將用戶放入等待列表")
-        
-        # 如果無法立即配對，將用戶加入等待名單
-        # 檢查或創建用戶狀態
-        user_status_resp = supabase.table("user_status") \
-            .select("id") \
-            .eq("user_id", user_id) \
-            .execute()
-        
-        # 更新用戶狀態為等待配對
-        if user_status_resp.data:
-            supabase.table("user_status").update({
-                "status": "waiting_matching",
-                "updated_at": datetime.now().isoformat()
-            }).eq("id", user_status_resp.data[0]["id"]).execute()
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="用戶資料不存在"
-            )
-        
-        # 清除任何之前的配對信息
-        supabase.table("user_matching_info") \
-            .delete() \
-            .eq("user_id", user_id) \
-            .execute()
-        
-        # 返回加入等待名單的響應
-    return {
-        "status": "waiting_matching",
-        "message": "您已加入聚餐等待名單",
-        "group_id": None,
-        "deadline": None
-    }
-
-@router.post("/auto-form", response_model=AutoFormGroupsResponse, status_code=status.HTTP_200_OK, dependencies=[Depends(verify_cron_api_key)])
-async def auto_form_groups(
-    background_tasks: BackgroundTasks,
-    supabase: Client = Depends(get_supabase_service)
-):
-    """
-    自動成桌任務（週三 06:00 AM 觸發）
-    若等待名單中用戶數≥3人，自動組成新桌位
-    此API僅限授權的Cron任務調用
-    """
-    # 實際實現會將此邏輯放入背景任務
-    background_tasks.add_task(process_auto_form_groups, supabase)
-    return {
-        "success": True, 
-        "message": "自動成桌任務已啟動",
-        "created_groups": None,
-        "remaining_users": None
+        "total_users_processed": None
     }
 
 # 共用的配對邏輯函數
-async def _match_users_into_groups(user_data: Dict[str, Dict[str, str]]) -> Tuple[List[Dict], List[Tuple]]:
+async def _match_users_into_groups(user_data: Dict[str, Dict[str, Any]], supabase: Client) -> List[Dict]:
     """
-    根據用戶資料將用戶分組配對
-    
+    根據用戶資料將用戶分組配對，確保所有用戶都被分配，優先4人組，
+    剩餘分配至5人組，僅在 N=6,7,11 時允許3人組。
+
     Args:
         user_data: 格式 {user_id: {"gender": gender, "personality_type": personality_type, "prefer_school_only": bool}}
-        
-    Returns:
-        Tuple[List[Dict], List[Tuple]]: 返回 (結果組別, 剩餘未配對用戶)
-    """
-    # 首先按照校內配對偏好將用戶分為兩組
-    school_only_users = {}
-    mixed_users = {}
-    
-    for user_id, data in user_data.items():
-        if data.get("prefer_school_only", False):
-            school_only_users[user_id] = data
-        else:
-            mixed_users[user_id] = data
-    
-    logger.info(f"僅校內配對用戶數: {len(school_only_users)}, 混合配對用戶數: {len(mixed_users)}")
-    
-    # 按性別和人格類型分組 - 對校內專屬配對用戶
-    school_only_by_type = {
-        'male': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []},
-        'female': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
-    }
-    
-    # 按性別和人格類型分組 - 對混合配對用戶
-    mixed_by_type = {
-        'male': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []},
-        'female': {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
-    }
-    
-    # 將用戶分類到對應組別
-    for user_id, data in school_only_users.items():
-        p_type = data["personality_type"]
-        gender = data["gender"]
-        if p_type and gender and p_type in school_only_by_type[gender]:
-            school_only_by_type[gender][p_type].append(user_id)
-    
-    for user_id, data in mixed_users.items():
-        p_type = data["personality_type"]
-        gender = data["gender"]
-        if p_type and gender and p_type in mixed_by_type[gender]:
-            mixed_by_type[gender][p_type].append(user_id)
-    
-    # 記錄各類型人數 - 校內專屬
-    logger.info("校內專屬配對用戶分布:")
-    for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-        m_count = len(school_only_by_type['male'][p_type])
-        f_count = len(school_only_by_type['female'][p_type])
-        logger.info(f"{p_type}: 男 {m_count}人, 女 {f_count}人")
-    
-    # 記錄各類型人數 - 混合配對
-    logger.info("混合配對用戶分布:")
-    for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-        m_count = len(mixed_by_type['male'][p_type])
-        f_count = len(mixed_by_type['female'][p_type])
-        logger.info(f"{p_type}: 男 {m_count}人, 女 {f_count}人")
-    
-    # 執行配對算法 - 分別處理兩組用戶
-    result_groups = []
-    
-    # 先處理校內專屬配對用戶
-    school_only_groups = await _match_user_group(school_only_by_type)
-    result_groups.extend(school_only_groups)
-    
-    # 再處理混合配對用戶
-    mixed_groups = await _match_user_group(mixed_by_type)
-    result_groups.extend(mixed_groups)
-    
-    # 收集剩餘的用戶 - 這些用戶暫時無法被配對
-    remaining_school_only = []
-    for gender in ['male', 'female']:
-        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-            for uid in school_only_by_type[gender][p_type]:
-                remaining_school_only.append((uid, p_type, gender, True))  # True表示校內專屬
-    
-    remaining_mixed = []
-    for gender in ['male', 'female']:
-        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-            for uid in mixed_by_type[gender][p_type]:
-                remaining_mixed.append((uid, p_type, gender, False))  # False表示混合配對
-    
-    all_remaining = remaining_school_only + remaining_mixed
-    
-    return result_groups, all_remaining
+        supabase: Supabase客戶端實例
 
-# 新增輔助函數來處理一組用戶的配對邏輯
-async def _match_user_group(users_by_type):
-    """處理一組用戶的配對邏輯"""
+    Returns:
+        List[Dict]: 結果組別列表
+    """
+    total_users = len(user_data)
+    logger.info(f"開始配對，總人數: {total_users}")
+    if total_users == 0:
+        return []
+
+    # 按校內偏好分組
+    school_only_users = {uid: data for uid, data in user_data.items() if data.get("prefer_school_only", False)}
+    mixed_users = {uid: data for uid, data in user_data.items() if not data.get("prefer_school_only", False)}
+
+    # 處理校內專屬用戶
+    logger.info(f"處理校內專屬用戶: {len(school_only_users)} 人")
+    school_only_groups = await _form_groups_for_subset(school_only_users, is_school_only=True, supabase=supabase)
+
+    # 處理混合配對用戶
+    logger.info(f"處理混合配對用戶: {len(mixed_users)} 人")
+    mixed_groups = await _form_groups_for_subset(mixed_users, is_school_only=False, supabase=supabase)
+
+    # 合併結果
+    all_groups = school_only_groups + mixed_groups
+    logger.info(f"總共形成 {len(all_groups)} 個組別")
+    return all_groups
+
+async def _form_groups_for_subset(user_data: Dict[str, Dict[str, Any]], is_school_only: bool, supabase: Client) -> List[Dict]:
+    """
+    為特定子集（校內專屬或混合）的用戶進行分組，加入個性類型匹配。
+    """
+    if not user_data:
+        return []
+
+    # 按性別和個性類型分類用戶
+    categorized_users = defaultdict(lambda: defaultdict(list))
+    all_user_ids = list(user_data.keys())
+    random.shuffle(all_user_ids) # 初始隨機化
+
+    for user_id in all_user_ids:
+        data = user_data[user_id]
+        gender = data.get('gender')
+        p_type = data.get('personality_type')
+        if gender and p_type:
+            categorized_users[gender][p_type].append(user_id)
+        else:
+            logger.warning(f"用戶 {user_id} 缺少性別或個性類型，無法參與基於個性的匹配。")
+            # 可以考慮將這些用戶放入一個特殊列表，最後隨機分配
+
+    remaining_user_ids = set(all_user_ids) # 使用集合方便移除
+    total_users = len(remaining_user_ids)
     result_groups = []
+
+    logger.info(f"開始為 is_school_only={is_school_only} 的 {total_users} 位用戶分組 (考慮個性)")
     
-    # 步驟 1: 按人格類型優先分配 2男2女 組
-    for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-        # 隨機打亂順序，避免固定順序選擇
-        random.shuffle(users_by_type['male'][p_type])
-        random.shuffle(users_by_type['female'][p_type])
+    # 新增：檢查用戶子集數量，如果少於3人，將其狀態更新為 matching_failed
+    if total_users < 3:
+        logger.warning(f"用戶數 {total_users} 過少，無法在 _form_groups_for_subset 中正常分組 (is_school_only={is_school_only})")
         
-        while len(users_by_type['male'][p_type]) >= 2 and len(users_by_type['female'][p_type]) >= 2:
-            group = {
-                "user_ids": users_by_type['male'][p_type][:2] + users_by_type['female'][p_type][:2],
-                "is_complete": True,
-                "male_count": 2,
-                "female_count": 2
-            }
-            result_groups.append(group)
-            users_by_type['male'][p_type] = users_by_type['male'][p_type][2:]
-            users_by_type['female'][p_type] = users_by_type['female'][p_type][2:]
-    
-    # 步驟 2: 混合人格類型，但保持性別平衡 2男2女
-    remaining_male = []
-    remaining_female = []
-    
-    # 收集剩餘的用戶
-    for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-        remaining_male.extend([(uid, p_type) for uid in users_by_type['male'][p_type]])
-        remaining_female.extend([(uid, p_type) for uid in users_by_type['female'][p_type]])
-    
-    # 如果還能形成2男2女組，繼續配對
-    while len(remaining_male) >= 2 and len(remaining_female) >= 2:
-        # 選擇2名男性和2名女性
-        selected_male = remaining_male[:2]
-        selected_female = remaining_female[:2]
-        
-        # 提取用戶ID和人格類型
-        male_users = [uid for uid, _ in selected_male]
-        female_users = [uid for uid, _ in selected_female]
-        
-        # 確定主導人格類型
-        personality_counts = {}
-        for _, p_type in selected_male + selected_female:
-            personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
-        
-        dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0]
-        
-        group = {
-            "user_ids": male_users + female_users,
-            "is_complete": True,
-            "male_count": 2,
-            "female_count": 2
-        }
-        result_groups.append(group)
-        remaining_male = remaining_male[2:]
-        remaining_female = remaining_female[2:]
-    
-    # 步驟 3: 處理剩餘用戶，按相同人格類型優先配對4人組
-    # 這部分邏輯與原來相同，確保完整處理所有剩餘用戶
-    remaining_users = []
-    for gender in ['male', 'female']:
-        for p_type in ['分析型', '功能型', '直覺型', '個人型']:
-            if gender == 'male':
-                remaining_users.extend([(uid, p_type, 'male') for uid in users_by_type[gender][p_type]])
+        # 更新用戶狀態為 matching_failed
+        for user_id in all_user_ids:
+            await update_user_status_to_failed(supabase, user_id)
+            logger.info(f"用戶 {user_id} 狀態已更新為 matching_failed (子集用戶不足)")
+                
+        return []
+
+    # 特殊情況處理 N=6, 7, 11
+    if total_users == 6:
+        logger.info(f"處理特殊情況 N=6：組成兩個 3 人組")
+        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        if group1: result_groups.append(_create_group_dict(group1, user_data, is_school_only))
+        if group2: result_groups.append(_create_group_dict(group2, user_data, is_school_only))
+        return result_groups
+    elif total_users == 7:
+        logger.info(f"處理特殊情況 N=7：組成一個 4 人組和一個 3 人組")
+        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
+        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        if group4: result_groups.append(_create_group_dict(group4, user_data, is_school_only))
+        if group3: result_groups.append(_create_group_dict(group3, user_data, is_school_only))
+        return result_groups
+    elif total_users == 11:
+        logger.info(f"處理特殊情況 N=11：組成兩個 4 人組和一個 3 人組")
+        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
+        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
+        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        if group1: result_groups.append(_create_group_dict(group1, user_data, is_school_only))
+        if group2: result_groups.append(_create_group_dict(group2, user_data, is_school_only))
+        if group3: result_groups.append(_create_group_dict(group3, user_data, is_school_only))
+        return result_groups
+
+    # 一般情況處理: 計算需要的 4 人和 5 人組數量
+    num_groups_of_4 = 0
+    num_groups_of_5 = 0
+    if total_users >= 3: # 確保至少3人才能開始計算
+        if total_users % 4 == 0:
+            num_groups_of_4 = total_users // 4
+        elif total_users % 4 == 1:
+            if total_users >= 5:
+                num_groups_of_4 = (total_users - 5) // 4
+                num_groups_of_5 = 1
+        elif total_users % 4 == 2:
+            if total_users >= 10:
+                num_groups_of_4 = (total_users - 10) // 4
+                num_groups_of_5 = 2
+            elif total_users == 6: # 已處理
+                pass
+            elif total_users == 2: # 會在 process_batch_matching 處理
+                pass
+        elif total_users % 4 == 3:
+            if total_users >= 15:
+                num_groups_of_4 = (total_users - 15) // 4
+                num_groups_of_5 = 3
+            elif total_users == 11: # 已處理
+                pass
+            elif total_users == 7: # 已處理
+                pass
+            elif total_users == 3: # 如果總數恰好是3, 需要組成一個3人組 (雖然一般不期望走到這)
+                group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+                if group3: result_groups.append(_create_group_dict(group3, user_data, is_school_only))
+                return result_groups
             else:
-                remaining_users.extend([(uid, p_type, 'female') for uid in users_by_type[gender][p_type]])
-    
-    # 按人格類型分組
-    personality_groups = {'分析型': [], '功能型': [], '直覺型': [], '個人型': []}
-    for uid, p_type, gender in remaining_users:
-        personality_groups[p_type].append((uid, gender))
-    
-    # 處理每個人格類型組
-    for p_type, users in personality_groups.items():
-        while len(users) >= 4:
-            # 提取用戶ID
-            group_users = [uid for uid, _ in users[:4]]
-            
-            # 計算性別比例
-            genders = [gender for _, gender in users[:4]]
-            male_count = genders.count('male')
-            female_count = genders.count('female')
-            
-            group = {
-                "user_ids": group_users,
-                "is_complete": True,
-                "male_count": male_count,
-                "female_count": female_count
-            }
-            result_groups.append(group)
-            users = users[4:]
-        
-        # 保存剩餘不足4人的用戶
-        personality_groups[p_type] = users
-    
-    # 步驟 4: 將所有剩餘用戶混合配對
-    all_remaining = []
-    for p_type in personality_groups:
-        all_remaining.extend([(uid, p_type, gender) for uid, gender in personality_groups[p_type]])
-    
-    while len(all_remaining) >= 4:
-        # 提取用戶信息
-        group_infos = all_remaining[:4]
-        group_users = [uid for uid, _, _ in group_infos]
-        
-        # 計算性別比例
-        genders = [gender for _, _, gender in group_infos]
-        male_count = genders.count('male')
-        female_count = genders.count('female')
-        
-        # 確定主導人格類型
-        personality_counts = {}
-        for _, p_type, _ in group_infos:
-            personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
-        
-        dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0]
-        
-        group = {
-            "user_ids": group_users,
-            "is_complete": True,
-            "male_count": male_count,
-            "female_count": female_count
-        }
-        result_groups.append(group)
-        all_remaining = all_remaining[4:]
-    
-    # 步驟 5: 如果剩餘3人，形成一個不完整組
-    if len(all_remaining) == 3:
-        # 提取用戶信息
-        group_infos = all_remaining
-        group_users = [uid for uid, _, _ in group_infos]
-        
-        # 計算性別比例
-        genders = [gender for _, _, gender in group_infos]
-        male_count = genders.count('male')
-        female_count = genders.count('female')
-        
-        # 確定主導人格類型
-        personality_counts = {}
-        for _, p_type, _ in group_infos:
-            personality_counts[p_type] = personality_counts.get(p_type, 0) + 1
-        
-        dominant_personality = max(personality_counts.items(), key=lambda x: x[1])[0]
-        
-        group = {
-            "user_ids": group_users,
-            "is_complete": False,
-            "male_count": male_count,
-            "female_count": female_count
-        }
-        result_groups.append(group)
-        all_remaining = []
-    
+                logger.warning(f"用戶數 {total_users} 過少，無法在 _form_groups_for_subset 中正常分組 (is_school_only={is_school_only})")
+                # 理論上 N<3 應在 process_batch_matching 攔截
+                return []
+
+    logger.info(f"計劃組成 {num_groups_of_4} 個 4 人組和 {num_groups_of_5} 個 5 人組 (is_school_only={is_school_only})")
+
+    # 組建 4 人組
+    for _ in range(num_groups_of_4):
+        if len(remaining_user_ids) < 4:
+            logger.error("邏輯錯誤：剩餘用戶不足以組成計劃的 4 人組")
+            break
+        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
+        if group4:
+            result_groups.append(_create_group_dict(group4, user_data, is_school_only))
+        else:
+            logger.error("無法找到合適的 4 人組，即使人數足夠")
+            # 備用邏輯：隨機選4人？
+            if len(remaining_user_ids) >= 4:
+                group4 = random.sample(list(remaining_user_ids), 4)
+                remaining_user_ids -= set(group4)
+                result_groups.append(_create_group_dict(group4, user_data, is_school_only))
+                logger.warning("找不到優化的4人組，已隨機選擇4人")
+            else: # 人數不足，跳出 (理論上不應發生)
+                break
+
+    # 組建 5 人組
+    for _ in range(num_groups_of_5):
+        if len(remaining_user_ids) < 5:
+            logger.error("邏輯錯誤：剩餘用戶不足以組成計劃的 5 人組")
+            break
+        group5, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 5)
+        if group5:
+            result_groups.append(_create_group_dict(group5, user_data, is_school_only))
+        else:
+            logger.error("無法找到合適的 5 人組，即使人數足夠")
+            if len(remaining_user_ids) >= 5:
+                group5 = random.sample(list(remaining_user_ids), 5)
+                remaining_user_ids -= set(group5)
+                result_groups.append(_create_group_dict(group5, user_data, is_school_only))
+                logger.warning("找不到優化的5人組，已隨機選擇5人")
+            else: # 人數不足，跳出 (理論上不應發生)
+                break
+
+    if remaining_user_ids:
+        logger.warning(f"配對完成後仍有 {len(remaining_user_ids)} 個用戶剩餘，這不應該發生。剩餘用戶ID: {remaining_user_ids}")
+        # 可以考慮將這些用戶強行加入最後一個組或創建新組
+
     return result_groups
+
+def _calculate_group_score(group_ids: List[str], user_data: Dict[str, Dict[str, Any]]) -> Tuple[int, int, int]:
+    """
+    計算組別的質量分數。
+    分數越高越好。
+    返回 (性別平衡分數, 個性相似度分數, 總人數)
+    性別平衡：2男2女最高(4人組), 3男2女/2男3女次之(5人組)
+    個性相似度：相同個性類型越多越好
+    """
+    size = len(group_ids)
+    if size == 0: return (-1, -1, 0)
+
+    genders = [user_data[uid].get('gender') for uid in group_ids]
+    p_types = [user_data[uid].get('personality_type') for uid in group_ids]
+
+    male_count = genders.count('male')
+    female_count = size - male_count
+
+    # 性別平衡分數 (簡單示例)
+    gender_score = 0
+    if size == 4:
+        if male_count == 2: gender_score = 10
+        elif male_count == 3 or male_count == 1: gender_score = 5
+        else: gender_score = 1
+    elif size == 5:
+        if male_count == 3 or male_count == 2: gender_score = 10
+        elif male_count == 4 or male_count == 1: gender_score = 5
+        else: gender_score = 1
+    elif size == 3:
+        if male_count == 2 or male_count == 1: gender_score = 10
+        else: gender_score = 1
+
+    # 個性相似度分數
+    p_type_counts = Counter(p for p in p_types if p)
+    # 分數 = (相同個性人數)^2 的總和 (鼓勵大群體)
+    personality_score = sum(count ** 2 for count in p_type_counts.values())
+
+    return (gender_score, personality_score, size)
+
+def _find_best_group(remaining_ids_set: set, user_data: Dict[str, Dict[str, Any]], categorized_users: defaultdict, target_size: int) -> Tuple[Optional[List[str]], set]:
+    """
+    從剩餘用戶中找到最佳的組（基於性別和個性）
+    返回 (找到的組ID列表 或 None, 更新後的剩餘用戶ID集合)
+    """
+    if len(remaining_ids_set) < target_size:
+        return None, remaining_ids_set
+
+    best_group = None
+    best_score = (-1, -1, -1) # (性別分, 個性分, size)
+
+    # 迭代所有可能的組合 (如果人數過多，這裡需要優化，例如使用啟發式搜索)
+    # 注意：itertools.combinations 對於大數量級非常慢！
+    # 實際應用中可能需要限制搜索範圍或使用近似算法
+    max_combinations_to_check = 1000 # 限制檢查的組合數量以避免性能問題
+    count = 0
+
+    potential_combinations = itertools.combinations(list(remaining_ids_set), target_size)
+
+    for current_group_tuple in potential_combinations:
+        count += 1
+        current_group = list(current_group_tuple)
+        current_score = _calculate_group_score(current_group, user_data)
+
+        # 比較分數 (優先性別，其次個性)
+        if current_score[0] > best_score[0] or \
+           (current_score[0] == best_score[0] and current_score[1] > best_score[1]):
+            best_score = current_score
+            best_group = current_group
+
+        if count >= max_combinations_to_check:
+            logger.warning(f"檢查組合數達到上限 {max_combinations_to_check}，可能未找到全局最優解")
+            break
+
+    if best_group:
+        remaining_ids_set -= set(best_group)
+        return best_group, remaining_ids_set
+    else:
+        # 如果迭代完所有組合（或達到上限）都沒找到，返回 None
+        # 這理論上只在人數不足時發生
+        return None, remaining_ids_set
+
+def _create_group_dict(user_ids: List[str], user_data: Dict[str, Dict[str, Any]], is_school_only: bool) -> Dict:
+    """
+    根據用戶ID列表和用戶數據創建組別字典
+    """
+    male_count = sum(1 for uid in user_ids if user_data[uid]['gender'] == 'male')
+    female_count = len(user_ids) - male_count
+    return {
+        "user_ids": user_ids,
+        "is_complete": len(user_ids) >= 4, # 3人組也標記為 incomplete?
+        "male_count": male_count,
+        "female_count": female_count,
+        "school_only": is_school_only # 根據傳入參數設定
+    }
 
 async def _save_matching_groups_to_db(
     supabase: Client, 
@@ -750,7 +488,7 @@ async def _save_matching_groups_to_db(
         
         # 更新用戶狀態和發送通知 (使用輔助函數)
         for user_id in group["user_ids"]:
-            update_success = await update_user_status_to_confirmation(
+            update_success = await update_user_status_to_restaurant(
                 supabase, user_id, group_id, confirm_deadline
             )
             if update_success:
@@ -852,22 +590,34 @@ async def process_batch_matching(supabase: Client):
         # 1. 獲取等待配對的用戶資料
         waiting_user_ids, user_data, valid_user_count = await _get_waiting_users_data(supabase)
         
+        # 新增：處理人數不足的情況
+        if valid_user_count < 3:
+            logger.warning(f"等待用戶不足 3 人 ({valid_user_count} 人)，無法進行配對。")
+            # 更新這些用戶的狀態為 matching_failed
+            failed_update_count = 0
+            for user_id in waiting_user_ids: # 使用 waiting_user_ids 而不是 valid_user_count 的 ID
+                if user_id in user_data: # 確保是有效用戶才更新
+                     if await update_user_status_to_failed(supabase, user_id):
+                         failed_update_count += 1
+            
+            return {
+                "success": False,
+                "message": f"等待用戶不足 3 人 ({valid_user_count} 人)，配對失敗。已更新 {failed_update_count} 位用戶狀態。",
+                "matched_groups": 0,
+                "total_users_processed": valid_user_count
+            }
+        
         if valid_user_count == 0:
             logger.warning("沒有足夠的用戶資料進行配對")
             return {
                 "success": False,
                 "message": "沒有足夠的用戶資料進行配對",
                 "matched_groups": 0,
-                "remaining_users": len(waiting_user_ids)
+                "total_users_processed": len(waiting_user_ids)
             }
         
-        # 2. 執行配對算法
-        result_groups, all_remaining = await _match_users_into_groups(user_data)
-        
-        # 如果還有1-2人，保持等待狀態
-        remaining_count = len(all_remaining)
-        if remaining_count > 0:
-            logger.info(f"剩餘 {remaining_count} 人無法配對成組，保持等待狀態")
+        # 2. 執行配對算法 (確保所有人都被分組)
+        result_groups = await _match_users_into_groups(user_data, supabase)
         
         logger.info(f"配對結果: 共形成 {len(result_groups)} 個組別")
         
@@ -879,14 +629,31 @@ async def process_batch_matching(supabase: Client):
         logger.info(result_message)
         
         # 計算未配對用戶數量
-        remaining_users = len(waiting_user_ids) - total_matched_users
+        unmatched_user_ids = set(waiting_user_ids)
+        for group in result_groups:
+            for user_id in group["user_ids"]:
+                if user_id in unmatched_user_ids:
+                    unmatched_user_ids.remove(user_id)
+        
+        # 新增：更新未配對用戶的狀態為 matching_failed
+        if unmatched_user_ids:
+            logger.warning(f"有 {len(unmatched_user_ids)} 名用戶未能被配對，將更新為 matching_failed")
+            failed_update_count = 0
+            for user_id in unmatched_user_ids:
+                if await update_user_status_to_failed(supabase, user_id):
+                    failed_update_count += 1
+            logger.info(f"已將 {failed_update_count}/{len(unmatched_user_ids)} 名未配對用戶的狀態更新為 matching_failed")
+            
+        # 更新訊息
+        if unmatched_user_ids:
+            result_message += f"，{len(unmatched_user_ids)} 名用戶因子集人數不足未能配對"
         
         # 返回配對結果
         return {
             "success": True,
             "message": result_message,
             "matched_groups": created_groups,
-            "remaining_users": remaining_users
+            "total_users_processed": total_matched_users
         }
         
     except Exception as e:
@@ -896,60 +663,7 @@ async def process_batch_matching(supabase: Client):
             "success": False,
             "message": error_message,
             "matched_groups": 0,
-            "remaining_users": None
-        }
-
-async def process_auto_form_groups(supabase: Client):
-    """自動成桌處理邏輯"""
-    try:
-        # 1. 獲取等待名單中的用戶資料
-        waiting_user_ids, user_data, valid_user_count = await _get_waiting_users_data(supabase)
-        
-        if valid_user_count < 3:
-            message = "等待名單中的用戶不足3人，無法自動成桌"
-            logger.warning(message)
-            return {
-                "success": True,
-                "message": message,
-                "created_groups": 0,
-                "remaining_users": len(waiting_user_ids) if waiting_user_ids else 0
-            }
-        
-        # 2. 執行配對算法
-        result_groups, all_remaining = await _match_users_into_groups(user_data)
-        
-        # 如果還有1-2人，保持等待狀態
-        remaining_count = len(all_remaining)
-        if remaining_count > 0:
-            logger.info(f"剩餘 {remaining_count} 人無法配對成組，保持等待狀態")
-        
-        logger.info(f"配對結果: 共形成 {len(result_groups)} 個組別")
-        
-        # 3. 將結果保存到數據庫
-        notification_service = NotificationService(use_service_role=True)
-        created_groups, total_matched_users = await _save_matching_groups_to_db(supabase, result_groups, notification_service, datetime.now() + timedelta(hours=7))
-        
-        result_message = f"自動成桌完成：共創建 {created_groups} 個組別"
-        logger.info(result_message)
-        
-        # 計算未配對用戶數量
-        remaining_users = valid_user_count - total_matched_users
-        
-        return {
-            "success": True,
-            "message": result_message,
-            "created_groups": created_groups,
-            "remaining_users": remaining_users
-        }
-        
-    except Exception as e:
-        error_message = f"自動成桌處理錯誤: {str(e)}"
-        logger.error(error_message)
-        return {
-            "success": False,
-            "message": error_message,
-            "created_groups": 0,
-            "remaining_users": None
+            "total_users_processed": None
         }
 
 # 在文件末尾添加餐廳推薦相關函數

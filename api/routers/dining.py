@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from supabase import Client
 from typing import List, Optional, Dict, Any
+from datetime import datetime
 
 from schemas.dining import (
     ConfirmAttendanceRequest, ConfirmAttendanceResponse,
@@ -45,7 +46,7 @@ async def get_group_status(
     # 模擬示例響應
     return {
         "group_id": group_id,
-        "status": DiningUserStatus.WAITING_CONFIRMATION,
+        "status": DiningUserStatus.WAITING_RESTAURANT,
         "members": [
             {"user_id": "user1", "status": TableAttendanceConfirmation.ATTEND},
             {"user_id": "user2", "status": TableAttendanceConfirmation.ATTEND},

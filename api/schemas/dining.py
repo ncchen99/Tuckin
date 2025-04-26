@@ -12,7 +12,7 @@ class DiningEventStatus(str, Enum):
 
 class DiningUserStatus(str, Enum):
     WAITING_MATCHING = "waiting_matching"
-    WAITING_CONFIRMATION = "waiting_confirmation"
+    WAITING_RESTAURANT = "waiting_restaurant"
     WAITING_OTHER_USERS = "waiting_other_users"
     WAITING_ATTENDANCE = "waiting_attendance"
     CONFIRMATION_TIMEOUT = "confirmation_timeout"
