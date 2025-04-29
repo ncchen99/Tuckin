@@ -146,33 +146,36 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
       );
     } else {
       if (widget.isFromProfile) {
-        // 如果是從profile頁面導航過來的
-        if (!_hasBackPressed) {
-          // 第一次點擊，顯示提示
-          setState(() {
-            _hasBackPressed = true;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                '尚未儲存資料，再點擊一次返回離開',
-                style: TextStyle(fontFamily: 'OtsutomeFont'),
-              ),
-              duration: Duration(seconds: 2),
-            ),
-          );
-          // 2秒後重置返回狀態
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              setState(() {
-                _hasBackPressed = false;
-              });
+        // 如果是從profile頁面導航過來的，顯示確認對話框
+        showCustomConfirmationDialog(
+          context: context,
+          iconPath: 'assets/images/icon/save.png',
+          content: '您尚未儲存資料，\n是否要儲存後離開？',
+          cancelButtonText: '不用',
+          confirmButtonText: '儲存',
+          onCancel: () {
+            // 不儲存，直接返回
+            Navigator.of(context).pop(); // 先關閉對話框
+            Navigator.of(context).pop(); // 然後返回上一頁
+          },
+          onConfirm: () async {
+            // 關閉對話框
+            Navigator.of(context).pop();
+            // 執行儲存操作
+            if (_questionTwoAnswer != null) {
+              await _handleComplete();
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    '請完成所有問題後再儲存',
+                    style: TextStyle(fontFamily: 'OtsutomeFont'),
+                  ),
+                ),
+              );
             }
-          });
-        } else {
-          // 第二次點擊，返回頁面
-          Navigator.of(context).pop();
-        }
+          },
+        );
       } else {
         // 在第一頁時，導航回food_preference頁面
         final navigationService = NavigationService();

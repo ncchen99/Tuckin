@@ -1,4 +1,6 @@
-* [ ] [API] 餐廳搜尋功能，google map api
+* [x] [API] 餐廳搜尋功能，google map api
+* [x] [前端] 尚未儲存，是否要儲存
+* [x] [前端] 餐廳資訊業面，profile_page route
 * [ ] [API] 完成餐廳資訊Get功能
 - [ ] [API] 完成"餐廳投票功能"
     - [ ] 檢查投票是否完成

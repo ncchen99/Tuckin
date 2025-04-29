@@ -83,10 +83,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage> {
     }
   }
 
-  void _handleProfileTap() {
-    _navigationService.navigateToUserSettings(context);
-  }
-
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
     try {
@@ -302,11 +298,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage> {
             child: Column(
               children: [
                 // 頂部導航欄 - 使用預設顯示TUCKIN
-                HeaderBar(
-                  title: '餐廳預訂',
-                  onProfileTap: _handleProfileTap,
-                  showBackButton: false,
-                ),
+                HeaderBar(title: '餐廳預訂'),
 
                 // 主要內容
                 Expanded(

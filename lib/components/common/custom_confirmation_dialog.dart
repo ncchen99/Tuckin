@@ -60,8 +60,8 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
               SizedBox(height: 30.h),
               // 圖標
               SizedBox(
-                width: 60.w,
-                height: 60.h,
+                width: 55.w,
+                height: 55.h,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -71,8 +71,8 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                       top: 3.h,
                       child: Image.asset(
                         widget.iconPath,
-                        width: 60.w,
-                        height: 60.h,
+                        width: 55.w,
+                        height: 55.h,
                         color: Colors.black.withOpacity(0.4),
                         colorBlendMode: BlendMode.srcIn,
                       ),
@@ -83,8 +83,8 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                       left: 0,
                       child: Image.asset(
                         widget.iconPath,
-                        width: 60.w,
-                        height: 60.h,
+                        width: 55.w,
+                        height: 55.h,
                       ),
                     ),
                   ],
@@ -95,7 +95,7 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
               // 標題（如果有）
               if (widget.title.isNotEmpty)
                 Padding(
-                  padding: EdgeInsets.only(bottom: 10.h),
+                  padding: EdgeInsets.only(top: 5.h),
                   child: Text(
                     widget.title,
                     textAlign: TextAlign.center,

@@ -90,33 +90,36 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
   // 處理返回按鈕
   void _handleBack() {
     if (widget.isFromProfile) {
-      // 如果是從profile頁面導航過來的
-      if (!_hasBackPressed) {
-        // 第一次點擊，顯示提示
-        setState(() {
-          _hasBackPressed = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              '尚未儲存資料，再點擊一次返回離開',
-              style: TextStyle(fontFamily: 'OtsutomeFont'),
-            ),
-            duration: Duration(seconds: 2),
-          ),
-        );
-        // 2秒後重置返回狀態
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            setState(() {
-              _hasBackPressed = false;
-            });
+      // 如果是從profile頁面導航過來的，顯示確認對話框
+      showCustomConfirmationDialog(
+        context: context,
+        iconPath: 'assets/images/icon/save.png',
+        content: '您尚未儲存資料，\n是否要儲存後離開？',
+        cancelButtonText: '不用',
+        confirmButtonText: '儲存',
+        onCancel: () {
+          // 不儲存，直接返回
+          Navigator.of(context).pop(); // 先關閉對話框
+          Navigator.of(context).pop(); // 然後返回上一頁
+        },
+        onConfirm: () async {
+          // 關閉對話框
+          Navigator.of(context).pop();
+          // 執行儲存操作
+          if (_isFormValid()) {
+            await _handleNextStep();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  '請至少選擇一種食物類型',
+                  style: TextStyle(fontFamily: 'OtsutomeFont'),
+                ),
+              ),
+            );
           }
-        });
-      } else {
-        // 第二次點擊，返回頁面
-        Navigator.of(context).pop();
-      }
+        },
+      );
     } else {
       // 否則使用正常的onboarding流程返回
       final navigationService = NavigationService();
