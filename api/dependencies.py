@@ -12,9 +12,18 @@ from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
 # 設置日誌記錄器
 logger = logging.getLogger(__name__)
 
+# 單例對象，存儲已初始化的客戶端
+_supabase_client = None
+_supabase_service_client = None
+
 # 創建 Supabase 客戶端，基本上不會用到
 def get_supabase() -> Client:
+    global _supabase_client
     try:
+        # 檢查是否已存在客戶端
+        if _supabase_client is not None:
+            return _supabase_client
+            
         if not SUPABASE_URL or not SUPABASE_KEY:
             logger.error(f"Supabase 配置缺失: URL={bool(SUPABASE_URL)}, KEY={bool(SUPABASE_KEY)}")
             raise ValueError("Supabase URL 或 API 金鑰未配置")
@@ -30,25 +39,40 @@ def get_supabase() -> Client:
         except Exception as e:
             logger.warning(f"Supabase 連接測試遇到問題: {str(e)}")
         
+        # 保存客戶端實例
+        _supabase_client = client
         return client
     except Exception as e:
         logger.error(f"初始化 Supabase 客戶端時出錯: {str(e)}")
         # 我們還是返回客戶端，但在日誌中記錄錯誤
-        return create_client(SUPABASE_URL or "", SUPABASE_KEY or "")
+        client = create_client(SUPABASE_URL or "", SUPABASE_KEY or "")
+        _supabase_client = client
+        return client
 
 # 創建 Supabase 服務客戶端 (擁有更高權限)，主要是使用這個
 def get_supabase_service() -> Client:
+    global _supabase_service_client
     try:
+        # 檢查是否已存在服務客戶端
+        if _supabase_service_client is not None:
+            return _supabase_service_client
+            
         if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
             logger.error(f"Supabase 服務配置缺失: URL={bool(SUPABASE_URL)}, SERVICE_KEY={bool(SUPABASE_SERVICE_KEY)}")
             raise ValueError("Supabase URL 或服務金鑰未配置")
         
         logger.info(f"初始化 Supabase 服務客戶端: URL={SUPABASE_URL[:10]}...")
-        return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        
+        # 保存服務客戶端實例
+        _supabase_service_client = client
+        return client
     except Exception as e:
         logger.error(f"初始化 Supabase 服務客戶端時出錯: {str(e)}")
         # 返回常規客戶端作為備用
-        return create_client(SUPABASE_URL or "", SUPABASE_KEY or "")
+        client = create_client(SUPABASE_URL or "", SUPABASE_KEY or "")
+        _supabase_service_client = client
+        return client
 
 # 獲取 Postgrest 客戶端
 def get_postgrest(supabase: Client = Depends(get_supabase_service)) -> PostgrestClient:

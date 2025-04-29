@@ -13,7 +13,7 @@ import io
 import hashlib
 import asyncio
 from PIL import Image
-from config import GOOGLE_PLACES_API_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME
+from config import GOOGLE_PLACES_API_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_BUCKET_NAME, R2_PUBLIC_URL
 
 from schemas.restaurant import RestaurantCreate, RestaurantResponse, RestaurantVote, RestaurantVoteCreate
 from dependencies import get_supabase, get_supabase_service, get_current_user
@@ -359,7 +359,8 @@ async def download_and_upload_photo(photo_reference: str) -> Optional[str]:
             r2_client.head_object(Bucket=R2_BUCKET_NAME, Key=file_name)
             # 如果沒有拋出異常，說明圖片已存在
             logger.info(f"圖片已存在於R2: {file_name}")
-            return f"{R2_ENDPOINT_URL}/{R2_BUCKET_NAME}/{file_name}"
+            # 使用公開URL而不是內部URL
+            return f"{R2_PUBLIC_URL}/{file_name}"
         except Exception:
             # 圖片不存在，需要下載並上傳
             logger.info(f"圖片不存在於R2，將下載並上傳: {photo_reference}")
@@ -407,7 +408,8 @@ async def download_and_upload_photo(photo_reference: str) -> Optional[str]:
             )
             
             logger.info(f"圖片已壓縮並上傳到R2: {file_name}")
-            return f"{R2_ENDPOINT_URL}/{R2_BUCKET_NAME}/{file_name}"
+            # 使用公開URL而不是內部URL
+            return f"{R2_PUBLIC_URL}/{file_name}"
             
     except Exception as e:
         logger.error(f"處理圖片時出錯: {str(e)}")
@@ -634,10 +636,15 @@ async def process_place_details(place_id: str, place_details: dict, request_id: 
     
     # 處理地址：移除郵遞區號和"臺灣"、"台灣"字樣
     if zh_address:
-        # 移除開頭的郵遞區號（3-6位數字+空格）
-        zh_address = re.sub(r'^(\d{3,6}\s+)', '', zh_address)
-        # 移除開頭的"臺灣"或"台灣"及其後可能的逗號或空格
-        zh_address = re.sub(r'^[台臺]灣[,\s]*', '', zh_address)
+        # 移除郵遞區號（開頭的3-6位數字，可能有空格也可能無空格）
+        zh_address = re.sub(r'^(\d{3,6})\s*', '', zh_address)
+        # 移除"臺灣"或"台灣"字樣，無論位於地址開頭還是中間
+        zh_address = re.sub(r'[台臺]灣[省市]?[,\s]*', '', zh_address)
+        # 移除縣市後的"市"或"縣"字樣，讓地址更簡短
+        # zh_address = re.sub(r'(市|縣)[,\s]*', '', zh_address)
+        # 去除可能的前後空白
+        zh_address = zh_address.strip()
+        logger.info(f"[{request_id}] 處理後的地址: {zh_address}")
     
     types = place_details.get("types", [])
     category = get_category_from_types(types)
@@ -710,7 +717,7 @@ async def process_and_update_image(photo_reference: str, restaurant_id: str, sup
 @router.post("/", response_model=RestaurantResponse, status_code=status.HTTP_201_CREATED)
 async def create_restaurant(
     restaurant: RestaurantCreate,
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
@@ -765,7 +772,7 @@ async def create_restaurant(
 @router.get("/{restaurant_id}", response_model=RestaurantResponse)
 async def get_restaurant(
     restaurant_id: str,
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
@@ -808,7 +815,7 @@ async def get_restaurant(
 @router.post("/vote", response_model=RestaurantVote)
 async def vote_restaurant(
     vote: RestaurantVoteCreate,
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
@@ -819,7 +826,7 @@ async def vote_restaurant(
 @router.get("/group/{group_id}/votes", response_model=List[RestaurantVote])
 async def get_group_restaurant_votes(
     group_id: str,
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
