@@ -345,6 +345,15 @@ async def search_restaurants(
             types = place_details.get("types", [])
             category = get_category_from_types(types)
             
+            # 提取電話號碼
+            phone = place_details.get("internationalPhoneNumber", None)
+            
+            # 提取網站或使用Google Maps連結
+            website = place_details.get("websiteUri", None)
+            if not website:
+                # 如果沒有網站連結，使用Google Maps連結
+                website = f"https://www.google.com/maps/place/?q=place_id:{valid_place_id}"
+            
             restaurant_data = {
                 "id": str(uuid4()),
                 "name": zh_name,
@@ -356,6 +365,9 @@ async def search_restaurants(
                 "image_path": place_details.get("photos", [{}])[0].get("name", "") if place_details.get("photos") else None,
                 "business_hours": str(place_details.get("regularOpeningHours", {})) if place_details.get("regularOpeningHours") else None,
                 "google_place_id": valid_place_id,
+                "is_user_added": False,  # 系統自動從Google Places API添加的
+                "phone": phone,
+                "website": website,
                 "created_at": datetime.utcnow().isoformat()
             }
             
@@ -404,6 +416,11 @@ async def create_restaurant(
         restaurant_id = str(uuid4())
         restaurant_data["id"] = restaurant_id
         restaurant_data["created_at"] = datetime.utcnow().isoformat()
+        restaurant_data["is_user_added"] = True  # 標記為用戶添加的餐廳
+        
+        # 如果沒有提供網站，但有Google Place ID，則使用Google Map連結
+        if not restaurant_data.get("website") and restaurant_data.get("google_place_id"):
+            restaurant_data["website"] = f"https://www.google.com/maps/place/?q=place_id:{restaurant_data['google_place_id']}"
         
         # 將餐廳保存到資料庫
         result = supabase.table("restaurants") \

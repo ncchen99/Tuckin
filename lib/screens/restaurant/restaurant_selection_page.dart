@@ -90,7 +90,8 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     final bool isGoogleMapsLink =
         link.contains('maps.google.com') ||
         link.contains('goo.gl/maps') ||
-        link.contains('maps.app.goo.gl');
+        link.contains('maps.app.goo.gl') ||
+        link.contains('google.com/maps');
 
     return isGoogleMapsLink;
   }
@@ -128,28 +129,54 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(height: 20.h),
+                      SizedBox(height: 15.h),
                       // 標題
                       Container(
                         width: double.infinity,
-                        margin: EdgeInsets.symmetric(horizontal: 20.w),
+                        margin: EdgeInsets.symmetric(horizontal: 15.w),
                         padding: EdgeInsets.symmetric(vertical: 10.h),
-                        child: Text(
-                          '推薦餐廳',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 24.sp,
-                            fontFamily: 'OtsutomeFont',
-                            color: const Color(0xFF23456B),
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Column(
+                          children: [
+                            // 圖標
+                            SizedBox(
+                              width: 55.w,
+                              height: 55.h,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  // 底部陰影
+                                  Positioned(
+                                    left: 0,
+                                    top: 3.h,
+                                    child: Image.asset(
+                                      'assets/images/icon/add.png',
+                                      width: 55.w,
+                                      height: 55.h,
+                                      color: Colors.black.withOpacity(0.4),
+                                      colorBlendMode: BlendMode.srcIn,
+                                    ),
+                                  ),
+                                  // 主圖像
+                                  Positioned(
+                                    top: 0,
+                                    left: 0,
+                                    child: Image.asset(
+                                      'assets/images/icon/add.png',
+                                      width: 55.w,
+                                      height: 55.h,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 20.h),
+                      SizedBox(height: 10.h),
 
                       // 改進的地圖連結輸入框
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.w),
+                        padding: EdgeInsets.symmetric(horizontal: 15.w),
                         child: Container(
                           padding: EdgeInsets.symmetric(horizontal: 15.w),
                           decoration: BoxDecoration(
@@ -271,9 +298,9 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                         ),
                       ),
 
-                      SizedBox(height: 15.h),
+                      SizedBox(height: 5.h),
 
-                      // 加載進度指示器或取消按鈕
+                      // 取消按鈕
                       Padding(
                         padding: EdgeInsets.symmetric(vertical: 10.h),
                         child:
@@ -301,7 +328,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                 ),
                       ),
 
-                      SizedBox(height: 20.h),
+                      SizedBox(height: 15.h),
                     ],
                   ),
                 ),
@@ -408,7 +435,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
         body: Container(
           decoration: const BoxDecoration(
             image: DecorationImage(
-              image: AssetImage('assets/images/background/bg1.png'),
+              image: AssetImage('assets/images/background/bg2.png'),
               fit: BoxFit.cover,
             ),
           ),

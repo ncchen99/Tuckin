@@ -13,6 +13,9 @@ class RestaurantBase(BaseModel):
     image_path: Optional[str] = None
     business_hours: Optional[str] = None
     google_place_id: Optional[str] = None
+    is_user_added: bool = False
+    phone: Optional[str] = None
+    website: Optional[str] = None
 
 class RestaurantCreate(RestaurantBase):
     pass

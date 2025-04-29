@@ -131,7 +131,7 @@ class _ConfirmationTimeoutPageState extends State<ConfirmationTimeoutPage> {
           body: Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/images/background/bg1.png'),
+                image: AssetImage('assets/images/background/bg2.png'),
                 fit: BoxFit.cover,
               ),
             ),
@@ -151,7 +151,7 @@ class _ConfirmationTimeoutPageState extends State<ConfirmationTimeoutPage> {
         body: Container(
           decoration: const BoxDecoration(
             image: DecorationImage(
-              image: AssetImage('assets/images/background/bg1.png'),
+              image: AssetImage('assets/images/background/bg2.png'),
               fit: BoxFit.cover,
             ),
           ),
