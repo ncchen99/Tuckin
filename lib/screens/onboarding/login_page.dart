@@ -309,7 +309,7 @@ class _LoginPageState extends State<LoginPage> {
 
                         // 進度指示器
                         Padding(
-                          padding: EdgeInsets.only(top: 60.h, bottom: 20.h),
+                          padding: EdgeInsets.only(top: 15.h, bottom: 20.h),
                           child: const ProgressDotsIndicator(
                             totalSteps: 5,
                             currentStep: 1,

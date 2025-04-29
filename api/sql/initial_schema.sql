@@ -48,37 +48,9 @@ CREATE TABLE IF NOT EXISTS restaurants (
     website TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
--- 為已有的餐廳表添加新欄位（如果欄位不存在）
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'restaurants' 
-        AND column_name = 'is_user_added'
-    ) THEN
-        ALTER TABLE restaurants ADD COLUMN is_user_added BOOLEAN DEFAULT FALSE;
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'restaurants' 
-        AND column_name = 'phone'
-    ) THEN
-        ALTER TABLE restaurants ADD COLUMN phone TEXT;
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name = 'restaurants' 
-        AND column_name = 'website'
-    ) THEN
-        ALTER TABLE restaurants ADD COLUMN website TEXT;
-    END IF;
-END $$;
+ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS is_user_added BOOLEAN DEFAULT FALSE;
+ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS website TEXT;
 
 -- 創建 restaurant_votes 表
 CREATE TABLE IF NOT EXISTS restaurant_votes (
