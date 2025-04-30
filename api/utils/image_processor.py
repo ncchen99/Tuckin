@@ -201,7 +201,7 @@ async def process_and_update_image(photo_reference: str, restaurant_id: str, sup
             return None
             
         # 更新數據庫中的圖片路徑
-        update_result = await supabase.table('restaurants').update({
+        update_result = supabase.table('restaurants').update({
             "image_path": image_url
         }).eq('id', restaurant_id).execute()
         

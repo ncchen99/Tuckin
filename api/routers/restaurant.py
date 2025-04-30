@@ -312,46 +312,24 @@ async def vote_restaurant(
     current_user = Depends(get_current_user)
 ):
     """
-    對餐廳進行投票
+    使用 restaurant_id 對餐廳進行投票，所以路由的schema可能需要更改
+    這部分需要使用user ID 查詢 user_matching_info 表，再取得 matching_group_id 與用戶的投票組合資料插入表格\
+    餐廳有可能是已經在restaurant vote 裡面存在的也有可能是用戶使用搜尋功能新增的
+    # 下一步:檢查是否該group當中用戶都已經投票如果是的話建立dining event...
     """
     pass
 
-@router.get("/group/{group_id}/votes", response_model=List[RestaurantVote])
+@router.get("/vote", response_model=List[RestaurantVote])
 async def get_group_restaurant_votes(
     group_id: str,
     supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
-    獲取群組中的餐廳投票
+    使用 user_id 查詢 user_matching_info 表，再使用 matching_group_id 查詢 restaurant_votes 表，
+    返回該用戶屬於之 matching_group_id 的餐廳投票的選項(過濾 restaurant vote 的欄位們 挑選出屬於該group的票)
+    并按照票數多少排序
+    返回所有選項的 restaurant 的列表資料
     """
     pass 
 
-async def process_and_update_image(photo_reference: str, restaurant_id: str, supabase: Client, request_id: str):
-    """
-    下載、壓縮並上傳圖片，然後更新資料庫中餐廳的圖片路徑
-    此函數用於非同步處理圖片，不阻塞API響應
-    """
-    try:
-        logger.info(f"[{request_id}] 開始處理餐廳 {restaurant_id} 的圖片")
-        
-        # 下載並上傳圖片到R2
-        image_path = await download_and_upload_photo(photo_reference)
-        
-        if not image_path:
-            logger.warning(f"[{request_id}] 無法取得餐廳 {restaurant_id} 的圖片")
-            return
-            
-        # 更新資料庫中的餐廳圖片路徑 - 注意：supabase的update方法不是異步的
-        update_result = supabase.table('restaurants').update({
-            "image_path": image_path
-        }).eq('id', restaurant_id).execute()
-        
-        if len(update_result.data) > 0:
-            logger.info(f"[{request_id}] 已更新餐廳 {restaurant_id} 的圖片路徑: {image_path}")
-        else:
-            logger.warning(f"[{request_id}] 更新餐廳 {restaurant_id} 的圖片路徑失敗")
-            
-    except Exception as e:
-        logger.error(f"[{request_id}] 處理和更新餐廳 {restaurant_id} 的圖片時出錯: {str(e)}")
-        return None 
