@@ -6,7 +6,7 @@ from typing import Optional
 import boto3
 from PIL import Image
 
-from config import GOOGLE_PLACES_API_KEY, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_ACCESS_KEY_ID, CLOUDFLARE_SECRET_ACCESS_KEY
+from config import GOOGLE_PLACES_API_KEY, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL, R2_ENDPOINT_URL
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +14,18 @@ def get_r2_client():
     """
     獲取Cloudflare R2客戶端
     """
+    # 先檢查必要的環境變數是否存在
+    if not R2_ENDPOINT_URL or not R2_ACCESS_KEY_ID or not R2_SECRET_ACCESS_KEY:
+        logger.error("缺少必要的R2環境變數，無法初始化客戶端")
+        raise ValueError("R2配置不完整，請檢查環境變數")
+        
+    logger.info(f"初始化R2客戶端: {R2_ENDPOINT_URL}")
+    
     return boto3.client(
         's3',
-        endpoint_url=f'https://{CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com',
-        aws_access_key_id=CLOUDFLARE_ACCESS_KEY_ID,
-        aws_secret_access_key=CLOUDFLARE_SECRET_ACCESS_KEY,
+        endpoint_url=R2_ENDPOINT_URL,
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
         region_name='auto'
     )
 
@@ -37,32 +44,66 @@ async def download_and_upload_photo(photo_reference: str) -> Optional[str]:
         return None
         
     try:
+        # 檢查R2環境變數
+        if not all([R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL, R2_ENDPOINT_URL]):
+            logger.error("缺少必要的R2環境變數，無法進行圖片上傳")
+            return None
+            
         # 計算照片雜湊值作為文件名
         photo_hash = hashlib.md5(photo_reference.encode()).hexdigest()
         file_name = f"places/{photo_hash}.jpg"
         
-        # 初始化R2客戶端
-        r2_client = get_r2_client()
-        bucket_name = 'tuckin'
+        logger.info(f"正在處理圖片: {photo_reference[:30]}... -> {file_name}")
         
         try:
+            # 初始化R2客戶端
+            r2_client = get_r2_client()
+            bucket_name = R2_BUCKET_NAME
+            
             # 檢查圖片是否已存在於R2
             r2_client.head_object(Bucket=bucket_name, Key=file_name)
             logger.info(f"圖片已存在於R2: {file_name}")
-            return f"https://tuckin.r2.dev/{file_name}"
-        except Exception:
-            # 圖片不存在，需要下載和上傳
-            logger.info(f"圖片不存在於R2，開始下載: {photo_reference}")
+            return f"{R2_PUBLIC_URL}/{file_name}"
+        except Exception as e:
+            if "Not Found" in str(e) or "404" in str(e):
+                # 圖片不存在於R2，需要下載
+                logger.info(f"圖片不存在於R2，開始下載: {photo_reference[:30]}...")
+            else:
+                # 其他R2錯誤
+                logger.error(f"檢查R2中的圖片時出錯: {str(e)}")
+                if "NoCredentialProviders" in str(e) or "InvalidAccessKeyId" in str(e):
+                    logger.error("R2認證錯誤，請檢查 ACCESS_KEY_ID 和 SECRET_ACCESS_KEY")
+                    return None
         
-        # 從Google Places API下載圖片
-        max_width = 1200
-        api_url = f"https://places.googleapis.com/v1/places/{photo_reference}/media?maxHeightPx={max_width}&maxWidthPx={max_width}&key={GOOGLE_PLACES_API_KEY}"
+        # 修正Google Places API的圖片URL格式
+        # 處理不同格式的照片引用ID
+        if photo_reference.startswith("places/"):
+            # 已經是完整路徑格式
+            photo_url = f"https://places.googleapis.com/v1/{photo_reference}/media?maxHeightPx=1200&maxWidthPx=1200&key={GOOGLE_PLACES_API_KEY}"
+        else:
+            # 嘗試兩種可能的格式
+            # 1. 基本格式：place_id直接作為路徑
+            photo_url = f"https://places.googleapis.com/v1/places/{photo_reference}/photos/media?maxHeightPx=1200&maxWidthPx=1200&key={GOOGLE_PLACES_API_KEY}"
+            
+        logger.info(f"嘗試下載圖片，URL: {photo_url}")
         
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(api_url)
+            response = await client.get(photo_url)
+            
             if response.status_code != 200:
-                logger.error(f"下載圖片失敗: {response.status_code} {response.text}")
-                return None
+                logger.error(f"下載圖片失敗: {response.status_code}")
+                
+                # 嘗試第二種格式
+                if not photo_reference.startswith("places/"):
+                    alternative_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photoreference={photo_reference}&key={GOOGLE_PLACES_API_KEY}"
+                    logger.info(f"嘗試替代URL格式: {alternative_url}")
+                    
+                    response = await client.get(alternative_url)
+                    if response.status_code != 200:
+                        logger.error(f"使用替代URL格式下載圖片也失敗: {response.status_code}")
+                        return None
+                else:
+                    return None
                 
             image_data = response.content
         
@@ -70,16 +111,25 @@ async def download_and_upload_photo(photo_reference: str) -> Optional[str]:
         compressed_image = compress_image(image_data)
         
         # 上傳到R2
-        r2_client.put_object(
-            Bucket=bucket_name,
-            Key=file_name,
-            Body=compressed_image,
-            ContentType='image/jpeg',
-            ACL='public-read'
-        )
-        
-        logger.info(f"圖片已上傳至R2: {file_name}")
-        return f"https://tuckin.r2.dev/{file_name}"
+        try:
+            logger.info(f"準備上傳圖片到R2: bucket={R2_BUCKET_NAME}, key={file_name}")
+            r2_client.put_object(
+                Bucket=R2_BUCKET_NAME,
+                Key=file_name,
+                Body=compressed_image,
+                ContentType='image/jpeg',
+                ACL='public-read'
+            )
+            
+            logger.info(f"圖片已上傳至R2: {file_name}")
+            public_url = f"{R2_PUBLIC_URL}/{file_name}"
+            logger.info(f"圖片公開URL: {public_url}")
+            return public_url
+        except Exception as r2_error:
+            logger.error(f"上傳圖片到R2時出錯: {str(r2_error)}")
+            if "NoSuchBucket" in str(r2_error):
+                logger.error(f"R2儲存桶不存在: {R2_BUCKET_NAME}")
+            return None
         
     except Exception as e:
         logger.error(f"處理圖片時出錯: {str(e)}")

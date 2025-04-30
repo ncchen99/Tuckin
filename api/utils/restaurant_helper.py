@@ -10,7 +10,7 @@ import unicodedata
 
 from config import GOOGLE_PLACES_API_KEY
 from .cloudflare import get_r2_client
-from api.utils.place_types import get_category_from_types
+from .place_types import get_category_from_types
 
 logger = logging.getLogger(__name__)
 
