@@ -158,7 +158,7 @@ class NotificationService {
           .select()
           .eq('user_id', currentUser.id);
 
-      if (existingTokens != null && existingTokens.isNotEmpty) {
+      if (existingTokens.isNotEmpty) {
         // 更新現有令牌
         final existingTokenId = existingTokens[0]['id'];
         await _supabaseService.client

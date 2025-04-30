@@ -5,7 +5,6 @@ import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:tuckin/services/notification_service.dart';
 
 class MatchingStatusPage extends StatefulWidget {

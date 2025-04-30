@@ -70,7 +70,7 @@ class _LoadingScreenState extends State<LoadingScreen>
   final Random _random = Random();
 
   // 淡出動畫控制
-  double _opacity = 1.0;
+  final double _opacity = 1.0;
   bool _isLoadingComplete = false;
 
   @override

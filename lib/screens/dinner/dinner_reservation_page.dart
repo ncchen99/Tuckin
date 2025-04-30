@@ -10,7 +10,6 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:tuckin/services/user_status_service.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class DinnerReservationPage extends StatefulWidget {
   const DinnerReservationPage({super.key});

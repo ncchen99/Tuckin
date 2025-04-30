@@ -25,7 +25,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   bool _isLoading = false;
   bool _isDataLoaded = false;
-  bool _hasBackPressed = false; // 追蹤是否已按過返回鍵
 
   @override
   void initState() {
@@ -615,34 +614,43 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
                         // 底部按鈕區域
                         Container(
-                          margin: EdgeInsets.only(bottom: 40.h),
+                          margin: EdgeInsets.only(bottom: 20.h),
                           child: Column(
                             children: [
-                              // 下一步或完成按鈕
-                              _isLoading
-                                  ? Container(
-                                    alignment: Alignment.center,
-                                    child: LoadingImage(
-                                      width: 60.w,
-                                      height: 60.h,
-                                      color: const Color(0xFFB33D1C),
-                                    ),
-                                  )
-                                  : ImageButton(
-                                    text: widget.isFromProfile ? '完成' : '下一步',
-                                    imagePath:
-                                        'assets/images/ui/button/red_l.png',
-                                    width: 150.w,
-                                    height: 70.h,
-                                    onPressed: _handleNextStep,
-                                    isEnabled:
-                                        _isFormValid(), // 根據表單有效性決定按鈕是否啟用
-                                  ),
-
+                              Padding(
+                                padding: EdgeInsets.symmetric(vertical: 20.h),
+                                child:
+                                    // 下一步或完成按鈕
+                                    _isLoading
+                                        ? Container(
+                                          alignment: Alignment.center,
+                                          child: LoadingImage(
+                                            width: 60.w,
+                                            height: 60.h,
+                                            color: const Color(0xFFB33D1C),
+                                          ),
+                                        )
+                                        : ImageButton(
+                                          text:
+                                              widget.isFromProfile
+                                                  ? '完成'
+                                                  : '下一步',
+                                          imagePath:
+                                              'assets/images/ui/button/red_l.png',
+                                          width: 150.w,
+                                          height: 70.h,
+                                          onPressed: _handleNextStep,
+                                          isEnabled:
+                                              _isFormValid(), // 根據表單有效性決定按鈕是否啟用
+                                        ),
+                              ),
                               // 進度指示器 - 只在非profile來源時顯示
                               if (!widget.isFromProfile)
                                 Padding(
-                                  padding: EdgeInsets.only(top: 20.h),
+                                  padding: EdgeInsets.only(
+                                    top: 15.h,
+                                    bottom: 10.h,
+                                  ),
                                   child: const ProgressDotsIndicator(
                                     totalSteps: 5,
                                     currentStep: 2,

@@ -435,7 +435,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                       // 分頁指示器
                       Padding(
-                        padding: EdgeInsets.only(bottom: 20.h), // 與登入頁面統一底部間距
+                        padding: EdgeInsets.only(bottom: 30.h), // 與登入頁面統一底部間距
                         child: ProgressDotsIndicator(
                           totalSteps: _totalPages,
                           currentStep: _currentPage + 1,

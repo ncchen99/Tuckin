@@ -546,9 +546,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
 
                                       // 下一步按鈕
                                       Container(
-                                        margin: EdgeInsets.symmetric(
-                                          vertical: 30.h,
-                                        ),
+                                        margin: EdgeInsets.only(bottom: 35.h),
                                         child: ImageButton(
                                           text: '下一步',
                                           imagePath:
@@ -665,9 +663,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
 
                                       // 完成按鈕
                                       Container(
-                                        margin: EdgeInsets.symmetric(
-                                          vertical: 30.h,
-                                        ),
+                                        margin: EdgeInsets.only(bottom: 35.h),
                                         child:
                                             _isLoading
                                                 ? LoadingImage(
@@ -698,7 +694,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                             // 頁面底部：進度指示器 - 只在非profile來源時顯示
                             if (!widget.isFromProfile)
                               Padding(
-                                padding: EdgeInsets.only(bottom: 20.h),
+                                padding: EdgeInsets.only(bottom: 30.h),
                                 child: const ProgressDotsIndicator(
                                   totalSteps: 5,
                                   currentStep: 4,

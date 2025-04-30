@@ -76,11 +76,11 @@ class UserStatusService with ChangeNotifier {
 
       debugPrint('從持久化儲存中載入 UserStatusService 資料:');
       if (_confirmedDinnerTime != null) {
-        debugPrint('- 聚餐時間: ${formattedDinnerTime}');
+        debugPrint('- 聚餐時間: $formattedDinnerTime');
       }
       if (_cancelDeadline != null) {
-        debugPrint('- 取消截止時間: ${formattedCancelDeadline}');
-        debugPrint('- 可以取消預約: ${canCancelReservation}');
+        debugPrint('- 取消截止時間: $formattedCancelDeadline');
+        debugPrint('- 可以取消預約: $canCancelReservation');
       }
 
       notifyListeners();
@@ -168,11 +168,11 @@ class UserStatusService with ChangeNotifier {
       _saveToPrefs(); // 當資料更新時儲存到持久化儲存
       debugPrint('UserStatusService 狀態已更新並持久化:');
       if (_confirmedDinnerTime != null) {
-        debugPrint('- 聚餐時間: ${formattedDinnerTime}');
+        debugPrint('- 聚餐時間: $formattedDinnerTime');
       }
       if (_cancelDeadline != null) {
-        debugPrint('- 取消截止時間: ${formattedCancelDeadline}');
-        debugPrint('- 可以取消預約: ${canCancelReservation}');
+        debugPrint('- 取消截止時間: $formattedCancelDeadline');
+        debugPrint('- 可以取消預約: $canCancelReservation');
       }
     }
   }

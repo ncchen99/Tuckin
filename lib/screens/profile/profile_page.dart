@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';

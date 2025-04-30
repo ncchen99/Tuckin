@@ -6,7 +6,6 @@ import 'package:tuckin/utils/index.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/services/user_status_service.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 
 class DinnerInfoPage extends StatefulWidget {
   const DinnerInfoPage({super.key});

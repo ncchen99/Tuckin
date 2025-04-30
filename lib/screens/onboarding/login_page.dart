@@ -222,9 +222,9 @@ class _LoginPageState extends State<LoginPage> {
 
                   // 底部登入區域
                   Container(
-                    margin: EdgeInsets.only(bottom: 40.h),
+                    margin: EdgeInsets.only(bottom: 20.h),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         // 隱私條款勾選 - 先顯示
                         Container(
@@ -309,7 +309,7 @@ class _LoginPageState extends State<LoginPage> {
 
                         // 進度指示器
                         Padding(
-                          padding: EdgeInsets.only(top: 15.h, bottom: 20.h),
+                          padding: EdgeInsets.only(bottom: 10.h, top: 15.h),
                           child: const ProgressDotsIndicator(
                             totalSteps: 5,
                             currentStep: 1,

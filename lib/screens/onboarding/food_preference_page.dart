@@ -21,7 +21,7 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
   final Set<int> _selectedFoods = {}; // 用於存儲選中的食物ID
   bool _isLoading = false;
   bool _isDataLoaded = false;
-  bool _hasBackPressed = false; // 追蹤是否已按過返回鍵
+  final bool _hasBackPressed = false; // 追蹤是否已按過返回鍵
 
   // 食物類型列表 - 更新為目錄中提供的圖片
   final List<Map<String, dynamic>> _foodTypes = [
@@ -439,37 +439,50 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
 
                             // 下一步或完成按鈕區域
                             Container(
-                              margin: EdgeInsets.symmetric(vertical: 30.h),
+                              margin: EdgeInsets.only(top: 20.h, bottom: 20.h),
                               alignment: Alignment.center,
-                              child:
-                                  _isLoading
-                                      ? LoadingImage(
-                                        width: 60.w,
-                                        height: 60.h,
-                                        color: const Color(0xFFB33D1C),
-                                      )
-                                      : ImageButton(
-                                        text:
-                                            widget.isFromProfile ? '完成' : '下一步',
-                                        imagePath:
-                                            'assets/images/ui/button/red_l.png',
-                                        width: 150.w,
-                                        height: 70.h,
-                                        onPressed: _handleNextStep,
-                                        isEnabled:
-                                            _isFormValid(), // 根據選擇狀態決定按鈕是否啟用
+                              child: Column(
+                                children: [
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 20.h,
+                                    ),
+                                    child:
+                                        _isLoading
+                                            ? LoadingImage(
+                                              width: 60.w,
+                                              height: 60.h,
+                                              color: const Color(0xFFB33D1C),
+                                            )
+                                            : ImageButton(
+                                              text:
+                                                  widget.isFromProfile
+                                                      ? '完成'
+                                                      : '下一步',
+                                              imagePath:
+                                                  'assets/images/ui/button/red_l.png',
+                                              width: 150.w,
+                                              height: 70.h,
+                                              onPressed: _handleNextStep,
+                                              isEnabled:
+                                                  _isFormValid(), // 根據選擇狀態決定按鈕是否啟用
+                                            ),
+                                  ),
+                                  // 進度指示器 - 只在非profile來源時顯示
+                                  if (!widget.isFromProfile)
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        top: 15.h,
+                                        bottom: 10.h,
                                       ),
-                            ),
-
-                            // 進度指示器 - 只在非profile來源時顯示
-                            if (!widget.isFromProfile)
-                              Padding(
-                                padding: EdgeInsets.only(bottom: 20.h),
-                                child: const ProgressDotsIndicator(
-                                  totalSteps: 5,
-                                  currentStep: 3,
-                                ),
+                                      child: const ProgressDotsIndicator(
+                                        totalSteps: 5,
+                                        currentStep: 3,
+                                      ),
+                                    ),
+                                ],
                               ),
+                            ),
                           ],
                         ),
                       ),
