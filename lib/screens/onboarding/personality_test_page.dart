@@ -700,6 +700,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                                   currentStep: 4,
                                 ),
                               ),
+                            if (widget.isFromProfile) SizedBox(height: 5.h),
                           ],
                         ),
                       ],

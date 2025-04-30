@@ -228,7 +228,7 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         // 隱私條款勾選 - 先顯示
                         Container(
-                          margin: EdgeInsets.symmetric(vertical: 15.h),
+                          margin: EdgeInsets.only(bottom: 5.h),
                           width: 250.w,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
