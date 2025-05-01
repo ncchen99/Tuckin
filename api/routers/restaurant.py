@@ -320,7 +320,7 @@ async def vote_restaurant(
     投票後檢查是否所有用戶都已投票，若是則建立聚餐事件
     """
     try:
-        user_id = current_user.id
+        user_id = current_user.user.id
         restaurant_id = vote.restaurant_id
         
         # 驗證餐廳存在
@@ -450,9 +450,9 @@ async def _get_group_and_votes(supabase: Client, group_id: str) -> Dict[str, Any
     
     # 獲取已投票的用戶和餐廳
     restaurant_votes = supabase.table("restaurant_votes") \
-        .select("user_id, restaurant_id") \
+        .select("user_id, restaurant_id, is_system_recommendation") \
         .eq("group_id", group_id) \
-        .not_("user_id", "is", "null") \
+        .filter("user_id", "not.is", "null") \
         .execute()
     
     # 計算已投票的用戶ID
@@ -475,9 +475,14 @@ async def _process_completed_votes(
     """
     logger.info(f"群組 {group_id} 的所有成員都已投票，開始建立聚餐事件")
     
-    # 計算每家餐廳的票數
+    # 計算每家餐廳的票數（僅計算非系統推薦的票數）
     vote_counts = {}
     for vote in votes:
+        # 只計算非系統推薦的投票
+        is_system_recommendation = vote.get("is_system_recommendation", False)
+        if is_system_recommendation is True:
+            continue
+            
         rid = vote["restaurant_id"]
         if rid not in vote_counts:
             vote_counts[rid] = 0
@@ -485,7 +490,7 @@ async def _process_completed_votes(
     
     # 找出票數最多的餐廳
     if not vote_counts:
-        raise ValueError(f"群組 {group_id} 沒有有效的投票記錄")
+        raise ValueError(f"群組 {group_id} 沒有有效的非系統推薦投票記錄")
     
     # 按票數排序餐廳
     sorted_restaurants = sorted(vote_counts.items(), key=lambda x: x[1], reverse=True)
@@ -547,7 +552,7 @@ async def _process_completed_votes(
             .execute()
     
     # 格式化聚餐時間顯示
-    formatted_dinner_time = next_dinner_time.strftime("%Y-%m-%d %H:%M")
+    formatted_dinner_time = next_dinner_time.strftime("%-m月%-d日")
     
     # 發送通知
     notification_service = NotificationService(use_service_role=True)
@@ -556,7 +561,7 @@ async def _process_completed_votes(
             await notification_service.send_notification(
                 user_id=member_id,
                 title="餐廳出爐！",
-                body=f"大家已選定 {restaurant_name} 作為聚餐地點，期待{formatted_dinner_time}的聚餐",
+                body=f"這次的餐廳是{restaurant_name}，期待{formatted_dinner_time}的聚餐歐！",
                 data={
                     "type": "dining_event_created",
                     "event_id": event_id,
@@ -583,9 +588,10 @@ async def get_group_restaurant_votes(
     自動根據當前用戶ID查詢其所屬群組的餐廳投票
     返回所有被投票的餐廳完整資料列表
     按照票數多少排序，但不向前端返回票數信息
+    只計算不是系統推薦(is_system_recommendation=false)的票數
     """
     try:
-        user_id = current_user.id
+        user_id = current_user.user.id
         
         # 獲取用戶所屬的群組ID
         user_group = supabase.table("user_matching_info") \
@@ -603,7 +609,7 @@ async def get_group_restaurant_votes(
         
         # 獲取該群組的所有投票
         votes = supabase.table("restaurant_votes") \
-            .select("restaurant_id") \
+            .select("restaurant_id, is_system_recommendation") \
             .eq("group_id", group_id) \
             .execute()
         
@@ -611,9 +617,14 @@ async def get_group_restaurant_votes(
             # 如果沒有投票，返回空列表
             return []
         
-        # 計算每家餐廳的票數
+        # 計算每家餐廳的票數（僅計算非系統推薦的票數）
         restaurant_vote_counts = {}
         for vote in votes.data:
+            # 只計算非系統推薦的投票
+            is_system_recommendation = vote.get("is_system_recommendation", False)
+            if is_system_recommendation is True:
+                continue
+                
             restaurant_id = vote["restaurant_id"]
             if restaurant_id not in restaurant_vote_counts:
                 restaurant_vote_counts[restaurant_id] = 0

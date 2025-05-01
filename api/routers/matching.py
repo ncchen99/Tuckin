@@ -759,7 +759,9 @@ async def process_batch_matching(supabase: Client):
         
         # 3. 將結果保存到數據庫
         notification_service = NotificationService(use_service_role=True)
-        created_groups, total_matched_users = await _save_matching_groups_to_db(supabase, result_groups, notification_service, datetime.now() + timedelta(hours=24))
+        # 使用 DinnerTimeUtils 計算確認期限
+        dinner_time_info = DinnerTimeUtils.calculate_dinner_time_info()
+        created_groups, total_matched_users = await _save_matching_groups_to_db(supabase, result_groups, notification_service, dinner_time_info.cancel_deadline)
         
         result_message = f"批量配對完成：共創建 {created_groups} 個組別"
         logger.info(result_message)

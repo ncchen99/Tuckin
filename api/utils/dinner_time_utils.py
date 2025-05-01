@@ -171,7 +171,13 @@ class DinnerTimeUtils:
         restaurant_selection_end = dinner_date_time - timedelta(hours=37)
 
         # 計算取消預約的截止時間
-        cancel_deadline = restaurant_selection_start
+        cancel_deadline = TW_TIMEZONE.localize(datetime(
+            selected_dinner_date.year,
+            selected_dinner_date.month,
+            selected_dinner_date.day,
+            6,  # 早上6點
+            0,
+        ) - timedelta(days=2))
 
         # 計算聚餐后問卷推播時間（聚餐后4小時）
         questionnaire_notification_time = dinner_date_time + timedelta(hours=4)

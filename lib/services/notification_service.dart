@@ -5,9 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/supabase_service.dart';
 import 'package:tuckin/utils/index.dart';
-import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter/foundation.dart';
 
 /// 通知服務，處理推送通知相關邏輯
 class NotificationService {

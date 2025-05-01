@@ -23,7 +23,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   bool _isDataLoaded = false;
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  bool _hasBackPressed = false; // 追蹤是否已按過返回鍵
+  final bool _hasBackPressed = false; // 追蹤是否已按過返回鍵
 
   // 個性類型問題與選項
   final List<Map<String, dynamic>> _questions = [
