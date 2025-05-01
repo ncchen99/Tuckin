@@ -6,10 +6,11 @@
 * [x] [前端] 歡迎和登錄設定頁面的液面指示器對齊問題
 
 - [x] [SQL] dining_events 新增餐廳已經確認(status 已確認?)
-- [ ] [API] 完成"餐廳投票功能"
-    - [ ] 檢查投票是否完成
-    - [ ] 若已完成，建立聚餐資訊 (dining_events)，更改所有用戶狀態，發送提醒，返回用戶狀態
-    - [ ] 若未完成，更改狀態成 waiting_other_users，返回用戶狀態
+- [x] [API] 完成"餐廳投票功能"
+    - [x] 檢查投票是否完成
+    - [x] 若已完成，建立聚餐資訊 (dining_events)，設置聚餐資訊status為pending_confirmation，更改所有用戶狀態成 waiting_attendance，發送提醒，返回用戶狀態
+    - [x] 若未完成，更改用戶狀態成 waiting_other_users，返回用戶狀態
+    - [ ] 聚餐時間計算
 - [ ] [API] server 端計算流程時程
 - [ ] [API] 修改推薦餐廳的邏輯先檢查餐廳的營業時間
 - [ ] [API] 定時更改投票狀態

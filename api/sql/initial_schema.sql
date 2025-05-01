@@ -14,11 +14,25 @@ CREATE TABLE IF NOT EXISTS dining_events (
     restaurant_id UUID REFERENCES restaurants(id),
     name TEXT NOT NULL,
     date TIMESTAMP WITH TIME ZONE NOT NULL,
-    status TEXT NOT NULL DEFAULT 'confirmed',
+    status TEXT NOT NULL DEFAULT 'pending_confirmation' CHECK (status IN ('pending_confirmation', 'confirmed', 'completed')),
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 更新現有記錄的status以符合新的限制條件
+DO $$
+BEGIN
+    -- 將舊的 'confirmed' 值更新為 'completed'（如果有任何時間早於現在的confirmed事件）
+    UPDATE dining_events
+    SET status = 'completed'
+    WHERE status = 'confirmed' AND date < NOW();
+    
+    -- 將任何不在允許列表中的狀態更新為 'pending_confirmation'
+    UPDATE dining_events
+    SET status = 'pending_confirmation'
+    WHERE status NOT IN ('pending_confirmation', 'confirmed', 'completed');
+END $$;
 
 -- 創建 dining_event_participants 表
 CREATE TABLE IF NOT EXISTS dining_event_participants (
@@ -175,8 +189,8 @@ CREATE POLICY restaurants_read ON restaurants FOR SELECT TO authenticated USING 
 -- 為群組成員提供對群組聚餐事件的讀取權限
 CREATE POLICY dining_events_group_read ON dining_events 
     FOR SELECT TO authenticated 
-    USING (group_id IN (
-        SELECT group_id FROM group_uuid_mapping 
+    USING (matching_group_id IN (
+        SELECT matching_group_id FROM user_matching_info 
         WHERE user_id = auth.uid()
     ));
 

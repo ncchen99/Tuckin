@@ -7,6 +7,7 @@ import logging
 from collections import Counter
 import itertools
 from collections import defaultdict
+import json
 
 from schemas.matching import (
     JoinMatchingRequest, JoinMatchingResponse, 
@@ -16,6 +17,7 @@ from schemas.matching import (
 from schemas.dining import DiningUserStatus
 from dependencies import get_supabase, get_current_user, get_supabase_service, verify_cron_api_key
 from services.notification_service import NotificationService
+from utils.dinner_time_utils import DinnerTimeUtils
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -805,7 +807,7 @@ async def recommend_restaurants_for_group(supabase: Client, group_id: str, user_
     """
     為群組推薦餐廳並保存到restaurant_votes表
     
-    基於群組成員的食物偏好，推薦2家餐廳
+    基於群組成員的食物偏好和餐廳營業時間，推薦2家餐廳
     """
     try:
         logger.info(f"為群組 {group_id} 推薦餐廳")
@@ -815,14 +817,30 @@ async def recommend_restaurants_for_group(supabase: Client, group_id: str, user_
         if not food_preferences:
             logger.warning(f"無法獲取群組 {group_id} 成員的食物偏好")
             return False
+        
+        # 2. 獲取聚餐時間資訊
+        dinner_time_info = DinnerTimeUtils.calculate_dinner_time_info()
+        dinner_time = dinner_time_info.next_dinner_time
+        dinner_weekday = dinner_time.weekday()  # 0=星期一, 6=星期日
+        dinner_hour = dinner_time.hour
+        dinner_minute = dinner_time.minute
+        
+        logger.info(f"聚餐時間: {dinner_time.strftime('%Y-%m-%d %H:%M')}, 星期{dinner_weekday+1}, 時間: {dinner_hour}:{dinner_minute}")
             
-        # 2. 根據偏好選擇兩家餐廳
-        recommended_restaurants = await select_recommended_restaurants(supabase, food_preferences)
+        # 3. 根據偏好和營業時間選擇兩家餐廳
+        recommended_restaurants = await select_recommended_restaurants(
+            supabase, 
+            food_preferences,
+            dinner_weekday,
+            dinner_hour,
+            dinner_minute
+        )
+        
         if not recommended_restaurants or len(recommended_restaurants) == 0:
             logger.warning(f"無法為群組 {group_id} 推薦餐廳")
             return False
             
-        # 3. 將推薦餐廳保存到restaurant_votes表
+        # 4. 將推薦餐廳保存到restaurant_votes表
         for restaurant_id in recommended_restaurants:
             # 檢查是否已存在記錄
             existing_vote = supabase.table("restaurant_votes") \
@@ -899,27 +917,56 @@ async def get_group_food_preferences(supabase: Client, user_ids: List[str]) -> D
 
 async def select_recommended_restaurants(
     supabase: Client, 
-    food_preferences: Dict[str, int], 
+    food_preferences: Dict[str, int],
+    dinner_weekday: int,
+    dinner_hour: int,
+    dinner_minute: int,
     limit: int = 2
 ) -> List[str]:
     """
-    基於食物偏好選擇推薦餐廳
+    基於食物偏好和營業時間選擇推薦餐廳
     
     策略:
-    1. 如果有共同偏好，優先選擇符合最受歡迎類別的餐廳
-    2. 如果偏好多樣化，選擇覆蓋多數用戶偏好的餐廳
-    3. 如果沒有偏好資料，隨機選擇餐廳
+    1. 過濾聚餐時間有營業的餐廳
+    2. 如果有共同偏好，優先選擇符合最受歡迎類別的餐廳
+    3. 如果偏好多樣化，選擇覆蓋多數用戶偏好的餐廳
+    4. 如果沒有偏好資料，隨機選擇營業中的餐廳
     """
     try:
-        if not food_preferences:
-            # 如果沒有偏好資料，隨機選擇餐廳
-            random_restaurants = supabase.table("restaurants") \
-                .select("id") \
-                .limit(limit) \
-                .order("created_at") \
-                .execute()
+        # 調整星期幾的表示方式，使其與 Google Places API 一致 (0=星期日, 6=星期六)
+        google_weekday = (dinner_weekday + 1) % 7
+        logger.info(f"聚餐時間：星期 {google_weekday}，{dinner_hour}:{dinner_minute}")
+        
+        # 查詢所有餐廳並檢查營業時間
+        all_restaurants = supabase.table("restaurants") \
+            .select("id, name, category, business_hours") \
+            .execute()
+            
+        if not all_restaurants.data:
+            logger.warning("找不到任何餐廳")
+            return []
+            
+        # 過濾出營業中的餐廳
+        open_restaurants = []
+        for restaurant in all_restaurants.data:
+            restaurant_id = restaurant["id"]
+            restaurant_name = restaurant["name"]
+            business_hours = restaurant.get("business_hours")
+            
+            if is_restaurant_open(business_hours, google_weekday, dinner_hour, dinner_minute):
+                open_restaurants.append(restaurant)
+                logger.info(f"餐廳 {restaurant_name} 在聚餐時間營業")
+            else:
+                logger.info(f"餐廳 {restaurant_name} 在聚餐時間不營業")
                 
-            return [r["id"] for r in random_restaurants.data] if random_restaurants.data else []
+        if not open_restaurants:
+            logger.warning("找不到聚餐時間營業的餐廳")
+            return []
+            
+        # 如果沒有偏好資料，隨機選擇營業中的餐廳
+        if not food_preferences:
+            random.shuffle(open_restaurants)
+            return [r["id"] for r in open_restaurants[:limit]]
         
         # 按偏好度排序類別
         sorted_preferences = sorted(food_preferences.items(), key=lambda x: x[1], reverse=True)
@@ -928,45 +975,123 @@ async def select_recommended_restaurants(
         top_categories = [category for category, _ in sorted_preferences[:limit*2]]
         
         if not top_categories:
-            return []
+            # 如果沒有類別偏好，隨機選擇營業中的餐廳
+            random.shuffle(open_restaurants)
+            return [r["id"] for r in open_restaurants[:limit]]
             
-        # 從這些類別中查詢餐廳
+        # 從營業中的餐廳和偏好類別中選擇推薦
         recommended_ids = []
         for category in top_categories:
             if len(recommended_ids) >= limit:
                 break
                 
-            # 查詢指定類別的餐廳
-            category_restaurants = supabase.table("restaurants") \
-                .select("id") \
-                .eq("category", category) \
-                .limit(1) \
-                .order("created_at") \
-                .execute()
-                
-            if category_restaurants.data:
-                restaurant_id = category_restaurants.data[0]["id"]
+            # 從營業中的餐廳中查找符合類別的餐廳
+            category_restaurants = [r for r in open_restaurants if r.get("category") == category]
+            
+            if category_restaurants:
+                # 隨機選擇一家符合條件的餐廳
+                restaurant = random.choice(category_restaurants)
+                restaurant_id = restaurant["id"]
                 if restaurant_id not in recommended_ids:
                     recommended_ids.append(restaurant_id)
         
-        # 如果推薦不足，使用隨機餐廳補充
+        # 如果推薦不足，從其他營業中的餐廳中隨機補充
         if len(recommended_ids) < limit:
             remaining = limit - len(recommended_ids)
             
             # 排除已選擇的餐廳
-            random_restaurants = supabase.table("restaurants") \
-                .select("id") \
-                .not_("id", "in", f"({','.join(recommended_ids)})") \
-                .limit(remaining) \
-                .order("created_at") \
-                .execute()
-                
-            if random_restaurants.data:
-                for r in random_restaurants.data:
-                    recommended_ids.append(r["id"])
+            remaining_restaurants = [r for r in open_restaurants if r["id"] not in recommended_ids]
+            random.shuffle(remaining_restaurants)
+            
+            for i in range(min(remaining, len(remaining_restaurants))):
+                recommended_ids.append(remaining_restaurants[i]["id"])
         
         return recommended_ids
         
     except Exception as e:
         logger.error(f"選擇推薦餐廳時出錯: {str(e)}")
-        return [] 
+        return []
+
+def is_restaurant_open(business_hours_json, weekday, hour, minute):
+    """
+    檢查餐廳在指定時間是否營業
+    
+    Args:
+        business_hours_json: 餐廳營業時間的JSON字符串或物件
+        weekday: 星期幾 (0=星期日, 6=星期六)
+        hour: 小時 (0-23)
+        minute: 分鐘 (0-59)
+        
+    Returns:
+        bool: 餐廳是否營業
+    """
+    try:
+        # 如果沒有營業時間數據，預設為營業
+        if not business_hours_json:
+            return True
+            
+        # 嘗試解析營業時間數據
+        business_hours = None
+        if isinstance(business_hours_json, str):
+            # 檢查是否是已經使用單引號的dict字符串，這種情況在Python中不是有效的JSON
+            if business_hours_json.startswith('{') and business_hours_json.endswith('}'):
+                try:
+                    # 嘗試通過eval安全地將字符串轉換為字典
+                    # 注意：在生產環境中應謹慎使用eval
+                    business_hours = eval(business_hours_json)
+                except Exception:
+                    # 如果eval失敗，嘗試將單引號替換為雙引號後解析JSON
+                    try:
+                        import re
+                        # 將字符串中的單引號替換為雙引號，但忽略已在雙引號內的單引號
+                        # 這是一個簡化的方法，可能不適用於所有情況
+                        corrected_json = re.sub(r"(\w+):'([^']*)'", r'"\1":"\2"', business_hours_json)
+                        corrected_json = corrected_json.replace("'", '"')
+                        business_hours = json.loads(corrected_json)
+                    except Exception:
+                        logger.warning(f"無法解析營業時間數據: {business_hours_json}")
+                        return True
+            else:
+                try:
+                    business_hours = json.loads(business_hours_json)
+                except json.JSONDecodeError:
+                    logger.warning(f"無法解析營業時間數據: {business_hours_json}")
+                    return True
+        else:
+            # 已經是字典或其他對象
+            business_hours = business_hours_json
+            
+        # 如果沒有periods字段，預設為營業
+        if not isinstance(business_hours, dict) or "periods" not in business_hours:
+            return True
+            
+        # 檢查當天是否有營業時間安排
+        for period in business_hours["periods"]:
+            # 檢查是否為當天營業
+            if "open" in period and "day" in period["open"] and period["open"]["day"] == weekday:
+                opening_hour = period["open"].get("hour", 0)
+                opening_minute = period["open"].get("minute", 0)
+                
+                # 確保close數據存在
+                if "close" not in period:
+                    continue
+                    
+                closing_hour = period["close"].get("hour", 23)
+                closing_minute = period["close"].get("minute", 59)
+                
+                # 現在時間轉換為分鐘表示
+                current_time_in_minutes = hour * 60 + minute
+                opening_time_in_minutes = opening_hour * 60 + opening_minute
+                closing_time_in_minutes = closing_hour * 60 + closing_minute
+                
+                # 檢查是否在營業時間內
+                if opening_time_in_minutes <= current_time_in_minutes < closing_time_in_minutes:
+                    return True
+                    
+        # 如果沒有找到匹配的營業時間段，則視為不營業
+        return False
+        
+    except Exception as e:
+        logger.error(f"檢查餐廳營業時間出錯: {str(e)}")
+        # 出錯時預設為營業，避免篩選掉太多餐廳
+        return True 

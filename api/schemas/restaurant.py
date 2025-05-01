@@ -48,6 +48,9 @@ class RestaurantVoteCreate(RestaurantVoteBase):
 class RestaurantVote(RestaurantVoteBase):
     id: UUID
     created_at: datetime
+    is_voting_complete: Optional[bool] = False
+    dining_event_id: Optional[str] = None
+    winning_restaurant: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -70,6 +73,10 @@ class GroupRestaurantVotesResponse(BaseModel):
 class UserVoteRequest(BaseModel):
     group_id: str
     restaurant_id: str
+
+class UserVoteCreate(BaseModel):
+    restaurant_id: str
+    is_system_recommendation: bool = False
 
 class RatingBase(BaseModel):
     restaurant_id: str

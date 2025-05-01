@@ -25,10 +25,10 @@ app.add_middleware(
 )
 
 # 註冊路由
-app.include_router(group.router, prefix="/api/group", tags=["群組管理"])
+# app.include_router(group.router, prefix="/api/group", tags=["群組管理"])
 app.include_router(restaurant.router, prefix="/api/restaurant", tags=["餐廳管理"])
-app.include_router(user.router, prefix="/api/user", tags=["用戶資料"])
-app.include_router(utils.router, prefix="/api/utils", tags=["通用工具"])
+# app.include_router(user.router, prefix="/api/user", tags=["用戶資料"])
+# app.include_router(utils.router, prefix="/api/utils", tags=["通用工具"])
 app.include_router(matching.router, prefix="/api/matching", tags=["配對系統"])
 app.include_router(dining.router, prefix="/api/dining", tags=["聚餐管理"])
 

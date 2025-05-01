@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from supabase import Client
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import asyncio
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
-from schemas.restaurant import RestaurantCreate, RestaurantResponse, RestaurantVote, RestaurantVoteCreate
+from schemas.restaurant import RestaurantCreate, RestaurantResponse, RestaurantVote, RestaurantVoteCreate, UserVoteCreate
 from dependencies import get_supabase, get_supabase_service, get_current_user
 from utils.place_types import get_category_from_types
 from utils.google_maps import (
@@ -26,6 +26,8 @@ from utils.image_processor import (
     process_and_update_image,
     download_and_upload_photo
 )
+from services.notification_service import NotificationService
+from utils.dinner_time_utils import DinnerTimeUtils
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -307,29 +309,343 @@ async def get_restaurant(
 
 @router.post("/vote", response_model=RestaurantVote)
 async def vote_restaurant(
-    vote: RestaurantVoteCreate,
+    vote: UserVoteCreate,
     supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
-    使用 restaurant_id 對餐廳進行投票，所以路由的schema可能需要更改
-    這部分需要使用user ID 查詢 user_matching_info 表，再取得 matching_group_id 與用戶的投票組合資料插入表格\
-    餐廳有可能是已經在restaurant vote 裡面存在的也有可能是用戶使用搜尋功能新增的
-    # 下一步:檢查是否該group當中用戶都已經投票如果是的話建立dining event...
+    使用 restaurant_id 對餐廳進行投票
+    後端自動根據當前用戶ID查詢其所屬的matching_group_id
+    不需要前端提供group_id
+    投票後檢查是否所有用戶都已投票，若是則建立聚餐事件
     """
-    pass
+    try:
+        user_id = current_user.id
+        restaurant_id = vote.restaurant_id
+        
+        # 驗證餐廳存在
+        restaurant = supabase.table("restaurants") \
+            .select("*") \
+            .eq("id", restaurant_id) \
+            .execute()
+            
+        if not restaurant.data or len(restaurant.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"找不到ID為 {restaurant_id} 的餐廳"
+            )
+        restaurant_data = restaurant.data[0]
+        
+        # 獲取用戶所屬的群組ID和群組資訊
+        user_group_response = supabase.table("user_matching_info") \
+            .select("matching_group_id") \
+            .eq("user_id", user_id) \
+            .execute()
+            
+        if not user_group_response.data or len(user_group_response.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="您尚未加入任何配對群組"
+            )
+        
+        group_id = user_group_response.data[0]["matching_group_id"]
+        
+        # 檢查用戶是否已經為這個餐廳投過票
+        existing_vote = supabase.table("restaurant_votes") \
+            .select("*") \
+            .eq("restaurant_id", restaurant_id) \
+            .eq("group_id", group_id) \
+            .eq("user_id", user_id) \
+            .execute()
+            
+        if existing_vote.data and len(existing_vote.data) > 0:
+            # 用戶已經投過票，返回現有投票，但繼續檢查是否所有人都投票了
+            vote_data = existing_vote.data[0]
+        else:
+            # 創建新的投票記錄
+            vote_data = {
+                "id": str(uuid4()),
+                "restaurant_id": restaurant_id,
+                "group_id": group_id,
+                "user_id": user_id,
+                "is_system_recommendation": vote.is_system_recommendation,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            result = supabase.table("restaurant_votes") \
+                .insert(vote_data) \
+                .execute()
+            
+            if not result.data or len(result.data) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="創建投票時出錯"
+                )
+            vote_data = result.data[0]
+        
+        # 獲取群組成員資訊和已投票的用戶
+        group_and_votes = await _get_group_and_votes(supabase, group_id)
+        
+        group_members = group_and_votes["group_members"]
+        voted_user_ids = group_and_votes["voted_user_ids"]
+        
+        # 計算投票結果
+        result_data = {"is_voting_complete": False}
+        
+        # 如果所有成員都已投票
+        if len(voted_user_ids) >= len(group_members):
+            # 處理投票完成的情況
+            result_data = await _process_completed_votes(
+                supabase, 
+                group_id, 
+                group_members, 
+                group_and_votes["restaurant_votes"]
+            )
+            result_data["is_voting_complete"] = True
+        else:
+            # 更新當前用戶狀態為等待其他用戶
+            supabase.table("user_status") \
+                .update({
+                    "status": "waiting_other_users",
+                    "updated_at": datetime.utcnow().isoformat()
+                }) \
+                .eq("user_id", user_id) \
+                .execute()
+        
+        # 將投票結果和票數信息合併
+        vote_response = RestaurantVote(**vote_data)
+        vote_response.is_voting_complete = result_data.get("is_voting_complete", False)
+        
+        if result_data.get("is_voting_complete"):
+            vote_response.dining_event_id = result_data.get("dining_event_id")
+            vote_response.winning_restaurant = result_data.get("winning_restaurant")
+        
+        return vote_response
+    
+    except HTTPException as e:
+        # 重新拋出HTTP異常
+        raise e
+    except Exception as e:
+        logger.error(f"投票時出錯: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"投票時出錯: {str(e)}"
+        )
 
-@router.get("/vote", response_model=List[RestaurantVote])
+async def _get_group_and_votes(supabase: Client, group_id: str) -> Dict[str, Any]:
+    """
+    獲取群組成員和投票情況，減少重複數據庫查詢
+    """
+    # 獲取群組成員資訊
+    group_info = supabase.table("matching_groups") \
+        .select("user_ids") \
+        .eq("id", group_id) \
+        .execute()
+    
+    if not group_info.data or not group_info.data[0].get("user_ids"):
+        raise ValueError(f"無法獲取群組 {group_id} 的成員信息")
+    
+    # 獲取群組成員ID
+    group_members = group_info.data[0]["user_ids"]
+    
+    # 獲取已投票的用戶和餐廳
+    restaurant_votes = supabase.table("restaurant_votes") \
+        .select("user_id, restaurant_id") \
+        .eq("group_id", group_id) \
+        .not_("user_id", "is", "null") \
+        .execute()
+    
+    # 計算已投票的用戶ID
+    voted_user_ids = set(vote["user_id"] for vote in restaurant_votes.data if vote.get("user_id"))
+    
+    return {
+        "group_members": group_members,
+        "voted_user_ids": voted_user_ids,
+        "restaurant_votes": restaurant_votes.data
+    }
+
+async def _process_completed_votes(
+    supabase: Client, 
+    group_id: str, 
+    group_members: List[str], 
+    votes: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    處理投票完成的邏輯
+    """
+    logger.info(f"群組 {group_id} 的所有成員都已投票，開始建立聚餐事件")
+    
+    # 計算每家餐廳的票數
+    vote_counts = {}
+    for vote in votes:
+        rid = vote["restaurant_id"]
+        if rid not in vote_counts:
+            vote_counts[rid] = 0
+        vote_counts[rid] += 1
+    
+    # 找出票數最多的餐廳
+    if not vote_counts:
+        raise ValueError(f"群組 {group_id} 沒有有效的投票記錄")
+    
+    # 按票數排序餐廳
+    sorted_restaurants = sorted(vote_counts.items(), key=lambda x: x[1], reverse=True)
+    winning_restaurant_id = sorted_restaurants[0][0]
+    
+    # 獲取餐廳資訊
+    restaurant_info = supabase.table("restaurants") \
+        .select("*") \
+        .eq("id", winning_restaurant_id) \
+        .execute()
+    
+    if not restaurant_info.data:
+        raise ValueError(f"無法獲取餐廳 {winning_restaurant_id} 的資訊")
+    
+    restaurant_name = restaurant_info.data[0]["name"]
+    restaurant_data = restaurant_info.data[0]
+    
+    # 使用DinnerTimeUtils獲取下次聚餐時間
+    dinner_time_info = DinnerTimeUtils.calculate_dinner_time_info()
+    next_dinner_time = dinner_time_info.next_dinner_time
+    
+    # 創建聚餐事件
+    dining_event = {
+        "id": str(uuid4()),
+        "matching_group_id": group_id,
+        "restaurant_id": winning_restaurant_id,
+        "name": f"{restaurant_name} 聚餐",
+        "date": next_dinner_time.isoformat(),  # 使用計算出的聚餐時間
+        "status": "pending_confirmation",  # 餐廳待確認
+        "description": f"群組投票選出的餐廳: {restaurant_name}",
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat()
+    }
+    
+    event_result = supabase.table("dining_events") \
+        .insert(dining_event) \
+        .execute()
+    
+    if not event_result.data:
+        raise ValueError(f"創建聚餐事件失敗: {event_result.error}")
+    
+    event_id = event_result.data[0]["id"]
+    
+    # 批量更新所有成員狀態為等待參加聚餐
+    status_updates = []
+    current_time = datetime.utcnow().isoformat()
+    
+    for member_id in group_members:
+        status_updates.append({
+            "user_id": member_id,
+            "status": "waiting_attendance",
+            "updated_at": current_time
+        })
+    
+    # 使用UPSERT批量更新用戶狀態
+    if status_updates:
+        supabase.table("user_status") \
+            .upsert(status_updates, on_conflict="user_id") \
+            .execute()
+    
+    # 格式化聚餐時間顯示
+    formatted_dinner_time = next_dinner_time.strftime("%Y-%m-%d %H:%M")
+    
+    # 發送通知
+    notification_service = NotificationService(use_service_role=True)
+    for member_id in group_members:
+        try:
+            await notification_service.send_notification(
+                user_id=member_id,
+                title="餐廳出爐！",
+                body=f"大家已選定 {restaurant_name} 作為聚餐地點，期待{formatted_dinner_time}的聚餐",
+                data={
+                    "type": "dining_event_created",
+                    "event_id": event_id,
+                    "restaurant_id": winning_restaurant_id
+                }
+            )
+        except Exception as ne:
+            logger.error(f"發送通知給用戶 {member_id} 失敗: {str(ne)}")
+    
+    logger.info(f"群組 {group_id} 的聚餐事件 {event_id} 已建立完成")
+    
+    return {
+        "dining_event_id": event_id,
+        "winning_restaurant": restaurant_data
+    }
+
+@router.get("/vote", response_model=List[RestaurantResponse])
 async def get_group_restaurant_votes(
-    group_id: str,
     supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
-    使用 user_id 查詢 user_matching_info 表，再使用 matching_group_id 查詢 restaurant_votes 表，
-    返回該用戶屬於之 matching_group_id 的餐廳投票的選項(過濾 restaurant vote 的欄位們 挑選出屬於該group的票)
-    并按照票數多少排序
-    返回所有選項的 restaurant 的列表資料
+    (應該會改成前端直接做)
+    自動根據當前用戶ID查詢其所屬群組的餐廳投票
+    返回所有被投票的餐廳完整資料列表
+    按照票數多少排序，但不向前端返回票數信息
     """
-    pass 
+    try:
+        user_id = current_user.id
+        
+        # 獲取用戶所屬的群組ID
+        user_group = supabase.table("user_matching_info") \
+            .select("matching_group_id") \
+            .eq("user_id", user_id) \
+            .execute()
+            
+        if not user_group.data or len(user_group.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="您尚未加入任何配對群組"
+            )
+        
+        group_id = user_group.data[0]["matching_group_id"]
+        
+        # 獲取該群組的所有投票
+        votes = supabase.table("restaurant_votes") \
+            .select("restaurant_id") \
+            .eq("group_id", group_id) \
+            .execute()
+        
+        if not votes.data:
+            # 如果沒有投票，返回空列表
+            return []
+        
+        # 計算每家餐廳的票數
+        restaurant_vote_counts = {}
+        for vote in votes.data:
+            restaurant_id = vote["restaurant_id"]
+            if restaurant_id not in restaurant_vote_counts:
+                restaurant_vote_counts[restaurant_id] = 0
+            restaurant_vote_counts[restaurant_id] += 1
+        
+        # 按票數排序餐廳ID
+        sorted_restaurant_ids = sorted(
+            restaurant_vote_counts.keys(),
+            key=lambda rid: restaurant_vote_counts[rid],
+            reverse=True
+        )
+        
+        # 獲取所有餐廳的詳細信息
+        restaurants = []
+        for restaurant_id in sorted_restaurant_ids:
+            restaurant = supabase.table("restaurants") \
+                .select("*") \
+                .eq("id", restaurant_id) \
+                .execute()
+            
+            if restaurant.data and len(restaurant.data) > 0:
+                restaurants.append(RestaurantResponse(**restaurant.data[0]))
+        
+        return restaurants
+    
+    except HTTPException as e:
+        # 重新拋出HTTP異常
+        raise e
+    except Exception as e:
+        logger.error(f"獲取群組餐廳投票時出錯: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"獲取群組餐廳投票時出錯: {str(e)}"
+        )
 
