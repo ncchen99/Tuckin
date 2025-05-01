@@ -362,86 +362,33 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           ),
         ),
         child: SafeArea(
-          child: Column(
+          // 使用Stack佈局，底層是PageView，頂層是固定的頁面指示器
+          child: Stack(
             children: [
-              // 主要內容區域 - 確保正方形
-              AspectRatio(
-                aspectRatio: 1.0, // 強制1:1的比例
-                child: Padding(
-                  padding: EdgeInsets.all(25.r), // 使用自適應圓角
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // 使用LayoutBuilder獲取實際可用空間
-                      final actualSize = math.max(
-                        constraints.maxWidth,
-                        constraints.maxHeight,
-                      );
-                      return SizedBox(
-                        width: actualSize,
-                        height: actualSize,
-                        child: PageView(
-                          controller: _pageController,
-                          onPageChanged: _onPageChanged,
-                          children: [
-                            // 第一頁：方形影片播放區域
-                            _buildVideoSquare(actualSize),
-                            // 第二頁：人物動畫
-                            _buildFiguresAnimation(actualSize),
-                            // 第三頁：食物動畫
-                            _buildFoodAnimation(actualSize),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
+              // 第一層：PageView 包含方形區域、說明文字和按鈕
+              PageView(
+                controller: _pageController,
+                onPageChanged: _onPageChanged,
+                children: [
+                  // 第一頁完整內容
+                  _buildPageContent(0, _buildVideoSquare(squareSize)),
+                  // 第二頁完整內容
+                  _buildPageContent(1, _buildFiguresAnimation(squareSize)),
+                  // 第三頁完整內容
+                  _buildPageContent(2, _buildFoodAnimation(squareSize)),
+                ],
               ),
 
-              // 底部說明區域
-              Expanded(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 30.w), // 使用自適應寬度
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // 說明文字
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            _introTexts[_currentPage],
-                            style: TextStyle(
-                              fontSize: 20.sp, // 使用自適應字體大小
-                              color: const Color(0xFF23456B),
-                              fontFamily: 'OtsutomeFont',
-                              fontWeight: FontWeight.bold,
-                              height: 1.4,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-
-                      // 下一步按鈕
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 40.h), // 統一底部間距
-                        child: ImageButton(
-                          imagePath: 'assets/images/ui/button/red_m.png',
-                          text: _currentPage < _totalPages - 1 ? '下一步' : '開始使用',
-                          width: 160.w, // 使用自適應寬度
-                          height: 70.h, // 使用自適應高度
-                          onPressed: _goToNextPage,
-                        ),
-                      ),
-
-                      // 分頁指示器
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 30.h), // 與登入頁面統一底部間距
-                        child: ProgressDotsIndicator(
-                          totalSteps: _totalPages,
-                          currentStep: _currentPage + 1,
-                        ),
-                      ),
-                    ],
+              // 第二層：固定位置的頁面指示器
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 30.h,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 30.w),
+                  child: ProgressDotsIndicator(
+                    totalSteps: _totalPages,
+                    currentStep: _currentPage + 1,
                   ),
                 ),
               ),
@@ -449,6 +396,75 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           ),
         ),
       ),
+    );
+  }
+
+  // 構建每個頁面的內容（方形區域、說明文字和按鈕）
+  Widget _buildPageContent(int pageIndex, Widget topContent) {
+    return Column(
+      children: [
+        // 主要內容區域 - 確保正方形
+        AspectRatio(
+          aspectRatio: 1.0, // 強制1:1的比例
+          child: Padding(
+            padding: EdgeInsets.all(25.r), // 使用自適應圓角
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // 使用LayoutBuilder獲取實際可用空間
+                final actualSize = math.max(
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                );
+                return SizedBox(
+                  width: actualSize,
+                  height: actualSize,
+                  child: topContent,
+                );
+              },
+            ),
+          ),
+        ),
+
+        // 底部說明區域
+        Expanded(
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 30.w), // 使用自適應寬度
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // 說明文字
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      _introTexts[pageIndex],
+                      style: TextStyle(
+                        fontSize: 20.sp, // 使用自適應字體大小
+                        color: const Color(0xFF23456B),
+                        fontFamily: 'OtsutomeFont',
+                        fontWeight: FontWeight.bold,
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+
+                // 下一步按鈕
+                Padding(
+                  padding: EdgeInsets.only(bottom: 70.h), // 調整底部間距為頁面指示器留出空間
+                  child: ImageButton(
+                    imagePath: 'assets/images/ui/button/red_m.png',
+                    text: pageIndex < _totalPages - 1 ? '下一步' : '開始使用',
+                    width: 160.w, // 使用自適應寬度
+                    height: 70.h, // 使用自適應高度
+                    onPressed: _goToNextPage,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
