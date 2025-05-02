@@ -81,7 +81,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   final int _virtualFigureCount = 50; // 增加到50個虛擬人物
 
   // 添加人物佈局相關變數，使其能在不同方法間共享
-  final List<int> _rowGrids = [15, 10, 7, 5, 4]; // 由上到下的格子數
+  final List<int> _rowGrids = [15, 10, 7, 4, 4]; // 由上到下的格子數
   List<double> _rowStartY = [];
   List<double> _rowHeights = [];
 
@@ -146,35 +146,35 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     // 為每個食物生成隨機的初始位置、縮放和旋轉
     final random = math.Random();
     for (int i = 0; i < _dishPaths.length; i++) {
-      // 隨機位置 (從四面八方進入)
-      double dx, dy;
+      // 使用正規化座標 (-1.0 到 1.0 的範圍)
+      double normalizedDx, normalizedDy;
 
-      // 決定從哪個方向進入
+      // 決定從哪個方向進入 (使用正規化座標)
       int direction = random.nextInt(4); // 0:上, 1:右, 2:下, 3:左
       switch (direction) {
         case 0: // 上方
-          dx = random.nextDouble() * 400 - 200; // 擴大範圍
-          dy = -200; // 擴大範圍
+          normalizedDx = random.nextDouble() * 2.0 - 1.0; // -1.0 到 1.0
+          normalizedDy = -1.2; // 稍微超出邊界
           break;
         case 1: // 右方
-          dx = 200; // 擴大範圍
-          dy = random.nextDouble() * 400 - 200; // 擴大範圍
+          normalizedDx = 1.2; // 稍微超出邊界
+          normalizedDy = random.nextDouble() * 2.0 - 1.0; // -1.0 到 1.0
           break;
         case 2: // 下方
-          dx = random.nextDouble() * 400 - 200; // 擴大範圍
-          dy = 200; // 擴大範圍
+          normalizedDx = random.nextDouble() * 2.0 - 1.0; // -1.0 到 1.0
+          normalizedDy = 1.2; // 稍微超出邊界
           break;
         case 3: // 左方
         default:
-          dx = -200; // 擴大範圍
-          dy = random.nextDouble() * 400 - 200; // 擴大範圍
+          normalizedDx = -1.2; // 稍微超出邊界
+          normalizedDy = random.nextDouble() * 2.0 - 1.0; // -1.0 到 1.0
           break;
       }
 
-      _dishPositions.add(Offset(dx, dy));
+      _dishPositions.add(Offset(normalizedDx, normalizedDy));
 
-      // 隨機縮放 - 增加變化
-      _dishScales.add(0.6 + random.nextDouble() * 0.8); // 放大並增加變化
+      // 隨機縮放 - 增加變化 (使用相對尺寸係數)
+      _dishScales.add(1 + random.nextDouble() * 0.4); // 放大並增加變化
 
       // 隨機旋轉 (0-360度)
       _dishRotations.add(random.nextDouble() * 2 * math.pi);
@@ -196,18 +196,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _rowStartY.clear();
     _rowHeights.clear();
 
-    // 定義正確的畫布邊界：為了確保出血效果正確
-    final double canvasHalfSize = 150.0; // 假設畫布大小為300x300，中心點(0,0)
+    // 使用正規化座標系統，範圍從-1到1，中心點是(0,0)
+    final double canvasHalfNormalized = 1.0;
 
-    // 定義5個橫排的格子數量
-    // _rowGrids = [15, 10, 7, 5, 4]; // 由上到下的格子數 (已在類中定義)
+    // 定義5個橫排的格子數量 (已在類中定義)
     final int totalGrids = _rowGrids.reduce((a, b) => a + b); // 總格子數
 
     // 生成所有可能的格子位置
     List<Offset> gridPositions = [];
-
-    // 計算每一行的高度
-    final double totalHeight = canvasHalfSize * 2;
 
     // 使用漸進式行高：上方行較窄，下方行較寬
     // 計算行高權重，使得上方行高低，下方行高高
@@ -220,9 +216,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     // 計算權重總和
     final double totalWeight = rowHeightWeights.reduce((a, b) => a + b);
 
-    // 定義Y座標的有效顯示範圍
-    final double yStart = canvasHalfSize / 3; // 起始位置提高
-    final double yEnd = canvasHalfSize + 30; // 底部位置降低
+    // 定義Y座標的有效顯示範圍 (正規化座標)
+    final double yStart = 0.1; // 頂部位置（正規化）
+    final double yEnd = 0.65; // 底部位置（正規化）
     final double yRange = yEnd - yStart; // 總可用Y軸範圍
 
     // 計算每一行的實際高度
@@ -237,8 +233,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       _rowStartY.add(_rowStartY[i - 1] + _rowHeights[i - 1]);
     }
 
-    // 將倒數第二行下移5個像素
-    _rowStartY[3] += 5;
+    // 將倒數第二行下移少許
+    _rowStartY[3] += 0.1;
 
     // 從上到下生成每一行的格子位置
     for (int rowIndex = 0; rowIndex < _rowGrids.length; rowIndex++) {
@@ -247,16 +243,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       // 計算行的Y坐標（從上往下）
       final double rowY = _rowStartY[rowIndex] + _rowHeights[rowIndex] / 2;
 
-      // 計算每個格子的寬度
-      final double gridWidth = (canvasHalfSize * 2) / gridsInRow;
+      // 計算每個格子的寬度（正規化）
+      final double gridWidth = 2.0 / gridsInRow; // 正規化寬度
 
       // 在這一行中生成每個格子的位置
       for (int colIndex = 0; colIndex < gridsInRow; colIndex++) {
-        // 計算格子的X坐標
-        final double gridX =
-            -canvasHalfSize - 30 + (gridWidth + 10) * (colIndex + 0.5);
-
-        // 添加格子位置
+        // 計算格子的X坐標（正規化）
+        double gridX = -1.0 - 0.1 + (gridWidth + 0.05) * (colIndex + 0.5);
+        if (rowIndex == 4) gridX -= 0.1;
+        if (rowIndex == 3) gridX += 0.15;
+        // 添加格子位置（正規化座標）
         gridPositions.add(Offset(gridX, rowY));
       }
     }
@@ -268,24 +264,22 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final actualFigureCount = math.min(_virtualFigureCount, totalGrids);
 
     for (int i = 0; i < actualFigureCount; i++) {
-      // 起始位置在底部之外，以容器中心為基準設定一個較對稱的起始位置
-      double startX = random.nextDouble() * 300 - 150; // -150 到 150
-      double startY = canvasHalfSize + random.nextDouble() * 100; // 底部進入
+      // 起始位置在底部之外（正規化座標）
+      double startX = random.nextDouble() * 2.0 - 1.0; // -1.0 到 1.0
+      double startY = 1.2 + random.nextDouble() * 0.3; // 底部之外（正規化）
       _figureInitialPositions.add(Offset(startX, startY));
 
       // 將人物分配到一個格子位置，加上一些隨機偏移
       Offset gridPos = gridPositions[i];
 
-      // 更小的隨機偏移，使排列更整齊
-      double offsetX = random.nextDouble() * 3 - 1.5; // 小幅度隨機偏移
-      double offsetY = random.nextDouble() * 3 - 1.5;
+      // 更小的隨機偏移，使排列更整齊（正規化）
+      double offsetX = (random.nextDouble() * 0.003 - 0.0015); // 小幅度隨機偏移
+      double offsetY = (random.nextDouble() * 0.003 - 0.0015);
 
-      // 決定這個人物是否應該有出血效果（僅第一行和最後一行的邊緣格子）
-      bool shouldBleed = false;
       double finalX = gridPos.dx + offsetX;
       double finalY = gridPos.dy + offsetY;
 
-      // 確保Y座標在有效範圍內
+      // 確保Y座標在有效範圍內（正規化）
       finalY = finalY.clamp(yStart, yEnd);
 
       _figureFinalPositions.add(Offset(finalX, finalY));
@@ -552,26 +546,25 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     List<int> rowCurrentIndex = List.generate(_rowGrids.length, (_) => 0);
 
     for (int i = 0; i < figureCount; i++) {
-      // 根據finalY決定人物大小和層次 - Y值越大表示越"靠前"
-      final finalPos = _figureFinalPositions[i];
+      // 獲取正規化的最終位置
+      final Offset normalizedFinalPos = _figureFinalPositions[i];
 
-      // 計算到中心的距離，用於決定大小和深度
+      // 計算到中心的距離（仍使用正規化座標）
       final distanceFromCenter = math.sqrt(
-        finalPos.dx * finalPos.dx + finalPos.dy * finalPos.dy,
+        normalizedFinalPos.dx * normalizedFinalPos.dx +
+            normalizedFinalPos.dy * normalizedFinalPos.dy,
       );
 
       // 調整深度計算，讓Y值更大的人物（底部）更大
       double depthFactor;
-      // 根據Y位置創建平滑漸變效果，範圍大約是 -150 到 150
-      // 將Y值歸一化到0-1範圍，然後計算大小係數
-      double normalizedY = (finalPos.dy + 150) / 300; // 將 -150 到 150 歸一化到 0-1
+      // 將Y值從正規化座標(-1到1)進一步歸一化到0-1範圍
+      double normalizedY = (normalizedFinalPos.dy + 1.0) / 2.0; // -1到1轉換為0-1
 
       // 使用更溫和的二次曲線，減小上下層差異
-      // 基礎大小範圍：頂部0.7，底部1.4 (降低最大值防止過大)
-      double baseSize = 0.7 + (normalizedY * normalizedY);
+      double baseSize = 0.6 + (normalizedY * normalizedY * 1.1);
 
-      // 適當增加距離中心的縮小效果
-      double distanceFactor = (distanceFromCenter / 350).clamp(0.0, 0.25);
+      // 適當增加距離中心的縮小效果（也基於正規化距離）
+      double distanceFactor = (distanceFromCenter / 1.5).clamp(0.0, 0.02);
 
       depthFactor = baseSize - distanceFactor;
 
@@ -579,20 +572,22 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       depthFactor = depthFactor.clamp(0.6, 2);
 
       // 計算動畫延遲 - 根據行數計算，讓越靠近底部的行越先出現
-      double baseDelay = (finalPos.dy + 150) / 300 * 0.4; // 將Y值範圍轉換為0-0.4的延遲範圍
+      double baseDelay = normalizedY * 0.4; // 使用正規化Y值計算延遲
       double randomOffset = (i % 5) * 0.02; // 增加一些隨機性
       double delayTime = (baseDelay + randomOffset).clamp(0.0, 0.5);
 
       // 確定人物所在行
       int personRow = -1;
       for (int rowIndex = 0; rowIndex < _rowGrids.length; rowIndex++) {
-        if (rowIndex == 0 && finalPos.dy <= _rowStartY[0] + _rowHeights[0]) {
+        if (rowIndex == 0 &&
+            normalizedFinalPos.dy <= _rowStartY[0] + _rowHeights[0]) {
           personRow = 0;
           break;
         } else if (rowIndex > 0 &&
-            finalPos.dy >
+            normalizedFinalPos.dy >
                 _rowStartY[rowIndex - 1] + _rowHeights[rowIndex - 1] &&
-            finalPos.dy <= _rowStartY[rowIndex] + _rowHeights[rowIndex]) {
+            normalizedFinalPos.dy <=
+                _rowStartY[rowIndex] + _rowHeights[rowIndex]) {
           personRow = rowIndex;
           break;
         }
@@ -612,17 +607,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       rowCurrentIndex[personRow]++;
 
       // 計算透明度 - 上方的人物半透明
-      double baseOpacity = finalPos.dy < -50 ? 0.7 : 1.0;
+      double baseOpacity = normalizedFinalPos.dy < -0.3 ? 0.7 : 1.0;
 
       characterData.add({
         'index': i,
         'path': _figuresPaths[figureIndex], // 確保索引不會超出範圍
         'initialPos': _figureInitialPositions[i],
-        'finalPos': finalPos,
+        'finalPos': normalizedFinalPos,
         'depth': depthFactor,
         'delay': delayTime,
         'distance': distanceFromCenter,
-        'yPos': finalPos.dy, // 記錄Y座標，用於Z軸排序
+        'yPos': normalizedFinalPos.dy, // 記錄Y座標，用於Z軸排序
         'baseOpacity': baseOpacity, // 基礎透明度
       });
     }
@@ -642,8 +637,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ).value;
 
-      // 計算當前位置
-      final currentPos = Offset.lerp(data['initialPos'], data['finalPos'], t)!;
+      // 獲取正規化位置
+      Offset normalizedInitialPos = data['initialPos'];
+      Offset normalizedFinalPos = data['finalPos'];
+
+      // 計算當前正規化位置
+      final normalizedCurrentPos =
+          Offset.lerp(normalizedInitialPos, normalizedFinalPos, t)!;
+
+      // 將正規化位置轉換為實際畫面上的位置
+      final currentPos = Offset(
+        normalizedCurrentPos.dx * size / 2,
+        normalizedCurrentPos.dy * size / 2,
+      );
 
       // 計算縮放比例，更大的對比
       final scale = Tween<double>(begin: 0.0, end: data['depth']).evaluate(
@@ -672,14 +678,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         ),
       );
 
-      // 計算尺寸 - 讓大小變化更合理
-      final baseSize = size * 0.21; // 縮小基礎大小
+      // 計算尺寸 - 使用相對於容器的比例
+      final baseSize = size * 0.21; // 相對於容器的百分比
       final imageSize = baseSize * data['depth'];
 
-      // 定位人物，根據排序後的位置
+      // 定位人物 - 從正規化座標轉換為實際座標
       return Positioned(
-        left: currentPos.dx + size / 2 - (imageSize / 2),
-        top: currentPos.dy + size / 2 - (imageSize / 2),
+        left: size / 2 + currentPos.dx - (imageSize / 2),
+        top: size / 2 + currentPos.dy - (imageSize / 2),
         child: Opacity(
           opacity: opacity,
           child: Transform.scale(
@@ -756,60 +762,59 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     // 創建一個臨時數組來保存食物數據
     List<Map<String, dynamic>> foodData = [];
 
-    // 預先加載所有食物圖片以獲取其尺寸，用於正規化
-    final assetBundle = DefaultAssetBundle.of(context);
-
     for (int index = 0; index < math.min(16, _dishPaths.length); index++) {
       String dishPath = _dishPaths[index];
       final random = math.Random(index + 100);
 
-      // 計算網格位置
+      // 計算網格位置 (使用正規化坐標)
       final gridSize = 4; // 4x4網格
-      final cellSize = size / gridSize;
+      final normalizedCellSize = 2.0 / gridSize; // 正規化格子大小
       final row = index ~/ gridSize; // 0, 1, 2, 3
       final col = index % gridSize; // 0, 1, 2, 3
 
-      // 計算網格中心坐標，加入小幅隨機偏移
-      final offsetX = random.nextDouble() * 15 - 7.5;
-      final offsetY = random.nextDouble() * 15 - 7.5;
+      // 計算網格中心坐標，加入小幅隨機偏移 (使用正規化坐標)
+      final normalizedOffsetX = (random.nextDouble() * 0.1 - 0.05);
+      final normalizedOffsetY = (random.nextDouble() * 0.1 - 0.05);
 
-      // 計算相對於中心的坐標
+      // 計算相對於中心的正規化坐標 (範圍為-1到1)
       final halfGrid = (gridSize - 1) / 2;
-      final relativeX = (col - halfGrid) * cellSize + offsetX;
-      final relativeY = (row - halfGrid) * (cellSize - 8) + offsetY;
+      final normalizedRelativeX =
+          (col - halfGrid) * normalizedCellSize + normalizedOffsetX;
+      final normalizedRelativeY =
+          (row - halfGrid) * (normalizedCellSize - 0.05) + normalizedOffsetY;
 
-      // 起始位置設置在四個方向之外
-      double startX, startY;
+      // 起始位置設置在四個方向之外 (使用正規化坐標)
+      double normalizedStartX, normalizedStartY;
       int direction = index % 4; // 0:上, 1:右, 2:下, 3:左
       switch (direction) {
         case 0: // 上方
-          startX = relativeX * 0.5;
-          startY = -size / 2 - 50;
+          normalizedStartX = normalizedRelativeX * 0.5;
+          normalizedStartY = -1.2; // 正規化座標，超出頂部
           break;
         case 1: // 右方
-          startX = size / 2 + 50;
-          startY = relativeY * 0.5;
+          normalizedStartX = 1.2; // 正規化座標，超出右側
+          normalizedStartY = normalizedRelativeY * 0.5;
           break;
         case 2: // 下方
-          startX = relativeX * 0.5;
-          startY = size / 2 + 50;
+          normalizedStartX = normalizedRelativeX * 0.5;
+          normalizedStartY = 1.2; // 正規化座標，超出底部
           break;
         case 3: // 左方
         default:
-          startX = -size / 2 - 50;
-          startY = relativeY * 0.5;
+          normalizedStartX = -1.2; // 正規化座標，超出左側
+          normalizedStartY = normalizedRelativeY * 0.5;
           break;
       }
 
       // 隨機分配Z軸位置 (用於決定渲染順序和大小)
       final zPosition = random.nextDouble();
 
-      // 添加到數據集合
+      // 添加到數據集合 (使用正規化坐標)
       foodData.add({
         'index': index,
         'path': dishPath,
-        'startPos': Offset(startX, startY),
-        'finalPos': Offset(relativeX, relativeY),
+        'startPos': Offset(normalizedStartX, normalizedStartY), // 正規化起始位置
+        'finalPos': Offset(normalizedRelativeX, normalizedRelativeY), // 正規化最終位置
         'zPosition': zPosition, // Z軸位置
         'direction': direction,
         'random': random, // 保存隨機數生成器以保持一致性
@@ -834,13 +839,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               ),
             ).value;
 
-        // 計算當前位置
-        final currentPos =
+        // 計算當前正規化位置
+        final normalizedCurrentPos =
             Offset.lerp(
               data['startPos'] as Offset,
               data['finalPos'] as Offset,
               t,
             )!;
+
+        // 將正規化位置轉換為實際像素位置
+        final currentPos = Offset(
+          normalizedCurrentPos.dx * size / 2,
+          normalizedCurrentPos.dy * size / 2,
+        );
 
         // 旋轉動畫 - 隨機旋轉角度
         final initialRotation = random.nextDouble() * 2 * math.pi;
@@ -884,14 +895,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         );
 
         // 陰影效果
-        final shadowOffset = 5.0;
+        final shadowOffset = size * 0.015; // 相對於容器大小的陰影偏移
         final shadowOpacity = 0.4 + (zPosition * 0.1); // 前面的食物陰影更明顯
 
         // 基於Z位置調整食物位置，避免前方食物被截斷
         final centeringOffset = zPosition > 0.7 ? size * 0.02 : 0.0;
 
-        // 調整的基礎尺寸，較大範圍確保不被截斷
-        final baseSize = size * 0.3;
+        // 調整的基礎尺寸 - 使用相對於容器的比例
+        final baseSize = size * 0.3; // 相對於容器的30%
         // 根據Z軸調整的最終尺寸
         final foodSize = baseSize * currentScale;
 
