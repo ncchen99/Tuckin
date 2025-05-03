@@ -10,7 +10,8 @@ from schemas.dining import (
     ConfirmAttendanceRequest, ConfirmAttendanceResponse,
     GroupStatusResponse, RatingRequest, RatingResponse,
     TableAttendanceConfirmation, DiningUserStatus,
-    ConfirmRestaurantResponse, ChangeRestaurantResponse
+    ConfirmRestaurantResponse, ChangeRestaurantResponse,
+    ConfirmRestaurantRequest
 )
 from dependencies import get_supabase_service, get_current_user, verify_cron_api_key
 from services.notification_service import NotificationService
@@ -220,13 +221,14 @@ async def admin_reset_confirming_events(
 @router.post("/confirm-restaurant/{event_id}", response_model=ConfirmRestaurantResponse)
 async def confirm_restaurant(
     event_id: UUID,
+    request: ConfirmRestaurantRequest,
     supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
     確認餐廳預訂成功
     - 檢查dining_events的status是否為'confirming'
-    - 如果是，將status更新為'confirmed'
+    - 如果是，將status更新為'confirmed'，並保存訂位人資訊
     """
     try:
         # 獲取聚餐事件
@@ -250,10 +252,13 @@ async def confirm_restaurant(
                 detail="聚餐事件狀態不是正在確認中，無法進行確認操作"
             )
             
-        # 更新狀態為confirmed
+        # 更新狀態為confirmed並保存訂位人資訊
         updated_event = supabase.table("dining_events") \
             .update({
                 "status": "confirmed", 
+                "reservation_name": request.reservation_name,
+                "reservation_phone": request.reservation_phone,
+                "attendee_count": request.attendee_count,
                 "updated_at": datetime.utcnow().isoformat()
             }) \
             .eq("id", str(event_id)) \

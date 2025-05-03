@@ -153,6 +153,11 @@ class MatchingScore(MatchingScoreBase):
         orm_mode = True  # 為了向後兼容
 
 # 新增確認餐廳和更換餐廳的響應模型
+class ConfirmRestaurantRequest(BaseModel):
+    reservation_name: str = Field(..., min_length=1, max_length=100)
+    reservation_phone: str = Field(..., min_length=8, max_length=20)
+    attendee_count: int = Field(..., ge=1, le=20)
+
 class ConfirmRestaurantResponse(BaseModel):
     success: bool
     message: str

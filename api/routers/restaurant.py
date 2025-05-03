@@ -617,6 +617,7 @@ async def process_group_voting(
             "status": "pending_confirmation",  # 餐廳待確認
             "description": description,
             "candidate_restaurant_ids": candidate_restaurant_ids,  # 加入候選餐廳列表
+            "attendee_count": len(group_members),  # 添加聚餐人數，預設為群組成員數量
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat()
         }
