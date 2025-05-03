@@ -169,4 +169,30 @@ class ChangeRestaurantResponse(BaseModel):
     success: bool
     message: str
     event_id: str
-    restaurant: Dict[str, Any] 
+    restaurant: Dict[str, Any]
+
+# 評分系統相關模型
+class GetRatingFormRequest(BaseModel):
+    dining_event_id: UUID
+
+class RatingParticipant(BaseModel):
+    index: int
+    nickname: str
+
+class GetRatingFormResponse(BaseModel):
+    success: bool
+    message: str
+    session_token: Optional[str] = None
+    participants: List[RatingParticipant] = []
+
+class RatingItem(BaseModel):
+    index: int
+    rating_type: str = Field(..., description="評分類型: like, dislike, no_show")
+
+class SubmitRatingRequest(BaseModel):
+    session_token: str
+    ratings: List[RatingItem]
+
+class RatingResponse(BaseModel):
+    success: bool
+    message: str 

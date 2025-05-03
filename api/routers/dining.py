@@ -5,13 +5,16 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 import asyncio
 import logging
+import random
+import secrets
 
 from schemas.dining import (
     ConfirmAttendanceRequest, ConfirmAttendanceResponse,
     GroupStatusResponse, RatingRequest, RatingResponse,
     TableAttendanceConfirmation, DiningUserStatus,
     ConfirmRestaurantResponse, ChangeRestaurantResponse,
-    ConfirmRestaurantRequest
+    ConfirmRestaurantRequest, GetRatingFormRequest, GetRatingFormResponse,
+    SubmitRatingRequest
 )
 from dependencies import get_supabase_service, get_current_user, verify_cron_api_key
 from services.notification_service import NotificationService
@@ -397,19 +400,280 @@ async def change_restaurant(
             detail=f"更換餐廳時發生錯誤: {str(e)}"
         )
 
-# 評分API
+# 獲取評分表單API
+@router.post("/ratings/form", response_model=GetRatingFormResponse, status_code=status.HTTP_200_OK)
+async def get_rating_form(
+    request: GetRatingFormRequest,
+    supabase: Client = Depends(get_supabase_service),
+    current_user = Depends(get_current_user)
+):
+    """
+    獲取評分表單，返回需要評分的參與者列表（不含用戶ID）
+    只有聚餐事件狀態為 completed 時才允許評分
+    """
+    try:
+        user_id = current_user.user.id
+        
+        # 獲取聚餐事件信息
+        dining_event = supabase.table("dining_events") \
+            .select("matching_group_id, status") \
+            .eq("id", str(request.dining_event_id)) \
+            .execute()
+            
+        if not dining_event.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="找不到指定的聚餐事件"
+            )
+            
+        # 檢查聚餐事件狀態是否為 completed
+        event_status = dining_event.data[0]["status"]
+        if event_status != "completed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="只有在聚餐事件完成後才能進行評分"
+            )
+            
+        group_id = dining_event.data[0]["matching_group_id"]
+        
+        # 驗證用戶是否參與了該聚餐群組
+        user_group = supabase.table("user_matching_info") \
+            .select("matching_group_id") \
+            .eq("user_id", user_id) \
+            .eq("matching_group_id", group_id) \
+            .execute()
+        
+        if not user_group.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="您沒有參與此聚餐事件，無法提交評分"
+            )
+        
+        # 檢查是否已有現有會話
+        existing_session = supabase.table("rating_sessions") \
+            .select("*") \
+            .eq("dining_event_id", str(request.dining_event_id)) \
+            .eq("from_user_id", user_id) \
+            .execute()
+            
+        # 如果已有現有會話，更新有效期並直接返回
+        if existing_session.data:
+            session_data = existing_session.data[0]
+            
+            # 設置新的過期時間（24小時後）
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+            
+            # 更新會話過期時間
+            supabase.table("rating_sessions") \
+                .update({
+                    "expires_at": expires_at.isoformat()
+                }) \
+                .eq("id", session_data["id"]) \
+                .execute()
+                
+            # 返回現有會話數據
+            user_sequence = session_data.get("user_sequence", [])
+            participants_response = [
+                {"index": item["index"], "nickname": item["nickname"]} 
+                for item in user_sequence
+            ]
+            
+            return {
+                "success": True,
+                "message": "已返回現有評分表單",
+                "session_token": session_data["session_token"],
+                "participants": participants_response
+            }
+            
+        # 獲取聚餐群組的所有參與者（排除當前用戶）
+        group_info = supabase.table("matching_groups") \
+            .select("user_ids") \
+            .eq("id", group_id) \
+            .execute()
+            
+        if not group_info.data or not group_info.data[0].get("user_ids"):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="找不到聚餐群組成員資訊"
+            )
+            
+        # 獲取群組成員ID
+        all_user_ids = group_info.data[0]["user_ids"]
+        
+        # 排除當前用戶
+        participant_ids = [uid for uid in all_user_ids if uid != user_id]
+        
+        if not participant_ids:
+            return {
+                "success": True,
+                "message": "沒有其他參與者需要評分",
+                "session_token": "",
+                "participants": []
+            }
+        
+        # 獲取參與者暱稱
+        profiles = supabase.table("user_profiles") \
+            .select("user_id, nickname") \
+            .in_("user_id", participant_ids) \
+            .execute()
+        
+        # 建立用戶映射
+        id_to_nickname = {p["user_id"]: p["nickname"] for p in profiles.data}
+        
+        # 生成隨機順序的參與者列表
+        random_order = participant_ids.copy()
+        random.shuffle(random_order)
+        
+        # 創建前端顯示用的序列（只包含索引和暱稱）
+        user_sequence = [
+            {"index": i, "nickname": id_to_nickname.get(uid, "未知用戶")}
+            for i, uid in enumerate(random_order)
+        ]
+        
+        # 創建後端映射用的對照表（索引到用戶ID）
+        user_mapping = {
+            str(i): uid for i, uid in enumerate(random_order)
+        }
+        
+        # 生成安全的會話令牌
+        session_token = secrets.token_urlsafe(32)
+        
+        # 設置過期時間（例如24小時後）使用帶時區的時間
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        
+        # 保存評分會話
+        supabase.table("rating_sessions").insert({
+            "dining_event_id": str(request.dining_event_id),
+            "from_user_id": user_id,
+            "session_token": session_token,
+            "user_sequence": user_sequence,
+            "user_mapping": user_mapping,
+            "expires_at": expires_at.isoformat()
+        }).execute()
+        
+        # 轉換為API響應格式
+        participants_response = [
+            {"index": item["index"], "nickname": item["nickname"]} 
+            for item in user_sequence
+        ]
+        
+        return {
+            "success": True,
+            "message": "評分表單生成成功",
+            "session_token": session_token,
+            "participants": participants_response
+        }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"獲取評分表單時出錯: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"獲取評分表單時出錯: {str(e)}"
+        )
+
+# 提交評分API
 @router.post("/ratings/submit", response_model=RatingResponse, status_code=status.HTTP_200_OK)
 async def submit_rating(
-    request: RatingRequest,
+    request: SubmitRatingRequest,
     supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
     活動結束後用戶提交評分
+    只有聚餐事件狀態為 completed 時才允許評分
     """
-    # 檢查用戶是否參加了該桌位
-    # 記錄評分和評論
-    
-    return {"success": True, "message": "評分提交成功"}
+    try:
+        user_id = current_user.user.id
+        
+        # 驗證會話令牌
+        session = supabase.table("rating_sessions") \
+            .select("*") \
+            .eq("session_token", request.session_token) \
+            .eq("from_user_id", user_id) \
+            .execute()
+        
+        if not session.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="無效的評分會話"
+            )
+        
+        session_data = session.data[0]
+        dining_event_id = session_data["dining_event_id"]
+        
+        # 檢查聚餐事件狀態是否為 completed
+        dining_event = supabase.table("dining_events") \
+            .select("status") \
+            .eq("id", dining_event_id) \
+            .execute()
+            
+        if not dining_event.data or dining_event.data[0]["status"] != "completed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="只有在聚餐事件完成後才能進行評分"
+            )
+        
+        # 檢查會話是否過期，使用帶時區的datetime
+        from datetime import datetime, timezone
+        expires_at_str = session_data["expires_at"]
+        
+        # 確保expires_at字符串有時區信息
+        if "Z" in expires_at_str:
+            # UTC時區標記為Z的情況
+            expires_at_str = expires_at_str.replace("Z", "+00:00")
+        
+        # 解析時間字符串為帶時區的datetime對象
+        expires_at = datetime.fromisoformat(expires_at_str)
+        now = datetime.now(timezone.utc)
+        
+        if now > expires_at:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="評分會話已過期"
+            )
+        
+        # 獲取用戶映射和聚餐事件ID
+        user_mapping = session_data["user_mapping"]
+        
+        # 處理評分提交
+        for rating in request.ratings:
+            index = str(rating.index)
+            rating_type = rating.rating_type
+            
+            # 驗證評分類型
+            if rating_type not in ["like", "dislike", "no_show"]:
+                continue
+            
+            # 從映射中獲取真實用戶ID
+            if index not in user_mapping:
+                continue
+                
+            to_user_id = user_mapping[index]
+            
+            # 保存評分
+            supabase.table("user_ratings").upsert({
+                "dining_event_id": dining_event_id,
+                "from_user_id": user_id,
+                "to_user_id": to_user_id,
+                "rating_type": rating_type,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }).execute()
+        
+        # 評分完成後刪除會話（可選）
+        supabase.table("rating_sessions") \
+            .delete() \
+            .eq("session_token", request.session_token) \
+            .execute()
+        
+        return {"success": True, "message": "評分提交成功"}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"提交評分時出錯: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"提交評分時出錯: {str(e)}"
+        )
 
 

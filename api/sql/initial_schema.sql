@@ -87,17 +87,6 @@ BEGIN
     WHERE status NOT IN ('pending_confirmation', 'confirming', 'confirmed', 'completed');
 END $$;
 
--- 創建 dining_event_participants 表
-CREATE TABLE IF NOT EXISTS dining_event_participants (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    event_id UUID NOT NULL REFERENCES dining_events(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES auth.users(id),
-    attendance_status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'confirmed', 'declined'
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(event_id, user_id)
-);
-
 -- 創建 restaurants 表
 CREATE TABLE IF NOT EXISTS restaurants (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -199,7 +188,6 @@ LEFT JOIN
 -- 創建必要的索引來優化查詢性能
 CREATE INDEX IF NOT EXISTS idx_dining_events_group_id ON dining_events(group_id);
 CREATE INDEX IF NOT EXISTS idx_dining_events_restaurant_id ON dining_events(restaurant_id);
-CREATE INDEX IF NOT EXISTS idx_dining_event_participants_event_id ON dining_event_participants(event_id);
 CREATE INDEX IF NOT EXISTS idx_restaurant_votes_group_id ON restaurant_votes(group_id);
 CREATE INDEX IF NOT EXISTS idx_restaurant_votes_restaurant_id ON restaurant_votes(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_ratings_restaurant_id ON ratings(restaurant_id);
@@ -214,7 +202,6 @@ CREATE INDEX IF NOT EXISTS idx_matching_groups_status ON matching_groups(status)
 
 -- 設置 RLS 權限，以下為範例，實際使用時應根據需求進行調整
 ALTER TABLE dining_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE dining_event_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE restaurants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE restaurant_votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ratings ENABLE ROW LEVEL SECURITY;
@@ -226,7 +213,6 @@ ALTER TABLE user_matching_info ENABLE ROW LEVEL SECURITY;
 
 -- 為API服務提供所有表的完全存取權限
 CREATE POLICY service_all ON dining_events FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
-CREATE POLICY service_all ON dining_event_participants FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
 CREATE POLICY service_all ON restaurants FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
 CREATE POLICY service_all ON restaurant_votes FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
 CREATE POLICY service_all ON ratings FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
@@ -262,9 +248,6 @@ ALTER VIEW user_status_extended SECURITY INVOKER;
 -- 添加安全性備註
 COMMENT ON TABLE user_matching_info IS '此表允許用戶查看自己的數據，API服務可完全訪問';
 COMMENT ON TABLE matching_groups IS '此表僅限API服務訪問';
-
--- 創建 ratings 表 對其他用戶的評價
--- TODO: 需要設計 ratings 表的 schema
 
 -- 確保 restaurant_votes 表中存在 is_system_recommendation 欄位
 DO $$
@@ -306,3 +289,35 @@ WHERE NOT EXISTS (
     SELECT 1 FROM user_matching_preferences 
     WHERE user_matching_preferences.user_id = user_profiles.user_id
 );
+
+-- 創建用戶評價資料表
+CREATE TABLE IF NOT EXISTS user_ratings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    dining_event_id UUID NOT NULL REFERENCES dining_events(id) ON DELETE CASCADE,
+    from_user_id UUID NOT NULL REFERENCES auth.users(id),
+    to_user_id UUID NOT NULL REFERENCES auth.users(id),
+    rating_type TEXT NOT NULL CHECK (rating_type IN ('like', 'dislike', 'no_show')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(dining_event_id, from_user_id, to_user_id)
+);
+
+-- 創建必要的索引
+CREATE INDEX IF NOT EXISTS idx_user_ratings_from_user_id ON user_ratings(from_user_id);
+CREATE INDEX IF NOT EXISTS idx_user_ratings_to_user_id ON user_ratings(to_user_id);
+CREATE INDEX IF NOT EXISTS idx_user_ratings_dining_event_id ON user_ratings(dining_event_id);
+
+-- 設置 RLS 權限
+ALTER TABLE user_ratings ENABLE ROW LEVEL SECURITY;
+
+-- 為API服務提供完全存取權限
+CREATE POLICY service_all ON user_ratings FOR ALL TO authenticated USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+
+-- -- 用戶只能查看自己發出的評價
+-- CREATE POLICY user_ratings_select_own ON user_ratings FOR SELECT TO authenticated USING (from_user_id = auth.uid());
+
+-- -- 用戶只能新增自己發出的評價
+-- CREATE POLICY user_ratings_insert_own ON user_ratings FOR INSERT TO authenticated WITH CHECK (from_user_id = auth.uid());
+
+-- -- 用戶只能更新自己發出的評價
+-- CREATE POLICY user_ratings_update_own ON user_ratings FOR UPDATE TO authenticated USING (from_user_id = auth.uid());
