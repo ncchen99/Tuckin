@@ -136,42 +136,6 @@ SET name = EXCLUDED.name,
 -- 確保序列從最大ID之後開始，避免插入新記錄時ID衝突
 SELECT setval('food_preferences_id_seq', (SELECT MAX(id) FROM food_preferences));
 
--- 遷移現有資料
--- 注意：這些指令應該在刪除原始欄位之前執行
-
--- 1. 將現有用戶的個性類型從user_profiles遷移到user_personality_results（如果欄位存在）：
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT FROM information_schema.columns 
-        WHERE table_name = 'user_profiles' AND column_name = 'personality_type'
-    ) THEN
-        INSERT INTO user_personality_results (user_id, personality_type)
-        SELECT user_id, personality_type FROM user_profiles
-        WHERE personality_type IS NOT NULL
-        ON CONFLICT (user_id) DO NOTHING;
-    END IF;
-END $$;
-
--- 2. 將現有用戶的食物偏好從user_profiles遷移到user_food_preferences（如果欄位存在）：
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT FROM information_schema.columns 
-        WHERE table_name = 'user_profiles' AND column_name = 'food_preferences_json'
-    ) THEN
-        INSERT INTO user_food_preferences (user_id, preference_id)
-        SELECT 
-            p.user_id,
-            (jsonb_array_elements_text(p.food_preferences_json))::integer as preference_id
-        FROM 
-            user_profiles p
-        WHERE 
-            p.food_preferences_json IS NOT NULL AND 
-            jsonb_array_length(p.food_preferences_json) > 0
-        ON CONFLICT (user_id, preference_id) DO NOTHING;
-    END IF;
-END $$;
 
 -- 3. 為所有用戶創建初始狀態記錄：
 INSERT INTO user_status (user_id, status)

@@ -14,11 +14,64 @@ CREATE TABLE IF NOT EXISTS dining_events (
     restaurant_id UUID REFERENCES restaurants(id),
     name TEXT NOT NULL,
     date TIMESTAMP WITH TIME ZONE NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending_confirmation' CHECK (status IN ('pending_confirmation', 'confirmed', 'completed')),
+    status TEXT NOT NULL DEFAULT 'pending_confirmation' CHECK (status IN ('pending_confirmation', 'confirming', 'confirmed', 'completed')),
     description TEXT,
+    candidate_restaurant_ids UUID[],
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    status_change_time TIMESTAMP WITH TIME ZONE
 );
+
+-- 確保 dining_events 表中存在 status_change_time 欄位
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name = 'dining_events' 
+        AND column_name = 'status_change_time'
+    ) THEN
+        ALTER TABLE dining_events ADD COLUMN status_change_time TIMESTAMP WITH TIME ZONE;
+    END IF;
+END $$;
+
+-- 創建狀態變更觸發器函數
+CREATE OR REPLACE FUNCTION process_dining_event_status_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- 只處理狀態變為 'confirming' 的情況
+    IF NEW.status = 'confirming' THEN
+        -- 記錄狀態變更時間
+        NEW.status_change_time = NOW();
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 創建觸發器
+DROP TRIGGER IF EXISTS dining_event_status_change_trigger ON dining_events;
+CREATE TRIGGER dining_event_status_change_trigger
+BEFORE UPDATE ON dining_events
+FOR EACH ROW
+WHEN (OLD.status IS DISTINCT FROM NEW.status)
+EXECUTE FUNCTION process_dining_event_status_change();
+
+-- 創建定期檢查和重置狀態的函數
+CREATE OR REPLACE FUNCTION reset_confirming_dining_events()
+RETURNS void AS $$
+BEGIN
+    -- 更新所有狀態為'confirming'且已經超過10分鐘的事件
+    UPDATE dining_events
+    SET status = 'pending_confirmation',
+        updated_at = NOW()
+    WHERE status = 'confirming'
+    AND status_change_time < NOW() - INTERVAL '10 minutes';
+END;
+$$ LANGUAGE plpgsql;
+
+-- 註解: 此函數保留供後端服務調用
+-- 後端應定期調用此函數以重置超時的confirming狀態
 
 -- 更新現有記錄的status以符合新的限制條件
 DO $$
@@ -31,7 +84,7 @@ BEGIN
     -- 將任何不在允許列表中的狀態更新為 'pending_confirmation'
     UPDATE dining_events
     SET status = 'pending_confirmation'
-    WHERE status NOT IN ('pending_confirmation', 'confirmed', 'completed');
+    WHERE status NOT IN ('pending_confirmation', 'confirming', 'confirmed', 'completed');
 END $$;
 
 -- 創建 dining_event_participants 表

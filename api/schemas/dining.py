@@ -150,4 +150,18 @@ class MatchingScore(MatchingScoreBase):
 
     class Config:
         from_attributes = True
-        orm_mode = True  # 為了向後兼容 
+        orm_mode = True  # 為了向後兼容
+
+# 新增確認餐廳和更換餐廳的響應模型
+class ConfirmRestaurantResponse(BaseModel):
+    success: bool
+    message: str
+    event_id: str
+    restaurant_id: str
+    restaurant_name: str
+
+class ChangeRestaurantResponse(BaseModel):
+    success: bool
+    message: str
+    event_id: str
+    restaurant: Dict[str, Any] 

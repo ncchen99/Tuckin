@@ -5,9 +5,10 @@ import asyncio
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta
 import logging
+import random
 
 from schemas.restaurant import RestaurantCreate, RestaurantResponse, RestaurantVote, RestaurantVoteCreate, UserVoteCreate
-from dependencies import get_supabase, get_supabase_service, get_current_user
+from dependencies import get_supabase, get_supabase_service, get_current_user, verify_cron_api_key
 from utils.place_types import get_category_from_types
 from utils.google_maps import (
     extract_place_id_from_url, 
@@ -395,12 +396,7 @@ async def vote_restaurant(
         # 如果所有成員都已投票
         if len(voted_user_ids) >= len(group_members):
             # 處理投票完成的情況
-            result_data = await _process_completed_votes(
-                supabase, 
-                group_id, 
-                group_members, 
-                group_and_votes["restaurant_votes"]
-            )
+            result_data = await process_group_voting(supabase, group_id)
             result_data["is_voting_complete"] = True
         else:
             # 更新當前用戶狀態為等待其他用戶
@@ -464,119 +460,257 @@ async def _get_group_and_votes(supabase: Client, group_id: str) -> Dict[str, Any
         "restaurant_votes": restaurant_votes.data
     }
 
-async def _process_completed_votes(
+async def process_group_voting(
     supabase: Client, 
     group_id: str, 
-    group_members: List[str], 
-    votes: List[Dict[str, Any]]
+    is_forced: bool = False
 ) -> Dict[str, Any]:
     """
-    處理投票完成的邏輯
+    處理群組餐廳投票的通用函數
+    如果is_forced為True，則強制結束投票，即使不是所有成員都已投票
+    如果沒有足夠投票，將從系統推薦中隨機選擇
+    返回處理結果
     """
-    logger.info(f"群組 {group_id} 的所有成員都已投票，開始建立聚餐事件")
-    
-    # 計算每家餐廳的票數（僅計算非系統推薦的票數）
-    vote_counts = {}
-    for vote in votes:
-        # 只計算非系統推薦的投票
-        is_system_recommendation = vote.get("is_system_recommendation", False)
-        if is_system_recommendation is True:
-            continue
-            
-        rid = vote["restaurant_id"]
-        if rid not in vote_counts:
-            vote_counts[rid] = 0
-        vote_counts[rid] += 1
-    
-    # 找出票數最多的餐廳
-    if not vote_counts:
-        raise ValueError(f"群組 {group_id} 沒有有效的非系統推薦投票記錄")
-    
-    # 按票數排序餐廳
-    sorted_restaurants = sorted(vote_counts.items(), key=lambda x: x[1], reverse=True)
-    winning_restaurant_id = sorted_restaurants[0][0]
-    
-    # 獲取餐廳資訊
-    restaurant_info = supabase.table("restaurants") \
-        .select("*") \
-        .eq("id", winning_restaurant_id) \
-        .execute()
-    
-    if not restaurant_info.data:
-        raise ValueError(f"無法獲取餐廳 {winning_restaurant_id} 的資訊")
-    
-    restaurant_name = restaurant_info.data[0]["name"]
-    restaurant_data = restaurant_info.data[0]
-    
-    # 使用DinnerTimeUtils獲取下次聚餐時間
-    dinner_time_info = DinnerTimeUtils.calculate_dinner_time_info()
-    next_dinner_time = dinner_time_info.next_dinner_time
-    
-    # 創建聚餐事件
-    dining_event = {
-        "id": str(uuid4()),
-        "matching_group_id": group_id,
-        "restaurant_id": winning_restaurant_id,
-        "name": f"{restaurant_name} 聚餐",
-        "date": next_dinner_time.isoformat(),  # 使用計算出的聚餐時間
-        "status": "pending_confirmation",  # 餐廳待確認
-        "description": f"群組投票選出的餐廳: {restaurant_name}",
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat()
-    }
-    
-    event_result = supabase.table("dining_events") \
-        .insert(dining_event) \
-        .execute()
-    
-    if not event_result.data:
-        raise ValueError(f"創建聚餐事件失敗: {event_result.error}")
-    
-    event_id = event_result.data[0]["id"]
-    
-    # 批量更新所有成員狀態為等待參加聚餐
-    status_updates = []
-    current_time = datetime.utcnow().isoformat()
-    
-    for member_id in group_members:
-        status_updates.append({
-            "user_id": member_id,
-            "status": "waiting_attendance",
-            "updated_at": current_time
-        })
-    
-    # 使用UPSERT批量更新用戶狀態
-    if status_updates:
-        supabase.table("user_status") \
-            .upsert(status_updates, on_conflict="user_id") \
+    try:
+        logger.info(f"處理群組 {group_id} 的投票{' (強制模式)' if is_forced else ''}")
+        
+        # 1. 獲取群組成員和投票情況
+        group_and_votes = await _get_group_and_votes(supabase, group_id)
+        
+        group_members = group_and_votes["group_members"]
+        voted_user_ids = group_and_votes["voted_user_ids"]
+        restaurant_votes = group_and_votes["restaurant_votes"]
+        
+        # 2. 決定如何選擇餐廳
+        is_all_voted = len(voted_user_ids) >= len(group_members)
+        has_user_votes = bool(restaurant_votes)
+        
+        # 計算用戶的有效投票（非系統推薦）
+        valid_votes = []
+        for vote in restaurant_votes:
+            is_system_recommendation = vote.get("is_system_recommendation", False)
+            if not is_system_recommendation:
+                valid_votes.append(vote)
+        
+        has_valid_votes = bool(valid_votes)
+        
+        # 3. 統一處理餐廳選擇邏輯，優化效能
+        restaurant_id = None
+        restaurant_data = None
+        selection_method = "無法確定"
+        candidate_restaurant_ids = []
+        
+        # 獲取所有與此群組相關的餐廳投票（包括系統推薦和用戶投票）
+        all_votes = supabase.table("restaurant_votes") \
+            .select("restaurant_id, user_id, is_system_recommendation") \
+            .eq("group_id", group_id) \
             .execute()
-    
-    # 格式化聚餐時間顯示
-    formatted_dinner_time = next_dinner_time.strftime("%-m月%-d日")
-    
-    # 發送通知
-    notification_service = NotificationService(use_service_role=True)
-    for member_id in group_members:
-        try:
-            await notification_service.send_notification(
-                user_id=member_id,
-                title="餐廳出爐！",
-                body=f"這次的餐廳是{restaurant_name}，期待{formatted_dinner_time}的聚餐歐！",
-                data={
-                    "type": "dining_event_created",
-                    "event_id": event_id,
-                    "restaurant_id": winning_restaurant_id
+            
+        if not all_votes.data:
+            logger.warning(f"群組 {group_id} 沒有任何餐廳投票或推薦")
+            return {
+                "success": False,
+                "message": "沒有可用的餐廳投票或推薦"
+            }
+            
+        # 計算每家餐廳的得票數並收集系統推薦的餐廳
+        vote_counts = {}
+        system_recommended_ids = set()
+        
+        for vote in all_votes.data:
+            rid = vote["restaurant_id"]
+            is_system_recommendation = vote.get("is_system_recommendation", False)
+            has_user_id = vote.get("user_id") is not None
+            
+            # 初始化餐廳投票計數（如果不存在）
+            if rid not in vote_counts:
+                vote_counts[rid] = 0
+                
+            # 系統推薦記為零票，但記錄為系統推薦
+            if is_system_recommendation and not has_user_id:
+                system_recommended_ids.add(rid)
+            # 用戶投票增加計數（如果不是系統推薦）
+            elif has_user_id and not is_system_recommendation:
+                vote_counts[rid] += 1
+        
+        # 按票數從高到低排序餐廳
+        sorted_restaurants = sorted(vote_counts.items(), key=lambda x: x[1], reverse=True)
+        
+        # 決定餐廳選擇方式
+        if sorted_restaurants and sorted_restaurants[0][1] > 0:
+            # 有效得票最高的餐廳獲勝
+            restaurant_id = sorted_restaurants[0][0]
+            selection_method = "用戶投票"
+            logger.info(f"群組 {group_id} 根據用戶投票選出餐廳 {restaurant_id}，得票數: {sorted_restaurants[0][1]}")
+        elif system_recommended_ids:
+            # 如果沒有有效得票，從系統推薦中隨機選擇
+            system_recommendations = list(system_recommended_ids)
+            random.shuffle(system_recommendations)
+            restaurant_id = system_recommendations[0]
+            selection_method = "系統隨機推薦"
+            logger.info(f"群組 {group_id} 從系統推薦中隨機選出餐廳 {restaurant_id}")
+        else:
+            # 如果沒有系統推薦，從所有餐廳中隨機選一個
+            all_restaurant_ids = [rid for rid, _ in sorted_restaurants]
+            if all_restaurant_ids:
+                restaurant_id = random.choice(all_restaurant_ids)
+                selection_method = "隨機選擇"
+                logger.info(f"群組 {group_id} 從所有餐廳中隨機選出 {restaurant_id}")
+            else:
+                logger.error(f"群組 {group_id} 沒有可用的餐廳選擇")
+                return {
+                    "success": False,
+                    "message": "沒有可用的餐廳"
                 }
-            )
-        except Exception as ne:
-            logger.error(f"發送通知給用戶 {member_id} 失敗: {str(ne)}")
-    
-    logger.info(f"群組 {group_id} 的聚餐事件 {event_id} 已建立完成")
-    
-    return {
-        "dining_event_id": event_id,
-        "winning_restaurant": restaurant_data
-    }
+        
+        # 構建候選餐廳列表
+        # 首先添加所有得票的餐廳（除了獲勝餐廳）
+        for rid, votes in sorted_restaurants:
+            if rid != restaurant_id and rid not in candidate_restaurant_ids:
+                candidate_restaurant_ids.append(rid)
+                
+        # 然後添加所有系統推薦的餐廳（如果尚未在列表中）
+        for rid in system_recommended_ids:
+            if rid != restaurant_id and rid not in candidate_restaurant_ids:
+                candidate_restaurant_ids.append(rid)
+                
+        logger.info(f"最終選擇餐廳: {restaurant_id}，選擇方式: {selection_method}")
+        logger.info(f"候選餐廳數量: {len(candidate_restaurant_ids)}")
+        
+        # 4. 獲取餐廳詳細資訊
+        restaurant_info = supabase.table("restaurants") \
+            .select("*") \
+            .eq("id", restaurant_id) \
+            .execute()
+        
+        if not restaurant_info.data:
+            logger.error(f"無法獲取餐廳 {restaurant_id} 的資訊")
+            return {
+                "success": False, 
+                "message": f"無法獲取餐廳資訊"
+            }
+            
+        restaurant_data = restaurant_info.data[0]
+        restaurant_name = restaurant_data["name"]
+        
+        # 5. 創建聚餐事件
+        # 使用DinnerTimeUtils獲取下次聚餐時間
+        dinner_time_info = DinnerTimeUtils.calculate_dinner_time_info()
+        next_dinner_time = dinner_time_info.next_dinner_time
+        
+        # 格式化餐廳選擇說明
+        if selection_method == "用戶投票":
+            description = f"群組投票選出的餐廳: {restaurant_name}"
+        else:
+            description = f"系統選出的餐廳: {restaurant_name}"
+            
+        if is_forced:
+            description += " (投票時間已到自動選出)"
+        
+        # 創建聚餐事件
+        dining_event = {
+            "id": str(uuid4()),
+            "matching_group_id": group_id,
+            "restaurant_id": restaurant_id,
+            "name": f"{restaurant_name} 聚餐",
+            "date": next_dinner_time.isoformat(),  # 使用計算出的聚餐時間
+            "status": "pending_confirmation",  # 餐廳待確認
+            "description": description,
+            "candidate_restaurant_ids": candidate_restaurant_ids,  # 加入候選餐廳列表
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        event_result = supabase.table("dining_events") \
+            .insert(dining_event) \
+            .execute()
+        
+        if not event_result.data:
+            logger.error(f"創建聚餐事件失敗: {event_result.error if hasattr(event_result, 'error') else '未知錯誤'}")
+            return {
+                "success": False,
+                "message": "創建聚餐事件失敗"
+            }
+        
+        event_id = event_result.data[0]["id"]
+        
+        # 6. 更新matching_groups表狀態為waiting_attendance
+        supabase.table("matching_groups") \
+            .update({
+                "status": "waiting_attendance", 
+                "updated_at": datetime.utcnow().isoformat()
+            }) \
+            .eq("id", group_id) \
+            .execute()
+        
+        # 7. 更新所有成員狀態為等待參加聚餐
+        status_updates = []
+        current_time = datetime.utcnow().isoformat()
+        
+        for member_id in group_members:
+            status_updates.append({
+                "user_id": member_id,
+                "status": "waiting_attendance",
+                "updated_at": current_time
+            })
+        
+        # 使用UPSERT批量更新用戶狀態
+        if status_updates:
+            supabase.table("user_status") \
+                .upsert(status_updates, on_conflict="user_id") \
+                .execute()
+        
+        # 8. 發送通知
+        # 格式化聚餐時間顯示 - 跨平台解決方案
+        try:
+            # 嘗試使用Linux格式（沒有前導零）
+            formatted_dinner_time = next_dinner_time.strftime("%-m月%-d日")
+        except ValueError:
+            # Windows平台回退方案
+            month = next_dinner_time.month
+            day = next_dinner_time.day
+            formatted_dinner_time = f"{month}月{day}日"
+        
+        # 通知消息
+        notification_title = "餐廳出爐！"
+        if is_forced:
+            notification_body = f"投票時間到！這次的餐廳是{restaurant_name}，期待{formatted_dinner_time}的聚餐歐！"
+        else:
+            notification_body = f"這次的餐廳是{restaurant_name}，期待{formatted_dinner_time}的聚餐歐！"
+        
+        notification_service = NotificationService(use_service_role=True)
+        for member_id in group_members:
+            try:
+                await notification_service.send_notification(
+                    user_id=member_id,
+                    title=notification_title,
+                    body=notification_body,
+                    data={
+                        "type": "dining_event_created",
+                        "event_id": event_id,
+                        "restaurant_id": restaurant_id
+                    }
+                )
+            except Exception as ne:
+                logger.error(f"發送通知給用戶 {member_id} 失敗: {str(ne)}")
+        
+        logger.info(f"群組 {group_id} 的聚餐事件 {event_id} 已成功創建")
+        
+        return {
+            "success": True,
+            "is_voting_complete": True,
+            "dining_event_id": event_id,
+            "winning_restaurant": restaurant_data,
+            "selection_method": selection_method,
+            "is_forced": is_forced
+        }
+        
+    except Exception as e:
+        logger.error(f"處理群組 {group_id} 投票時出錯: {str(e)}")
+        return {
+            "success": False,
+            "message": f"處理出錯: {str(e)}"
+        }
 
 @router.get("/vote", response_model=List[RestaurantResponse])
 async def get_group_restaurant_votes(
@@ -659,4 +793,51 @@ async def get_group_restaurant_votes(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"獲取群組餐廳投票時出錯: {str(e)}"
         )
+
+@router.post("/finalize-votes", response_model=Dict[str, Any], status_code=status.HTTP_200_OK, dependencies=[Depends(verify_cron_api_key)])
+async def finalize_restaurant_votes(
+    background_tasks: BackgroundTasks,
+    supabase: Client = Depends(get_supabase_service)
+):
+    """
+    定時觸發的API，用於處理未完成的餐廳投票階段
+    - 檢查所有狀態為 waiting_restaurant 的群組
+    - 對於每個群組，檢查投票是否已完成
+    - 如果投票未完成，強制結束投票，使用現有投票或隨機選擇系統推薦的餐廳
+    - 創建聚餐事件並發送通知
+    """
+    # 將任務放入背景執行，避免阻塞API響應
+    background_tasks.add_task(process_finalize_votes, supabase)
+    
+    return {
+        "success": True,
+        "message": "餐廳投票強制結束任務已啟動"
+    }
+
+async def process_finalize_votes(supabase: Client):
+    """處理強制結束餐廳投票的背景任務"""
+    try:
+        logger.info("開始執行餐廳投票強制結束任務")
+        
+        # 直接從matching_groups表中查詢狀態為waiting_restaurant的群組
+        waiting_groups = supabase.table("matching_groups") \
+            .select("id, user_ids") \
+            .eq("status", "waiting_restaurant") \
+            .execute()
+            
+        if not waiting_groups.data or len(waiting_groups.data) == 0:
+            logger.info("沒有等待中的群組，任務結束")
+            return
+            
+        group_ids = [group["id"] for group in waiting_groups.data]
+        logger.info(f"找到 {len(group_ids)} 個需要處理的群組")
+        
+        # 處理每個群組的投票情況
+        for group_id in group_ids:
+            await process_group_voting(supabase, group_id, is_forced=True)
+            
+        logger.info("餐廳投票強制結束任務完成")
+        
+    except Exception as e:
+        logger.error(f"處理餐廳投票強制結束任務時出錯: {str(e)}")
 
