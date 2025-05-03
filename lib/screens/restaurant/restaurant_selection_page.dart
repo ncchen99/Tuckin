@@ -318,7 +318,6 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                   height: 60.h,
                                   textStyle: TextStyle(
                                     fontFamily: 'OtsutomeFont',
-                                    fontSize: 16.sp,
                                     color: const Color(0xFFD1D1D1),
                                   ),
                                   onPressed: () {
@@ -466,9 +465,9 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                     horizontal: 20.w,
                                   ),
                                   child: Text(
-                                    '請選擇一家餐廳：',
+                                    '請選擇一家餐廳',
                                     style: TextStyle(
-                                      fontSize: 20.sp,
+                                      fontSize: 22.sp,
                                       fontFamily: 'OtsutomeFont',
                                       color: const Color(0xFF23456B),
                                       fontWeight: FontWeight.bold,

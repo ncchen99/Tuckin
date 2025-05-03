@@ -22,7 +22,7 @@ class ImageButton extends StatefulWidget {
     this.width = 150,
     this.height = 75,
     this.textStyle = const TextStyle(
-      fontSize: 20,
+      fontSize: 18,
       color: Color(0xFFD1D1D1),
       fontFamily: 'OtsutomeFont',
       fontWeight: FontWeight.bold,
@@ -51,6 +51,34 @@ class _ImageButtonState extends State<ImageButton> {
         (isSmallButton ? 5.h : 9.h); // 同步調整小號按鈕的文字頂部偏移
     final adaptiveTextNormalOffset = (isSmallButton ? 1.5.h : 3.h); // 調整常規文字偏移
     final adaptiveBottomSpace = (isSmallButton ? 5.h : 10.h); // 調整底部空間
+
+    // 計算自適應字體大小，同時考慮系統字體大小設定
+    final baseFontSize =
+        isSmallButton
+            ? (widget.textStyle.fontSize ?? 16)
+            : (widget.textStyle.fontSize ?? 18);
+
+    // 獲取系統字體縮放因子
+    final textScaleFactor = MediaQuery.of(context).textScaleFactor;
+
+    // 計算屏幕寬度比例因子 (相對於設計稿寬度)
+    final screenWidthFactor =
+        MediaQuery.of(context).size.width / sizeConfig.designWidth;
+
+    // 結合系統字體縮放因子和屏幕寬度來計算最終字體大小
+    // 使用加權平均，讓系統字體設定和屏幕尺寸都有影響
+    // 權重可以調整，這裡使用0.7和0.3的權重
+    final combinedFactor = (textScaleFactor * 0.7) + (screenWidthFactor * 0.3);
+
+    // 計算最終字體大小，並設置上下限
+    // 下限確保字體不會太小，上限確保字體不會太大
+    final double minFontSize = baseFontSize * 0.9; // 最小為基礎大小的80%
+    final double maxFontSize = baseFontSize * 1.1; // 最大為基礎大小的150%
+
+    final adaptiveFontSize = (baseFontSize * combinedFactor).clamp(
+      minFontSize,
+      maxFontSize,
+    );
 
     // 如果按鈕被禁用，直接返回靜態效果，沒有任何手勢識別
     if (!widget.isEnabled) {
@@ -135,10 +163,7 @@ class _ImageButtonState extends State<ImageButton> {
                       textStyle: widget.textStyle.copyWith(
                         letterSpacing: 1.0.w,
                         height: 1.2,
-                        fontSize:
-                            isSmallButton
-                                ? (widget.textStyle.fontSize ?? 18).sp
-                                : (widget.textStyle.fontSize ?? 20).sp,
+                        fontSize: adaptiveFontSize,
                       ),
                       strokeColor: const Color(0xFF23456B),
                       strokeWidth: (isSmallButton ? 3.r : 4.r),
@@ -220,11 +245,7 @@ class _ImageButtonState extends State<ImageButton> {
                     textStyle: widget.textStyle.copyWith(
                       letterSpacing: 1.0.w, // 自適應字母間距
                       height: 1.2, // 減小行高以改善垂直對齊
-                      fontSize:
-                          isSmallButton
-                              ? (widget.textStyle.fontSize ?? 18).sp
-                              : (widget.textStyle.fontSize ?? 20)
-                                  .sp, // 使用自適應字體大小
+                      fontSize: adaptiveFontSize, // 使用計算後的自適應字體大小
                     ),
                     strokeColor:
                         isRedButton

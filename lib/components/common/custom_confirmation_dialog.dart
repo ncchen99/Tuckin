@@ -116,7 +116,7 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                   widget.content,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 16.sp,
+                    fontSize: 18.sp,
                     fontFamily: 'OtsutomeFont',
                     color: const Color(0xFF23456B),
                   ),
@@ -148,7 +148,6 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                           }
                         },
                         textStyle: TextStyle(
-                          fontSize: 16.sp,
                           color: const Color(0xFFD1D1D1),
                           fontFamily: 'OtsutomeFont',
                           fontWeight: FontWeight.bold,
@@ -194,7 +193,6 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                           }
                         },
                         textStyle: TextStyle(
-                          fontSize: 16.sp,
                           color: const Color(0xFFD1D1D1),
                           fontFamily: 'OtsutomeFont',
                           fontWeight: FontWeight.bold,

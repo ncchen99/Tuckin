@@ -303,32 +303,38 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage> {
                 // 主要內容
                 Expanded(
                   child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(horizontal: 24.w),
                     physics: const BouncingScrollPhysics(),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: 40.h),
-
+                        SizedBox(height: 20.h),
                         // 標題
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 24.w),
-                          child: Text(
-                            '想請你幫忙訂位',
-                            style: TextStyle(
-                              fontSize: 24.sp,
-                              fontFamily: 'OtsutomeFont',
-                              color: const Color(0xFF23456B),
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.left,
+                        Text(
+                          '確認餐廳',
+                          style: TextStyle(
+                            fontSize: 24.sp,
+                            fontFamily: 'OtsutomeFont',
+                            color: const Color(0xFF23456B),
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-
-                        SizedBox(height: 40.h),
+                        SizedBox(height: 10.h),
+                        // 小標題
+                        Text(
+                          '確認營業時間，可以的話幫忙預定',
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            fontFamily: 'OtsutomeFont',
+                            color: const Color(0xFF23456B),
+                          ),
+                        ),
+                        SizedBox(height: 25.h),
 
                         // 餐廳資訊卡片
                         Container(
                           width: cardWidth,
-                          margin: EdgeInsets.symmetric(vertical: 8.h),
+                          margin: EdgeInsets.symmetric(vertical: 0.h),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(15.r),

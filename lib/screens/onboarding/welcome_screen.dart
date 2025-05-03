@@ -445,7 +445,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                 // 下一步按鈕
                 Padding(
-                  padding: EdgeInsets.only(bottom: 70.h), // 調整底部間距為頁面指示器留出空間
+                  padding: EdgeInsets.only(bottom: 85.h), // 調整底部間距為頁面指示器留出空間
                   child: ImageButton(
                     imagePath: 'assets/images/ui/button/red_m.png',
                     text: pageIndex < _totalPages - 1 ? '下一步' : '開始使用',
@@ -768,20 +768,22 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
       // 計算網格位置 (使用正規化坐標)
       final gridSize = 4; // 4x4網格
-      final normalizedCellSize = 2.0 / gridSize; // 正規化格子大小
+      final normalizedCellSize = 2.0 / gridSize - 0.08; // 正規化格子大小
       final row = index ~/ gridSize; // 0, 1, 2, 3
       final col = index % gridSize; // 0, 1, 2, 3
 
       // 計算網格中心坐標，加入小幅隨機偏移 (使用正規化坐標)
-      final normalizedOffsetX = (random.nextDouble() * 0.1 - 0.05);
-      final normalizedOffsetY = (random.nextDouble() * 0.1 - 0.05);
+      final normalizedOffsetX = (random.nextDouble() * 0.01 - 0.005);
+      final normalizedOffsetY = (random.nextDouble() * 0.01 - 0.005);
 
       // 計算相對於中心的正規化坐標 (範圍為-1到1)
       final halfGrid = (gridSize - 1) / 2;
       final normalizedRelativeX =
-          (col - halfGrid) * normalizedCellSize + normalizedOffsetX;
+          (col - halfGrid) * normalizedCellSize + normalizedOffsetX - 0.1;
       final normalizedRelativeY =
-          (row - halfGrid) * (normalizedCellSize - 0.05) + normalizedOffsetY;
+          (row - halfGrid) * (normalizedCellSize - 0.05) +
+          normalizedOffsetY -
+          0.15;
 
       // 起始位置設置在四個方向之外 (使用正規化坐標)
       double normalizedStartX, normalizedStartY;
@@ -869,12 +871,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
         // 縮放動畫 - 依據Z軸位置調整大小
         // Z軸位置影響大小，越前面(z值越大)的食物越大
-        final zSizeFactor = 0.8 + zPosition * 0.4; // 調小範圍，避免過大 (0.8-1.2)
+        final zSizeFactor = 0.9 + zPosition * 0.3; // 調小範圍，避免過大 (0.8-1.2)
 
         // 根據Z位置調整基礎大小，前方食物略小一些以避免被截斷
         final baseSizeMultiplier =
-            zPosition > 0.7 ? 1.0 : (1.0 + (index % 4) * 0.05);
-        final sizeMultiplier = baseSizeMultiplier * zSizeFactor;
+            zPosition > 0.7 ? 1.0 : (1.0 + (index % 4) * 0.005);
+        final sizeMultiplier = baseSizeMultiplier * zSizeFactor - 0.1;
 
         final currentScale = Tween<double>(
           begin: 0.3,
@@ -895,7 +897,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         );
 
         // 陰影效果
-        final shadowOffset = size * 0.015; // 相對於容器大小的陰影偏移
+        final shadowOffset = size * 0.01; // 相對於容器大小的陰影偏移
         final shadowOpacity = 0.4 + (zPosition * 0.1); // 前面的食物陰影更明顯
 
         // 基於Z位置調整食物位置，避免前方食物被截斷
