@@ -23,42 +23,6 @@ class RestaurantService {
   // 餐廳當前ID計數器（僅用於前端測試）
   int _restaurantIdCounter = 3; // 從3開始，避免與範例數據衝突
 
-  /// 獲取推薦餐廳列表
-  Future<List<Map<String, dynamic>>> getRecommendedRestaurants() async {
-    try {
-      // TODO: 實際項目中應當從後端API獲取推薦餐廳列表
-      // 這裡使用模擬數據
-      await Future.delayed(const Duration(milliseconds: 500)); // 模擬網路延遲
-
-      return [
-        {
-          'id': 1,
-          'name': '小山丘咖啡廳',
-          'imageUrl':
-              'https://images.unsplash.com/photo-1542181961-9590d0c79dab?q=80&w=500',
-          'category': '咖啡 / 輕食',
-          'address': '台北市信義區松壽路2號',
-          'mapUrl': 'https://maps.app.goo.gl/5JiNYEdFnJ2y6Ny79',
-        },
-        {
-          'id': 2,
-          'name': '水岸義式餐廳',
-          'imageUrl':
-              'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=500',
-          'category': '義式料理',
-          'address': '台北市中正區羅斯福路三段28號',
-          'mapUrl': 'https://maps.app.goo.gl/YHnNvgPeYhRJPqcT6',
-        },
-      ];
-    } catch (e) {
-      debugPrint('獲取推薦餐廳出錯: $e');
-      if (e is ApiError) {
-        rethrow;
-      }
-      throw ApiError(message: '獲取推薦餐廳時發生錯誤: $e');
-    }
-  }
-
   /// 處理Google地圖連結
   Future<Map<String, dynamic>> processMapLink(String mapLink) async {
     try {
@@ -78,7 +42,7 @@ class RestaurantService {
     dynamic restaurantId,
   ) async {
     try {
-      final String apiEndpoint = '${_apiService.baseUrl}/api/restaurant/vote';
+      final String apiEndpoint = '${_apiService.baseUrl}/restaurant/vote';
 
       // 獲取當前用戶
       final currentUser = await _authService.getCurrentUser();
@@ -153,31 +117,40 @@ class RestaurantService {
         return [];
       }
 
-      // 計算每家餐廳的投票數（參考 restaurant.py 的邏輯）
+      // 輸出原始投票數據用於調試
+      debugPrint('原始投票數據: $result');
+
+      // 計算每家餐廳的投票數
       Map<String, int> voteCountMap = {};
-      Set<String> systemRecommendedIds = {};
 
-      for (var vote in result) {
-        final restaurantId = vote['restaurant_id'] as String;
-        final isSystemRecommendation =
+      // 檢查 SQL 函數返回的數據格式
+      for (var item in result) {
+        debugPrint('投票項目: $item');
+        // 分析每條投票的內容
+        final Map<String, dynamic> vote = item;
+        final String restaurantId = vote['restaurant_id'] as String;
+        // 檢查是否有 user_id 字段，及其值是否為 null
+        final hasUserIdField = vote.containsKey('user_id');
+        final userId = vote['user_id'];
+        final bool isSystemRecommendation =
             vote['is_system_recommendation'] as bool? ?? false;
-        final hasUserId =
-            vote.containsKey('user_id') && vote['user_id'] != null;
 
-        // 初始化餐廳投票計數（如果不存在）
-        if (!voteCountMap.containsKey(restaurantId)) {
-          voteCountMap[restaurantId] = 0;
-        }
+        debugPrint(
+          '餐廳 ID: $restaurantId, 有 user_id 字段: $hasUserIdField, user_id: $userId, 系統推薦: $isSystemRecommendation',
+        );
 
-        // 系統推薦記為零票，但記錄為系統推薦
-        if (isSystemRecommendation && !hasUserId) {
-          systemRecommendedIds.add(restaurantId);
-        }
-        // 用戶投票增加計數（如果不是系統推薦）
-        else if (hasUserId && !isSystemRecommendation) {
-          voteCountMap[restaurantId] = (voteCountMap[restaurantId] ?? 0) + 1;
+        // 初始化餐廳投票計數
+        voteCountMap[restaurantId] ??= 0;
+
+        // 修改計數邏輯：如果不是系統推薦，則增加計數
+        if (!isSystemRecommendation) {
+          voteCountMap[restaurantId] = voteCountMap[restaurantId]! + 1;
+          debugPrint('增加計數：餐廳 $restaurantId 的票數：${voteCountMap[restaurantId]}');
         }
       }
+
+      // 輸出最終計算的投票數
+      debugPrint('最終計算的投票數: $voteCountMap');
 
       // 按票數從高到低排序
       List<MapEntry<String, int>> sortedVotes =
@@ -209,15 +182,21 @@ class RestaurantService {
         if (restaurant.isNotEmpty) {
           // 預設圖片路徑
           final defaultImagePath = 'assets/images/placeholder/restaurant.jpg';
-
-          // 確保處理 image_path 為空字串的情況
           String imageUrl;
+
+          // 檢查 image_path
           if (restaurant['image_path'] == null ||
               restaurant['image_path'].toString().trim().isEmpty) {
             imageUrl = defaultImagePath;
+            debugPrint('使用預設圖片路徑: $imageUrl');
           } else {
             imageUrl = restaurant['image_path'];
+            debugPrint('使用資料庫圖片路徑: $imageUrl');
           }
+
+          // 投票數
+          final votes = voteCountMap[restaurantId] ?? 0;
+          debugPrint('餐廳 ${restaurant['name']} 的最終票數: $votes');
 
           // 建立完整的餐廳名稱和地址查詢參數，用於 Google Maps URL
           final String restaurantName = Uri.encodeComponent(
@@ -238,10 +217,7 @@ class RestaurantService {
             'phone': restaurant['phone'],
             'website': restaurant['website'],
             'business_hours': restaurant['business_hours'],
-            'votes': voteCountMap[restaurantId] ?? 0,
-            'is_system_recommendation': systemRecommendedIds.contains(
-              restaurantId,
-            ),
+            'votes': votes,
           });
         }
       }

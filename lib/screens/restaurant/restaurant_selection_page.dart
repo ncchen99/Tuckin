@@ -501,8 +501,13 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                 SizedBox(height: 15.h),
 
                                 // 餐廳列表
-                                ..._restaurantList.map(
-                                  (restaurant) => RestaurantCard(
+                                ..._restaurantList.map((restaurant) {
+                                  // 添加調試信息
+                                  debugPrint(
+                                    '餐廳卡片數據: ${restaurant['name']}, 票數: ${restaurant['votes']}',
+                                  );
+
+                                  return RestaurantCard(
                                     name: restaurant['name'],
                                     imageUrl: restaurant['imageUrl'],
                                     category: restaurant['category'],
@@ -516,11 +521,11 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                         ),
                                     mapUrl: restaurant['mapUrl'],
                                     voteCount: restaurant['votes'],
-                                  ),
-                                ),
+                                  );
+                                }),
 
                                 if (_userRecommendedRestaurant == null)
-                                  SizedBox(height: 10.h),
+                                  SizedBox(height: 12.h),
 
                                 // 用戶推薦的餐廳（如果有）
                                 if (_userRecommendedRestaurant != null)

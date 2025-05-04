@@ -3,7 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class RestaurantCard extends StatelessWidget {
+class RestaurantCard extends StatefulWidget {
   final String name;
   final String imageUrl;
   final String category;
@@ -25,9 +25,72 @@ class RestaurantCard extends StatelessWidget {
     this.voteCount,
   });
 
+  @override
+  State<RestaurantCard> createState() => _RestaurantCardState();
+}
+
+class _RestaurantCardState extends State<RestaurantCard>
+    with SingleTickerProviderStateMixin {
+  // 本地額外票數
+  int _additionalVotes = 0;
+  // 是否選擇過
+  bool _wasSelected = false;
+  // 動畫控制器
+  late AnimationController _controller;
+  // 動畫
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(RestaurantCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // 當卡片從未選中變為選中狀態時，增加票數並播放動畫
+    if (!oldWidget.isSelected && widget.isSelected && !_wasSelected) {
+      setState(() {
+        _additionalVotes = 1;
+        _wasSelected = true;
+      });
+      _controller.reset();
+      _controller.forward();
+    }
+    // 當卡片從選中變為未選中狀態時，重置狀態
+    else if (oldWidget.isSelected && !widget.isSelected) {
+      setState(() {
+        _additionalVotes = 0;
+        _wasSelected = false;
+      });
+    }
+  }
+
+  // 獲取實際的票數（原始票數加上本地額外票數）
+  int get _effectiveVoteCount {
+    int baseCount = widget.voteCount ?? 0;
+    return baseCount + _additionalVotes;
+  }
+
   Future<void> _launchMapUrl() async {
-    if (mapUrl != null) {
-      final Uri url = Uri.parse(mapUrl!);
+    if (widget.mapUrl != null) {
+      final Uri url = Uri.parse(widget.mapUrl!);
       if (!await launchUrl(url)) {
         throw Exception('無法開啟地圖: $url');
       }
@@ -36,11 +99,17 @@ class RestaurantCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 添加調試信息，顯示投票數
+    debugPrint(
+      'RestaurantCard: ${widget.name}, voteCount: $_effectiveVoteCount',
+    );
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: 8.h, horizontal: 20.w),
+        margin: EdgeInsets.symmetric(vertical: 12.h, horizontal: 20.w),
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             // 卡片主體
             Container(
@@ -77,44 +146,32 @@ class RestaurantCard extends StatelessWidget {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  name,
-                                  style: TextStyle(
-                                    fontSize: 18.sp,
-                                    fontFamily: 'OtsutomeFont',
-                                    color: const Color(0xFF23456B),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (voteCount != null && voteCount! > 0)
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8.w,
-                                    vertical: 2.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFB33D1C),
-                                    borderRadius: BorderRadius.circular(10.r),
-                                  ),
+                                child: Container(
+                                  // 當有投票標籤時，限制文字寬度
+                                  width:
+                                      (_effectiveVoteCount > 0)
+                                          ? MediaQuery.of(context).size.width *
+                                              0.5
+                                          : null,
                                   child: Text(
-                                    '${voteCount}票',
+                                    widget.name,
                                     style: TextStyle(
-                                      fontSize: 12.sp,
+                                      fontSize: 18.sp,
                                       fontFamily: 'OtsutomeFont',
-                                      color: Colors.white,
+                                      color: const Color(0xFF23456B),
                                       fontWeight: FontWeight.bold,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                              ),
                             ],
                           ),
 
                           SizedBox(height: 2.h), // 減少間距
                           // 餐廳類別
                           Text(
-                            category,
+                            widget.category,
                             style: TextStyle(
                               fontSize: 14.sp,
                               fontFamily: 'OtsutomeFont',
@@ -128,7 +185,7 @@ class RestaurantCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                             text: TextSpan(
-                              text: address,
+                              text: widget.address,
                               style: TextStyle(
                                 fontSize: 14.sp,
                                 fontFamily: 'OtsutomeFont',
@@ -150,7 +207,7 @@ class RestaurantCard extends StatelessWidget {
             ),
 
             // 選中的邊框 - 調整為覆蓋整個卡片
-            if (isSelected)
+            if (widget.isSelected)
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
@@ -163,6 +220,63 @@ class RestaurantCard extends StatelessWidget {
                   ),
                 ),
               ),
+
+            // 票數顯示 - 帶動畫效果
+            if (_effectiveVoteCount > 0)
+              Positioned(
+                top: -12.h,
+                right: -6.w,
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale:
+                          _wasSelected && _additionalVotes > 0
+                              ? _scaleAnimation.value
+                              : 1.0,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10.w,
+                          vertical: 4.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF23456B),
+                          borderRadius: BorderRadius.circular(10.r),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 3,
+                              offset: Offset(1, 1),
+                            ),
+                          ],
+                        ),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 500),
+                          transitionBuilder: (
+                            Widget child,
+                            Animation<double> animation,
+                          ) {
+                            return ScaleTransition(
+                              scale: animation,
+                              child: child,
+                            );
+                          },
+                          child: Text(
+                            '$_effectiveVoteCount 票',
+                            key: ValueKey<int>(_effectiveVoteCount),
+                            style: TextStyle(
+                              fontSize: 16.sp,
+                              fontFamily: 'OtsutomeFont',
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),
@@ -172,19 +286,19 @@ class RestaurantCard extends StatelessWidget {
   // 構建餐廳圖片小部件
   Widget _buildRestaurantImage() {
     // 檢查圖片 URL 是否無效
-    if (imageUrl.isEmpty) {
+    if (widget.imageUrl.isEmpty) {
       return _buildFallbackImage();
     }
 
     // 如果是本地資源路徑
-    if (imageUrl.startsWith('assets/')) {
+    if (widget.imageUrl.startsWith('assets/')) {
       return Image.asset(
-        imageUrl,
+        widget.imageUrl,
         width: 100.w,
         height: 100.h,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
-          debugPrint('本地圖片載入錯誤 ($imageUrl): $error');
+          debugPrint('本地圖片載入錯誤 (${widget.imageUrl}): $error');
           return _buildFallbackImage();
         },
       );
@@ -192,7 +306,7 @@ class RestaurantCard extends StatelessWidget {
     // 如果是網路圖片
     else {
       return Image.network(
-        imageUrl,
+        widget.imageUrl,
         width: 100.w,
         height: 100.h,
         fit: BoxFit.cover,
@@ -215,7 +329,7 @@ class RestaurantCard extends StatelessWidget {
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          debugPrint('網路圖片載入錯誤 ($imageUrl): $error');
+          debugPrint('網路圖片載入錯誤 (${widget.imageUrl}): $error');
           return _buildFallbackImage();
         },
       );
@@ -244,7 +358,7 @@ class RecommendRestaurantCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: 8.h, horizontal: 20.w),
+        margin: EdgeInsets.symmetric(vertical: 12.h, horizontal: 20.w),
         height: 124.h, // 與餐廳卡片高度相符
         decoration: BoxDecoration(
           color: const Color.fromARGB(255, 255, 255, 255), // 改為橘色背景

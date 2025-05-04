@@ -234,7 +234,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     if (_userStatus == 'waiting_other_users') {
       content = Column(
         children: [
-          SizedBox(height: 40.h),
+          SizedBox(height: 80.h),
 
           // 提示文字
           Center(
