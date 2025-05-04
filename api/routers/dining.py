@@ -753,4 +753,144 @@ async def admin_update_completed_events(
         "message": "已啟動更新已完成聚餐事件的背景任務"
     }
 
+# 將已評分的聚餐事件結束並移至歷史記錄表
+async def finalize_dining_events(supabase: Client):
+    try:
+        # 獲取目前時間
+        current_time = datetime.now(timezone.utc)
+        
+        # 計算2天前的時間
+        two_days_ago = (current_time - timedelta(days=2)).isoformat()
+        
+        # 獲取所有已完成且時間已過2天的事件
+        events_to_finalize = supabase.table("dining_events") \
+            .select("id, matching_group_id, restaurant_id, name, date, attendee_count") \
+            .eq("status", "completed") \
+            .lt("date", two_days_ago) \
+            .execute()
+            
+        if not events_to_finalize.data or len(events_to_finalize.data) == 0:
+            logger.info("沒有需要結束的聚餐事件")
+            return
+        
+        # 取得所有需要處理的事件ID和相關聚餐群組ID
+        event_ids = [event["id"] for event in events_to_finalize.data]
+        group_ids = [event["matching_group_id"] for event in events_to_finalize.data]
+
+        # 獲取所有相關聚餐群組資訊
+        groups_info = supabase.table("matching_groups") \
+            .select("id, user_ids, school_only") \
+            .in_("id", group_ids) \
+            .execute()
+        
+        # 建立群組ID到群組資訊的映射
+        group_map = {group["id"]: group for group in groups_info.data}
+        
+        # 獲取餐廳資訊
+        restaurant_ids = [event["restaurant_id"] for event in events_to_finalize.data if event["restaurant_id"]]
+        restaurants_info = supabase.table("restaurants") \
+            .select("id, name") \
+            .in_("id", restaurant_ids) \
+            .execute()
+        
+        # 建立餐廳ID到餐廳名稱的映射
+        restaurant_map = {restaurant["id"]: restaurant["name"] for restaurant in restaurants_info.data}
+        
+        # 準備歷史記錄插入數據
+        history_records = []
+        for event in events_to_finalize.data:
+            if event["matching_group_id"] in group_map:
+                group_info = group_map[event["matching_group_id"]]
+                restaurant_id = event.get("restaurant_id")
+                
+                history_records.append({
+                    "restaurant_id": restaurant_id,
+                    "restaurant_name": restaurant_map.get(restaurant_id) if restaurant_id else None,
+                    "event_name": event["name"],
+                    "event_date": event["date"],
+                    "attendee_count": event.get("attendee_count"),
+                    "user_ids": group_info["user_ids"],
+                    "school_only": group_info.get("school_only", False)
+                })
+        
+        # 批量插入歷史記錄
+        if history_records:
+            supabase.table("dining_history").insert(history_records).execute()
+            logger.info(f"已將 {len(history_records)} 個聚餐事件移至歷史記錄")
+        
+        # 獲取所有相關用戶
+        all_user_ids = set()
+        for group_id in group_ids:
+            if group_id in group_map and group_map[group_id].get("user_ids"):
+                all_user_ids.update(group_map[group_id]["user_ids"])
+        
+        # 將這些用戶的狀態從rating更新為booking
+        if all_user_ids:
+            supabase.table("user_status") \
+                .update({
+                    "status": "booking",
+                    "updated_at": current_time.isoformat()
+                }) \
+                .in_("user_id", list(all_user_ids)) \
+                .eq("status", "rating") \
+                .execute()
+            
+            logger.info(f"已將 {len(all_user_ids)} 個用戶狀態從rating更新為booking")
+        
+        # 刪除週期性數據
+        # 1. 刪除rating_sessions
+        supabase.table("rating_sessions") \
+            .delete() \
+            .in_("dining_event_id", event_ids) \
+            .execute()
+        
+        # 2. 刪除restaurant_votes
+        supabase.table("restaurant_votes") \
+            .delete() \
+            .in_("group_id", group_ids) \
+            .execute()
+        
+        # 3. 刪除user_matching_info
+        supabase.table("user_matching_info") \
+            .delete() \
+            .in_("matching_group_id", group_ids) \
+            .execute()
+        
+        # 4. 刪除dining_events
+        supabase.table("dining_events") \
+            .delete() \
+            .in_("id", event_ids) \
+            .execute()
+        
+        # 5. 最後刪除matching_groups
+        supabase.table("matching_groups") \
+            .delete() \
+            .in_("id", group_ids) \
+            .execute()
+        
+        logger.info(f"已清理與 {len(event_ids)} 個聚餐事件相關的週期性數據")
+        
+    except Exception as e:
+        logger.error(f"結束聚餐事件時出錯: {str(e)}")
+
+# 添加一個管理員API，用於結束已完成的聚餐事件
+@router.post("/finalize-dining-events", response_model=Dict[str, Any], dependencies=[Depends(verify_cron_api_key)])
+async def admin_finalize_dining_events(
+    background_tasks: BackgroundTasks,
+    supabase: Client = Depends(get_supabase_service)
+):
+    """
+    管理員或排程任務API，用於結束已評分的聚餐事件(聚餐後2天)，
+    將rating狀態的用戶更新為booking狀態，
+    備份dining_events數據到歷史記錄表，
+    並刪除週期性數據以提高資料庫效率
+    """
+    # 添加到背景任務執行，避免阻塞API響應
+    background_tasks.add_task(finalize_dining_events, supabase)
+    
+    return {
+        "success": True,
+        "message": "已啟動結束聚餐事件的背景任務"
+    }
+
 
