@@ -676,4 +676,81 @@ async def submit_rating(
             detail=f"提交評分時出錯: {str(e)}"
         )
 
+# 將確認完成的聚餐事件更新為已完成
+async def update_completed_dining_events(supabase: Client):
+    try:
+        # 獲取目前時間
+        current_time = datetime.now(timezone.utc)
+        
+        # 獲取所有已確認且時間已過的事件
+        events_to_complete = supabase.table("dining_events") \
+            .select("id, matching_group_id") \
+            .eq("status", "confirmed") \
+            .lt("date", current_time.isoformat()) \
+            .execute()
+            
+        if not events_to_complete.data or len(events_to_complete.data) == 0:
+            logger.info("沒有需要更新為已完成狀態的聚餐事件")
+            return
+            
+        # 取得所有需要更新的事件ID和相關聚餐群組ID
+        event_ids = [event["id"] for event in events_to_complete.data]
+        group_ids = [event["matching_group_id"] for event in events_to_complete.data]
+        
+        # 批量更新聚餐事件狀態為completed
+        supabase.table("dining_events") \
+            .update({
+                "status": "completed",
+                "updated_at": current_time.isoformat()
+            }) \
+            .in_("id", event_ids) \
+            .execute()
+            
+        # 獲取所有相關聚餐群組的用戶
+        for group_id in group_ids:
+            # 獲取群組中所有用戶
+            group_info = supabase.table("matching_groups") \
+                .select("user_ids") \
+                .eq("id", group_id) \
+                .execute()
+                
+            if not group_info.data or not group_info.data[0].get("user_ids"):
+                logger.warning(f"找不到聚餐群組 {group_id} 的成員資訊")
+                continue
+                
+            user_ids = group_info.data[0]["user_ids"]
+            
+            # 將這些用戶的狀態從waiting_attendance更新為rating
+            supabase.table("user_status") \
+                .update({
+                    "status": "rating",
+                    "updated_at": current_time.isoformat()
+                }) \
+                .in_("user_id", user_ids) \
+                .eq("status", "waiting_attendance") \
+                .execute()
+        
+        logger.info(f"已將 {len(event_ids)} 個聚餐事件更新為已完成狀態，並更新相關用戶狀態")
+        
+    except Exception as e:
+        logger.error(f"更新已完成聚餐事件時出錯: {str(e)}")
+
+# 添加一個管理員API，用於更新已完成的聚餐事件
+@router.post("/update-completed-events", response_model=Dict[str, Any], dependencies=[Depends(verify_cron_api_key)])
+async def admin_update_completed_events(
+    background_tasks: BackgroundTasks,
+    supabase: Client = Depends(get_supabase_service)
+):
+    """
+    管理員或排程任務API，用於將已過期的confirmed狀態事件更新為completed，
+    同時將相關用戶狀態從waiting_attendance更新為rating
+    """
+    # 添加到背景任務執行，避免阻塞API響應
+    background_tasks.add_task(update_completed_dining_events, supabase)
+    
+    return {
+        "success": True,
+        "message": "已啟動更新已完成聚餐事件的背景任務"
+    }
+
 
