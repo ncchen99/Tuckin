@@ -29,8 +29,8 @@ class RestaurantService {
       // 使用Places服務處理地圖連結
       final restaurantData = await _placesService.processMapLink(mapLink);
 
-      // 轉換為前端所需格式
-      return _convertToFrontendRestaurantFormat(restaurantData, mapLink);
+      // 轉換為前端所需格式，直接傳遞原始數據（不生成新ID）
+      return restaurantData;
     } catch (e) {
       debugPrint('處理Google地圖連結出錯: $e');
       rethrow;
@@ -230,47 +230,6 @@ class RestaurantService {
       }
       throw ApiError(message: '獲取票數最高餐廳時發生錯誤: $e');
     }
-  }
-
-  /// 將Places API數據轉換為前端所需的餐廳格式
-  Map<String, dynamic> _convertToFrontendRestaurantFormat(
-    Map<String, dynamic> placeData, [
-    String? providedMapLink,
-  ]) {
-    // 生成唯一ID（實際應用中，這應該由後端提供）
-    int id = _restaurantIdCounter++;
-
-    // 使用第一張照片作為主圖
-    String imageUrl = 'assets/images/placeholder/restaurant.jpg'; // 預設圖片
-    if (placeData['photos'] != null &&
-        (placeData['photos'] as List).isNotEmpty) {
-      final photo = placeData['photos'][0];
-      // 確保照片URL有效，否則使用預設圖片
-      imageUrl =
-          (photo != null && photo.toString().isNotEmpty) ? photo : imageUrl;
-    }
-
-    // 建立餐廳名稱和地址的 Google Maps URL
-    final String name = placeData['name'] ?? '';
-    final String address = placeData['address'] ?? '';
-    final String encodedName = Uri.encodeComponent(name);
-    final String encodedAddress = Uri.encodeComponent(address);
-    final String mapUrlQuery = '$encodedName+$encodedAddress';
-    final String mapUrl =
-        providedMapLink ?? 'https://www.google.com/maps/place/?q=$mapUrlQuery';
-
-    return {
-      'id': id,
-      'name': name,
-      'imageUrl': imageUrl,
-      'category': placeData['category'],
-      'address': address,
-      'mapUrl': mapUrl,
-      'rating': placeData['rating'],
-      'openingHours': placeData['openingHours'],
-      'photos': placeData['photos'] ?? [],
-      'website': placeData['website'] ?? '',
-    };
   }
 
   /// 獲取測試餐廳數據（僅用於前端測試）

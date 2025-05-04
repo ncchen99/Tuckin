@@ -181,21 +181,26 @@ class _RestaurantCardState extends State<RestaurantCard>
 
                           SizedBox(height: 20.h), // 減少間距
                           // 餐廳地址 - 可點擊
-                          RichText(
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                            text: TextSpan(
-                              text: widget.address,
-                              style: TextStyle(
-                                fontSize: 14.sp,
-                                fontFamily: 'OtsutomeFont',
-                                color: const Color(0xFF23456B),
+                          GestureDetector(
+                            onTap: _launchMapUrl,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                vertical: 2.h,
+                              ), // 添加少量內邊距增加可點擊區域
+                              color: Colors.transparent, // 保持透明背景
+                              child: RichText(
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                text: TextSpan(
+                                  text: widget.address,
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    fontFamily: 'OtsutomeFont',
+                                    color: const Color(0xFF23456B),
+                                  ),
+                                  // 移除這裡的手勢識別，因為已在外層GestureDetector設置
+                                ),
                               ),
-                              recognizer:
-                                  TapGestureRecognizer()
-                                    ..onTap = () {
-                                      _launchMapUrl();
-                                    },
                             ),
                           ),
                         ],

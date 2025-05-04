@@ -14,50 +14,37 @@ class PlacesService {
     try {
       debugPrint('正在處理Google地圖連結: $mapLink');
 
-      // 在實際環境中，我們會將地圖連結發送到後端進行處理
-      // 這裡使用模擬數據模擬API響應
-      await Future.delayed(const Duration(seconds: 1));
+      // 使用API進行地圖連結處理
+      final response = await _apiService.get(
+        '/restaurant/search',
+        queryParameters: {'query': mapLink},
+      );
 
-      // 從地圖連結中提取餐廳名稱（這只是一個簡單的模擬邏輯）
-      // 實際情況下，後端應使用專門的API解析連結
-      String restaurantName = '用戶推薦的餐廳';
+      // 檢查API返回數據
+      if (response != null && response is List && response.isNotEmpty) {
+        // 使用第一個結果
+        final restaurantData = response[0];
 
-      // 檢查連結是否包含特定字符，如餐廳名稱
-      if (mapLink.contains('maps.app.goo.gl') ||
-          mapLink.contains('goo.gl/maps')) {
-        restaurantName = '用戶推薦的Google地圖餐廳';
-      } else if (mapLink.contains('maps.google.com')) {
-        // 嘗試從連結中提取名稱或地址部分（這裡是簡化邏輯）
-        if (mapLink.contains('search')) {
-          // 嘗試解析搜索查詢
-          final searchStart = mapLink.indexOf('search/') + 7;
-          final searchEnd = mapLink.indexOf('/', searchStart);
-          if (searchStart > 7 && searchEnd > searchStart) {
-            final searchQuery = mapLink.substring(searchStart, searchEnd);
-            restaurantName = Uri.decodeComponent(
-              searchQuery.replaceAll('+', ' '),
-            );
-          }
-        }
+        // 提取餐廳ID
+        final id = restaurantData['id'];
+
+        // 將API返回的數據轉換為前端所需格式
+        return {
+          'id': id,
+          'name': restaurantData['name'] ?? '未知餐廳',
+          'address': restaurantData['address'] ?? '地址不詳',
+          'category': restaurantData['category'] ?? '用戶推薦',
+          'mapUrl': mapLink,
+          'rating': 0.0, // API未提供評分，使用默認值
+          'openingHours': restaurantData['business_hours'] ?? '資訊待補充',
+          'photos': _getImageUrlList(restaurantData['image_path']),
+          'imageUrl': _getImageUrl(restaurantData['image_path']),
+          'website': restaurantData['website'] ?? '',
+          'phone': restaurantData['phone'] ?? '',
+        };
+      } else {
+        throw ApiError(message: '無法識別該地圖連結的餐廳資訊');
       }
-
-      // 模擬從後端獲得的餐廳信息
-      final int id = DateTime.now().millisecondsSinceEpoch;
-      return {
-        'id': id,
-        'name': restaurantName,
-        'address': '根據地圖連結解析的地址',
-        'category': '用戶推薦',
-        'mapUrl': mapLink,
-        'rating': 0.0,
-        'openingHours': '資訊待補充',
-        'photos': [
-          'https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=500',
-        ],
-        'imageUrl':
-            'https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=500',
-        'website': '',
-      };
     } catch (e) {
       debugPrint('處理地圖連結出錯: $e');
       if (e is ApiError) {
@@ -85,5 +72,32 @@ class PlacesService {
         'https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=500',
       ],
     };
+  }
+
+  // 處理圖片URL，確保返回有效的URL或預設圖片路徑
+  String _getImageUrl(String? imageUrl) {
+    // 如果URL為空，返回預設圖片
+    if (imageUrl == null || imageUrl.trim().isEmpty) {
+      return 'assets/images/placeholder/restaurant.jpg';
+    }
+
+    // 檢查是否已經是完整URL
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+
+    // 檢查是否是本地資源路徑
+    if (imageUrl.startsWith('assets/')) {
+      return imageUrl;
+    }
+
+    // 默認返回預設圖片
+    return 'assets/images/placeholder/restaurant.jpg';
+  }
+
+  // 處理圖片URL列表
+  List<String> _getImageUrlList(String? imageUrl) {
+    final url = _getImageUrl(imageUrl);
+    return [url];
   }
 }

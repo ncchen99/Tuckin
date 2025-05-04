@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 class ApiError implements Exception {
   final String message;
@@ -91,6 +93,75 @@ class ApiService {
         isServerError: !isNetworkRelated,
         isNetworkError: isNetworkRelated,
       );
+    }
+  }
+
+  /// 發送GET請求
+  Future<dynamic> get(
+    String endpoint, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    try {
+      // 獲取當前Session以獲取token
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+
+      // 構建請求頭，添加授權token
+      final requestHeaders = {...headers};
+      if (token != null) {
+        requestHeaders['Authorization'] = 'Bearer $token';
+      }
+
+      // 構建完整URL
+      String url = baseUrl + endpoint;
+      if (queryParameters != null && queryParameters.isNotEmpty) {
+        final queryString =
+            Uri(
+              queryParameters: queryParameters.map(
+                (key, value) => MapEntry(key, value.toString()),
+              ),
+            ).query;
+        url = '$url?$queryString';
+      }
+
+      debugPrint('發送GET請求: $url');
+
+      // 創建URI對象
+      final uri = Uri.parse(url);
+
+      // 使用http庫發送請求
+      final response = await handleRequest(
+        request: () => http.get(uri, headers: requestHeaders),
+      );
+
+      debugPrint('GET響應狀態碼: ${response.statusCode}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // 嘗試解析響應內容
+        final responseBody = utf8.decode(response.bodyBytes);
+        debugPrint('GET響應內容: $responseBody');
+
+        if (responseBody.trim().isNotEmpty) {
+          return jsonDecode(responseBody);
+        }
+        return null;
+      } else {
+        String errorMessage;
+        try {
+          final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+          errorMessage = errorData['detail'] ?? '伺服器錯誤: ${response.statusCode}';
+        } catch (_) {
+          errorMessage = '伺服器錯誤: ${response.statusCode}';
+        }
+
+        throw ApiError(message: errorMessage, isServerError: true);
+      }
+    } catch (e) {
+      debugPrint('GET請求失敗: $e');
+      if (e is ApiError) {
+        rethrow;
+      }
+      throw ApiError(message: '請求失敗: $e');
     }
   }
 }

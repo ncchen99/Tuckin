@@ -222,9 +222,13 @@ class _AttendanceConfirmationPageState
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
             content: Text(
               '確認失敗: $e',
-              style: TextStyle(fontFamily: 'OtsutomeFont'),
+              style: const TextStyle(
+                fontFamily: 'OtsutomeFont',
+                color: Colors.white,
+              ),
             ),
           ),
         );
@@ -268,9 +272,13 @@ class _AttendanceConfirmationPageState
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
             content: Text(
               '取消失敗: $e',
-              style: TextStyle(fontFamily: 'OtsutomeFont'),
+              style: const TextStyle(
+                fontFamily: 'OtsutomeFont',
+                color: Colors.white,
+              ),
             ),
           ),
         );

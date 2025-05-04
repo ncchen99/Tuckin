@@ -401,7 +401,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         SnackBar(
           content: Text(
             '將會在 ${DateFormat('MM/dd HH:mm').format(actualReminderTime)} 提醒您確認參加',
-            style: TextStyle(fontSize: 15.sp, fontFamily: 'OtsutomeFont'),
+            style: TextStyle(fontFamily: 'OtsutomeFont'),
           ),
           duration: const Duration(seconds: 3),
         ),
@@ -415,9 +415,10 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
             content: Text(
               '設定提醒功能暫時無法使用，但您的預約已成功',
-              style: TextStyle(fontSize: 15.sp, fontFamily: 'OtsutomeFont'),
+              style: TextStyle(fontFamily: 'OtsutomeFont', color: Colors.white),
             ),
             duration: const Duration(seconds: 3),
           ),

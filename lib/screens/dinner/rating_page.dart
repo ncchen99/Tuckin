@@ -14,7 +14,7 @@ class RatingPage extends StatefulWidget {
   State<RatingPage> createState() => _RatingPageState();
 }
 
-class _RatingPageState extends State<RatingPage> {
+class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   final NavigationService _navigationService = NavigationService();
@@ -49,10 +49,54 @@ class _RatingPageState extends State<RatingPage> {
     },
   ];
 
+  // 為每個參與者的每個選項創建動畫控制器
+  late List<List<AnimationController>> _animationControllers;
+  late List<List<Animation<double>>> _scaleAnimations;
+
   @override
   void initState() {
     super.initState();
     _checkUserStatus();
+
+    // 初始化動畫控制器和動畫
+    _initAnimations();
+  }
+
+  void _initAnimations() {
+    _animationControllers = List.generate(
+      _participants.length,
+      (_) => List.generate(
+        _ratingOptions.length,
+        (_) => AnimationController(
+          duration: const Duration(milliseconds: 300),
+          vsync: this,
+        ),
+      ),
+    );
+
+    _scaleAnimations = List.generate(
+      _participants.length,
+      (i) => List.generate(
+        _ratingOptions.length,
+        (j) => Tween<double>(begin: 1.0, end: 1.15).animate(
+          CurvedAnimation(
+            parent: _animationControllers[i][j],
+            curve: Curves.elasticOut,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    // 釋放所有動畫控制器
+    for (var controllers in _animationControllers) {
+      for (var controller in controllers) {
+        controller.dispose();
+      }
+    }
+    super.dispose();
   }
 
   Future<void> _checkUserStatus() async {
@@ -78,8 +122,28 @@ class _RatingPageState extends State<RatingPage> {
     }
   }
 
+  // 計算是否所有參與者都已評分
+  bool _isAllRated() {
+    return _participants.every(
+      (participant) => participant['selectedRating'] != null,
+    );
+  }
+
   // 用戶選擇評分
   void _handleRatingSelect(int participantIndex, String rating) {
+    // 找出選項在列表中的索引
+    int optionIndex = _ratingOptions.indexOf(rating);
+
+    if (optionIndex != -1) {
+      // 重置該參與者的所有動畫
+      for (int i = 0; i < _ratingOptions.length; i++) {
+        _animationControllers[participantIndex][i].reset();
+      }
+
+      // 播放選中的選項動畫
+      _animationControllers[participantIndex][optionIndex].forward();
+    }
+
     setState(() {
       _participants[participantIndex]['selectedRating'] = rating;
     });
@@ -365,37 +429,57 @@ class _RatingPageState extends State<RatingPage> {
   }) {
     final participant = _participants[participantIndex];
     final bool isSelected = participant['selectedRating'] == option;
+    final int optionIndex = _ratingOptions.indexOf(option);
 
     return GestureDetector(
       onTap: () => _handleRatingSelect(participantIndex, option),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 5.w),
-        child: Center(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // 選項文字，根據選中狀態使用不同的樣式
-              isSelected
-                  ? StrokeTextWidget(
-                    text: option,
-                    fontSize: 16,
-                    textColor: const Color.fromARGB(255, 243, 202, 202),
-                    strokeColor: const Color.fromARGB(255, 167, 53, 21),
-                    textAlign: TextAlign.center,
-                  )
-                  : StrokeTextWidget(
-                    text: option,
-                    fontSize: 16,
-                    textColor: const Color.fromARGB(255, 255, 255, 255),
-                    strokeColor: const Color(0xFF23456B),
-                    textAlign: TextAlign.center,
-                  ),
+      child: AnimatedBuilder(
+        animation: _animationControllers[participantIndex][optionIndex],
+        builder: (context, child) {
+          return Transform.scale(
+            scale:
+                isSelected
+                    ? _scaleAnimations[participantIndex][optionIndex].value
+                    : 1.0,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 5.w),
+              // 擴大點擊範圍
+              width: double.infinity,
+              height: 60.h,
+              // 添加可點擊的視覺效果，僅在滑鼠懸停時顯示（Web平台）
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+              child: Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // 選項文字，根據選中狀態使用不同的樣式
+                    isSelected
+                        ? StrokeTextWidget(
+                          text: option,
+                          fontSize: 16,
+                          textColor: const Color.fromARGB(255, 243, 202, 202),
+                          strokeColor: const Color.fromARGB(255, 167, 53, 21),
+                          textAlign: TextAlign.center,
+                        )
+                        : StrokeTextWidget(
+                          text: option,
+                          fontSize: 16,
+                          textColor: const Color.fromARGB(255, 255, 255, 255),
+                          strokeColor: const Color(0xFF23456B),
+                          textAlign: TextAlign.center,
+                        ),
 
-              // 若選中，則顯示指針圖標
-              if (isSelected) _buildPointerIcon(),
-            ],
-          ),
-        ),
+                    // 若選中，則顯示指針圖標
+                    if (isSelected) _buildPointerIcon(),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -557,6 +641,7 @@ class _RatingPageState extends State<RatingPage> {
                                       width: 160.w,
                                       height: 70.h,
                                       onPressed: _handleSubmitRating,
+                                      isEnabled: _isAllRated(),
                                     ),
 
                                 SizedBox(height: 30.h),

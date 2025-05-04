@@ -65,9 +65,15 @@ class _LoginPageState extends State<LoginPage> {
   // 處理 Google 登入
   Future<void> _handleGoogleSignIn() async {
     if (!_agreeToTerms) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('請先同意隱私條款')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFB33D1C), // 深橘色背景
+          content: Text(
+            '請先同意隱私條款',
+            style: TextStyle(fontFamily: 'OtsutomeFont', color: Colors.white),
+          ),
+        ),
+      );
       return;
     }
 
@@ -111,9 +117,18 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('登入失敗: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
+            content: Text(
+              '登入失敗: $error',
+              style: const TextStyle(
+                fontFamily: 'OtsutomeFont',
+                color: Colors.white,
+              ),
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {

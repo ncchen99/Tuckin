@@ -284,6 +284,8 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                               setModalState(() {
                                                 _isSubmittingLink = false;
                                               });
+                                              // 錯誤時關閉對話框，以顯示底部的錯誤提示
+                                              Navigator.pop(context);
                                             });
                                       }
                                     }
@@ -364,6 +366,24 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
         _selectedRestaurantId = restaurantData['id'];
       });
 
+      // 確保餐廳卡片更新並觸發投票標籤動畫
+      // 為了觸發RestaurantCard在didUpdateWidget中的動畫效果
+      // 先設為null再設回去，模擬點擊效果
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          setState(() {
+            _selectedRestaurantId = null;
+          });
+          Future.delayed(const Duration(milliseconds: 50), () {
+            if (mounted) {
+              setState(() {
+                _selectedRestaurantId = restaurantData['id'];
+              });
+            }
+          });
+        }
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -378,9 +398,13 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
             content: Text(
               '無法處理地圖連結: $e',
-              style: TextStyle(fontFamily: 'OtsutomeFont'),
+              style: const TextStyle(
+                fontFamily: 'OtsutomeFont',
+                color: Colors.white,
+              ),
             ),
           ),
         );
@@ -392,9 +416,15 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   // 處理提交按鈕
   Future<void> _handleSubmit() async {
     if (_selectedRestaurantId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('請選擇一家餐廳')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFB33D1C), // 深橘色背景
+          content: Text(
+            '請選擇一家餐廳',
+            style: TextStyle(fontFamily: 'OtsutomeFont', color: Colors.white),
+          ),
+        ),
+      );
       return;
     }
 
@@ -429,9 +459,18 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     } catch (e) {
       debugPrint('提交餐廳選擇出錯: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('提交失敗: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
+            content: Text(
+              '提交失敗: $e',
+              style: const TextStyle(
+                fontFamily: 'OtsutomeFont',
+                color: Colors.white,
+              ),
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {

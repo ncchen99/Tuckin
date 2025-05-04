@@ -142,9 +142,13 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
             content: Text(
               '取消失敗: $e',
-              style: TextStyle(fontSize: 15, fontFamily: 'OtsutomeFont'),
+              style: const TextStyle(
+                fontFamily: 'OtsutomeFont',
+                color: Colors.white,
+              ),
             ),
           ),
         );
