@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/services/api_service.dart';
 import 'package:tuckin/services/places_service.dart';
+import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/supabase_service.dart';
+import 'package:tuckin/services/auth_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// 餐廳服務 - 處理餐廳相關的API請求和數據操作
 class RestaurantService {
@@ -10,6 +16,9 @@ class RestaurantService {
 
   final ApiService _apiService = ApiService();
   final PlacesService _placesService = PlacesService();
+  final DatabaseService _databaseService = DatabaseService();
+  final SupabaseService _supabaseService = SupabaseService();
+  final AuthService _authService = AuthService();
 
   // 餐廳當前ID計數器（僅用於前端測試）
   int _restaurantIdCounter = 3; // 從3開始，避免與範例數據衝突
@@ -65,20 +74,185 @@ class RestaurantService {
   }
 
   /// 提交選定的餐廳
-  Future<bool> submitSelectedRestaurant(int restaurantId) async {
+  Future<Map<String, dynamic>> submitSelectedRestaurant(
+    dynamic restaurantId,
+  ) async {
     try {
-      // TODO: 實際項目中應當向後端API提交選定的餐廳
-      // 這裡使用模擬延遲
-      await Future.delayed(const Duration(seconds: 1));
+      final String apiEndpoint = '${_apiService.baseUrl}/api/restaurant/vote';
 
-      // 模擬成功
-      return true;
+      // 獲取當前用戶
+      final currentUser = await _authService.getCurrentUser();
+
+      if (currentUser == null) {
+        throw ApiError(message: '未登入，無法進行餐廳投票');
+      }
+
+      // 獲取 session
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) {
+        throw ApiError(message: '無法獲取用戶登入資訊，請重新登入');
+      }
+
+      // 準備請求資料
+      final requestData = {
+        'restaurant_id': restaurantId.toString(), // 確保 restaurant_id 是字串類型
+        'is_system_recommendation': false, // 從 APP 發出的請求一律設為 false
+      };
+
+      // 發送請求
+      final response = await http.post(
+        Uri.parse(apiEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.accessToken}',
+        },
+        body: jsonEncode(requestData),
+      );
+
+      // 檢查回應狀態
+      if (response.statusCode == 200) {
+        // 成功投票
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        debugPrint('餐廳投票成功: $responseData');
+        return responseData;
+      } else {
+        // 投票失敗
+        String errorMessage;
+        try {
+          final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+          errorMessage = errorData['detail'] ?? '投票失敗 (${response.statusCode})';
+        } catch (_) {
+          errorMessage = '投票失敗 (${response.statusCode})';
+        }
+        throw ApiError(message: errorMessage);
+      }
     } catch (e) {
       debugPrint('提交餐廳選擇出錯: $e');
       if (e is ApiError) {
         rethrow;
       }
       throw ApiError(message: '提交餐廳選擇時發生錯誤: $e');
+    }
+  }
+
+  /// 獲取票數最高的兩家餐廳
+  ///
+  /// [groupId] 配對群組ID
+  Future<List<Map<String, dynamic>>> getTopVotedRestaurants(
+    String groupId,
+  ) async {
+    try {
+      // 使用 get_group_votes 函數獲取餐廳投票數據
+      final result =
+          await _supabaseService.client
+              .rpc('get_group_votes', params: {'group_uuid': groupId})
+              .select();
+
+      if (result == null || result.isEmpty) {
+        debugPrint('沒有找到群組 $groupId 的餐廳投票數據');
+        return [];
+      }
+
+      // 計算每家餐廳的投票數（參考 restaurant.py 的邏輯）
+      Map<String, int> voteCountMap = {};
+      Set<String> systemRecommendedIds = {};
+
+      for (var vote in result) {
+        final restaurantId = vote['restaurant_id'] as String;
+        final isSystemRecommendation =
+            vote['is_system_recommendation'] as bool? ?? false;
+        final hasUserId =
+            vote.containsKey('user_id') && vote['user_id'] != null;
+
+        // 初始化餐廳投票計數（如果不存在）
+        if (!voteCountMap.containsKey(restaurantId)) {
+          voteCountMap[restaurantId] = 0;
+        }
+
+        // 系統推薦記為零票，但記錄為系統推薦
+        if (isSystemRecommendation && !hasUserId) {
+          systemRecommendedIds.add(restaurantId);
+        }
+        // 用戶投票增加計數（如果不是系統推薦）
+        else if (hasUserId && !isSystemRecommendation) {
+          voteCountMap[restaurantId] = (voteCountMap[restaurantId] ?? 0) + 1;
+        }
+      }
+
+      // 按票數從高到低排序
+      List<MapEntry<String, int>> sortedVotes =
+          voteCountMap.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+
+      // 提取所有餐廳 ID
+      List<String> restaurantIds =
+          sortedVotes.map((entry) => entry.key).toList();
+
+      if (restaurantIds.isEmpty) {
+        return [];
+      }
+
+      // 獲取這些餐廳的詳細資訊
+      final restaurantsInfo = await _databaseService.getRestaurantsInfo(
+        restaurantIds,
+      );
+
+      // 將餐廳信息轉換為前端所需格式，按票數排序
+      List<Map<String, dynamic>> resultList = [];
+
+      for (var restaurantId in restaurantIds) {
+        final restaurant = restaurantsInfo.firstWhere(
+          (r) => r['id'] == restaurantId,
+          orElse: () => <String, dynamic>{},
+        );
+
+        if (restaurant.isNotEmpty) {
+          // 預設圖片路徑
+          final defaultImagePath = 'assets/images/placeholder/restaurant.jpg';
+
+          // 確保處理 image_path 為空字串的情況
+          String imageUrl;
+          if (restaurant['image_path'] == null ||
+              restaurant['image_path'].toString().trim().isEmpty) {
+            imageUrl = defaultImagePath;
+          } else {
+            imageUrl = restaurant['image_path'];
+          }
+
+          // 建立完整的餐廳名稱和地址查詢參數，用於 Google Maps URL
+          final String restaurantName = Uri.encodeComponent(
+            restaurant['name'] ?? '',
+          );
+          final String restaurantAddress = Uri.encodeComponent(
+            restaurant['address'] ?? '',
+          );
+          final String mapUrlQuery = '$restaurantName+$restaurantAddress';
+
+          resultList.add({
+            'id': restaurant['id'],
+            'name': restaurant['name'],
+            'imageUrl': imageUrl,
+            'category': restaurant['category'] ?? '',
+            'address': restaurant['address'] ?? '',
+            'mapUrl': 'https://www.google.com/maps/place/?q=$mapUrlQuery',
+            'phone': restaurant['phone'],
+            'website': restaurant['website'],
+            'business_hours': restaurant['business_hours'],
+            'votes': voteCountMap[restaurantId] ?? 0,
+            'is_system_recommendation': systemRecommendedIds.contains(
+              restaurantId,
+            ),
+          });
+        }
+      }
+
+      return resultList;
+    } catch (e) {
+      debugPrint('獲取票數最高餐廳出錯: $e');
+      if (e is ApiError) {
+        rethrow;
+      }
+      throw ApiError(message: '獲取票數最高餐廳時發生錯誤: $e');
     }
   }
 
@@ -91,20 +265,31 @@ class RestaurantService {
     int id = _restaurantIdCounter++;
 
     // 使用第一張照片作為主圖
-    String imageUrl =
-        'https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=500'; // 預設圖片
+    String imageUrl = 'assets/images/placeholder/restaurant.jpg'; // 預設圖片
     if (placeData['photos'] != null &&
         (placeData['photos'] as List).isNotEmpty) {
-      imageUrl = placeData['photos'][0];
+      final photo = placeData['photos'][0];
+      // 確保照片URL有效，否則使用預設圖片
+      imageUrl =
+          (photo != null && photo.toString().isNotEmpty) ? photo : imageUrl;
     }
+
+    // 建立餐廳名稱和地址的 Google Maps URL
+    final String name = placeData['name'] ?? '';
+    final String address = placeData['address'] ?? '';
+    final String encodedName = Uri.encodeComponent(name);
+    final String encodedAddress = Uri.encodeComponent(address);
+    final String mapUrlQuery = '$encodedName+$encodedAddress';
+    final String mapUrl =
+        providedMapLink ?? 'https://www.google.com/maps/place/?q=$mapUrlQuery';
 
     return {
       'id': id,
-      'name': placeData['name'],
+      'name': name,
       'imageUrl': imageUrl,
       'category': placeData['category'],
-      'address': placeData['address'],
-      'mapUrl': providedMapLink ?? placeData['mapUrl'],
+      'address': address,
+      'mapUrl': mapUrl,
       'rating': placeData['rating'],
       'openingHours': placeData['openingHours'],
       'photos': placeData['photos'] ?? [],

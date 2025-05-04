@@ -6,6 +6,7 @@ import 'package:tuckin/services/error_handler.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'auth_service.dart'; // 需要AuthService來獲取token
+import 'supabase_service.dart';
 
 /// 加入配對回應模型
 class JoinMatchingResponse {
@@ -43,6 +44,7 @@ class MatchingService {
   final ApiService _apiService = ApiService();
   final ErrorHandler _errorHandler = ErrorHandler();
   final AuthService _authService = AuthService(); // 引入AuthService
+  final SupabaseService _supabaseService = SupabaseService();
 
   // 後端API基礎URL (從ApiService獲取或直接定義)
   // 假設ApiService已經有方法獲取baseUrl和headers
@@ -130,6 +132,49 @@ class MatchingService {
       _errorHandler.handleApiError(
         ApiError(message: '參加配對時發生未知錯誤: $e', isServerError: true),
         () => joinMatching(),
+      );
+      rethrow;
+    }
+  }
+
+  /// 獲取用戶當前的匹配群組信息
+  Future<Map<String, dynamic>?> getCurrentMatchingInfo() async {
+    try {
+      // 獲取當前用戶ID
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null) {
+        throw ApiError(message: '用戶未登入，無法獲取配對信息');
+      }
+      final userId = currentUser.id;
+
+      // 從user_matching_info表獲取用戶當前的匹配群組信息
+      return _apiService.handleRequest(
+        request: () async {
+          final response =
+              await _supabaseService.client
+                  .from('user_matching_info')
+                  .select('*')
+                  .eq('user_id', userId)
+                  .order('created_at', ascending: false)
+                  .maybeSingle();
+
+          if (response == null) {
+            debugPrint('用戶 $userId 目前沒有配對記錄');
+            return null;
+          }
+
+          debugPrint('獲取到用戶 $userId 的配對信息: $response');
+          return response;
+        },
+      );
+    } on ApiError catch (e) {
+      _errorHandler.handleApiError(e, () => getCurrentMatchingInfo());
+      rethrow;
+    } catch (e) {
+      debugPrint('獲取用戶配對信息時發生錯誤: $e');
+      _errorHandler.handleApiError(
+        ApiError(message: '獲取用戶配對信息時發生未知錯誤: $e'),
+        () => getCurrentMatchingInfo(),
       );
       rethrow;
     }

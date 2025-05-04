@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from routers import group, restaurant, user, utils, matching, dining
+from routers import restaurant, matching, dining
 
 
 logging.basicConfig(level=logging.INFO)
@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(
     title="Tuckin API",
     description="Tuckin 的 API 服務",
-    version="0.1.0"
+    version="0.1.1"
 )
 
 # 設置CORS
@@ -25,10 +25,7 @@ app.add_middleware(
 )
 
 # 註冊路由
-# app.include_router(group.router, prefix="/api/group", tags=["群組管理"])
 app.include_router(restaurant.router, prefix="/api/restaurant", tags=["餐廳管理"])
-# app.include_router(user.router, prefix="/api/user", tags=["用戶資料"])
-# app.include_router(utils.router, prefix="/api/utils", tags=["通用工具"])
 app.include_router(matching.router, prefix="/api/matching", tags=["配對系統"])
 app.include_router(dining.router, prefix="/api/dining", tags=["聚餐管理"])
 

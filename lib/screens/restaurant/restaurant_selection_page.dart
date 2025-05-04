@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/restaurant_service.dart';
+import 'package:tuckin/services/matching_service.dart';
+import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
 
 class RestaurantSelectionPage extends StatefulWidget {
@@ -15,10 +17,12 @@ class RestaurantSelectionPage extends StatefulWidget {
 class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   final NavigationService _navigationService = NavigationService();
   final RestaurantService _restaurantService = RestaurantService();
+  final MatchingService _matchingService = MatchingService();
+  final DatabaseService _databaseService = DatabaseService();
 
   bool _isLoading = true;
   bool _isSubmitting = false;
-  int? _selectedRestaurantId;
+  dynamic _selectedRestaurantId;
   final TextEditingController _mapLinkController = TextEditingController();
   final FocusNode _mapLinkFocusNode = FocusNode();
   bool _isSubmittingLink = false;
@@ -50,11 +54,20 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     });
 
     try {
-      // 從服務中獲取推薦餐廳列表
-      final restaurants = await _restaurantService.getRecommendedRestaurants();
+      // 獲取用戶當前的匹配群組
+      final userMatchingInfo = await _matchingService.getCurrentMatchingInfo();
+
+      // 載入投票餐廳
+      List<Map<String, dynamic>> votedRestaurants = [];
+      if (userMatchingInfo != null &&
+          userMatchingInfo.containsKey('matching_group_id')) {
+        votedRestaurants = await _restaurantService.getTopVotedRestaurants(
+          userMatchingInfo['matching_group_id'],
+        );
+      }
 
       setState(() {
-        _restaurantList = restaurants;
+        _restaurantList = votedRestaurants;
         _isLoading = false;
       });
     } catch (e) {
@@ -72,7 +85,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   }
 
   // 處理餐廳卡片點擊
-  void _handleRestaurantTap(int restaurantId) {
+  void _handleRestaurantTap(dynamic restaurantId) {
     setState(() {
       if (_selectedRestaurantId == restaurantId) {
         _selectedRestaurantId = null; // 取消選擇
@@ -391,17 +404,27 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
 
     try {
       // 使用餐廳服務提交選擇的餐廳
-      final success = await _restaurantService.submitSelectedRestaurant(
-        _selectedRestaurantId!,
+      final response = await _restaurantService.submitSelectedRestaurant(
+        _selectedRestaurantId,
       );
 
-      if (success && mounted) {
-        // TODO: 實際流程會根據後端回應決定導航到哪個頁面
-        // 使用導航服務導航到餐廳預訂頁面
-        _navigationService.navigateToRestaurantReservation(context);
+      if (mounted) {
+        // 檢查投票完成狀態
+        final isVotingComplete = response['is_voting_complete'] == true;
 
-        // 原始邏輯 - 導航到晚餐資訊頁面
-        // _navigationService.navigateToDinnerInfo(context);
+        if (isVotingComplete) {
+          // 投票已完成，導航到餐廳資訊頁面
+          _navigationService.navigateToDinnerInfo(context);
+        } else {
+          // 投票未完成，更新用戶狀態為等待其他用戶
+          await _databaseService.updateUserStatus(
+            response['user_id'],
+            'waiting_other_users',
+          );
+
+          // 然後導航到首頁（系統會自動根據用戶狀態重定向）
+          _navigationService.navigateToHome(context);
+        }
       }
     } catch (e) {
       debugPrint('提交餐廳選擇出錯: $e');
@@ -492,6 +515,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                           restaurant['id'],
                                         ),
                                     mapUrl: restaurant['mapUrl'],
+                                    voteCount: restaurant['votes'],
                                   ),
                                 ),
 

@@ -11,6 +11,7 @@ class RestaurantCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final String? mapUrl;
+  final int? voteCount;
 
   const RestaurantCard({
     super.key,
@@ -21,6 +22,7 @@ class RestaurantCard extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     this.mapUrl,
+    this.voteCount,
   });
 
   Future<void> _launchMapUrl() async {
@@ -60,24 +62,7 @@ class RestaurantCard extends StatelessWidget {
                     // 餐廳縮圖
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10.r),
-                      child: Image.network(
-                        imageUrl,
-                        width: 100.w,
-                        height: 100.h,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 100.w,
-                            height: 100.h,
-                            color: Colors.grey[300],
-                            child: Icon(
-                              Icons.restaurant,
-                              color: Colors.grey[600],
-                              size: 40.sp,
-                            ),
-                          );
-                        },
-                      ),
+                      child: _buildRestaurantImage(),
                     ),
 
                     SizedBox(width: 15.w),
@@ -88,16 +73,42 @@ class RestaurantCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min, // 使用最小空間
                         children: [
-                          // 餐廳名稱
-                          Text(
-                            name,
-                            style: TextStyle(
-                              fontSize: 18.sp,
-                              fontFamily: 'OtsutomeFont',
-                              color: const Color(0xFF23456B),
-                              fontWeight: FontWeight.bold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                          // 餐廳名稱和投票數
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: TextStyle(
+                                    fontSize: 18.sp,
+                                    fontFamily: 'OtsutomeFont',
+                                    color: const Color(0xFF23456B),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (voteCount != null && voteCount! > 0)
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8.w,
+                                    vertical: 2.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFB33D1C),
+                                    borderRadius: BorderRadius.circular(10.r),
+                                  ),
+                                  child: Text(
+                                    '${voteCount}票',
+                                    style: TextStyle(
+                                      fontSize: 12.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
 
                           SizedBox(height: 2.h), // 減少間距
@@ -155,6 +166,69 @@ class RestaurantCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // 構建餐廳圖片小部件
+  Widget _buildRestaurantImage() {
+    // 檢查圖片 URL 是否無效
+    if (imageUrl.isEmpty) {
+      return _buildFallbackImage();
+    }
+
+    // 如果是本地資源路徑
+    if (imageUrl.startsWith('assets/')) {
+      return Image.asset(
+        imageUrl,
+        width: 100.w,
+        height: 100.h,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('本地圖片載入錯誤 ($imageUrl): $error');
+          return _buildFallbackImage();
+        },
+      );
+    }
+    // 如果是網路圖片
+    else {
+      return Image.network(
+        imageUrl,
+        width: 100.w,
+        height: 100.h,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: 100.w,
+            height: 100.h,
+            color: Colors.grey[200],
+            child: Center(
+              child: CircularProgressIndicator(
+                value:
+                    loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                        : null,
+                color: const Color(0xFF23456B),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('網路圖片載入錯誤 ($imageUrl): $error');
+          return _buildFallbackImage();
+        },
+      );
+    }
+  }
+
+  // 備用圖片顯示
+  Widget _buildFallbackImage() {
+    return Container(
+      width: 100.w,
+      height: 100.h,
+      color: Colors.grey[300],
+      child: Icon(Icons.restaurant, color: Colors.grey[600], size: 40.sp),
     );
   }
 }

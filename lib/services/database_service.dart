@@ -25,6 +25,7 @@ class DatabaseService {
   static const String _userStatusTable = 'user_status';
   static const String _userMatchingPreferencesTable =
       'user_matching_preferences';
+  static const String _restaurantsTable = 'restaurants';
 
   /// 更新用戶基本資料
   ///
@@ -454,6 +455,56 @@ class DatabaseService {
         await prefs.clear(); // 清理所有相關存儲
 
         debugPrint('用戶刪除完成: $userId');
+      },
+    );
+  }
+
+  /// 獲取餐廳詳細資訊
+  ///
+  /// [restaurantId] 餐廳 ID
+  Future<Map<String, dynamic>?> getRestaurantInfo(String restaurantId) async {
+    return _apiService.handleRequest(
+      request: () async {
+        final restaurantData =
+            await _supabaseService.client
+                .from(_restaurantsTable)
+                .select()
+                .eq('id', restaurantId)
+                .maybeSingle();
+
+        if (restaurantData == null) {
+          debugPrint('未找到餐廳資訊: $restaurantId');
+          return null;
+        }
+
+        return restaurantData;
+      },
+    );
+  }
+
+  /// 獲取多個餐廳的詳細資訊
+  ///
+  /// [restaurantIds] 餐廳 ID 列表
+  Future<List<Map<String, dynamic>>> getRestaurantsInfo(
+    List<String> restaurantIds,
+  ) async {
+    if (restaurantIds.isEmpty) {
+      return [];
+    }
+
+    return _apiService.handleRequest(
+      request: () async {
+        final restaurantsData = await _supabaseService.client
+            .from(_restaurantsTable)
+            .select()
+            .inFilter('id', restaurantIds);
+
+        if (restaurantsData == null || restaurantsData.isEmpty) {
+          debugPrint('未找到任何餐廳資訊');
+          return [];
+        }
+
+        return List<Map<String, dynamic>>.from(restaurantsData);
       },
     );
   }

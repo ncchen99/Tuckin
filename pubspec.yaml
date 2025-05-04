@@ -115,6 +115,7 @@ flutter:
     - assets/images/dish/
     - assets/images/illustrate/
     - assets/images/frame/
+    - assets/images/placeholder/
     - assets/fonts/
     - assets/video/
     - .env

@@ -237,7 +237,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: 130.h),
+                        SizedBox(height: 100.h),
 
                         // 提示文字 - 根據用戶狀態顯示不同的文字
                         Center(

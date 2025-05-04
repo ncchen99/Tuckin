@@ -482,3 +482,25 @@ WHERE NOT EXISTS (
 CREATE POLICY dining_history_select ON dining_history
     FOR SELECT TO authenticated
     USING (auth.uid() = ANY(user_ids)); 
+
+CREATE OR REPLACE FUNCTION get_group_votes(group_uuid UUID)
+RETURNS TABLE (
+    id UUID,
+    restaurant_id UUID,
+    group_id UUID,
+    is_system_recommendation BOOLEAN,
+    created_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM user_matching_info 
+        WHERE user_id = auth.uid() AND matching_group_id = group_uuid
+    ) THEN
+        RETURN QUERY
+        SELECT rv.id, rv.restaurant_id, rv.group_id, rv.is_system_recommendation, rv.created_at
+        FROM restaurant_votes rv
+        WHERE rv.group_id = group_uuid;
+    END IF;
+    RETURN;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
