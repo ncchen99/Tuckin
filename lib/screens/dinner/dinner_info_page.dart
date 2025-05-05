@@ -31,6 +31,11 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   String? _restaurantCategory;
   String? _restaurantMapUrl;
 
+  // 新增變數
+  String? _dinnerEventStatus;
+  String? _reservationName;
+  String? _reservationPhone;
+
   @override
   void initState() {
     super.initState();
@@ -86,10 +91,18 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         String? restaurantImageUrl;
         String? restaurantCategory;
         String? restaurantMapUrl;
+        String? dinnerEventStatus;
+        String? reservationName;
+        String? reservationPhone;
 
         if (diningEvent != null) {
           // 從聚餐事件中獲取時間
           dinnerTime = DateTime.parse(diningEvent['date']);
+
+          // 從聚餐事件中獲取狀態和預訂信息
+          dinnerEventStatus = diningEvent['status'];
+          reservationName = diningEvent['reservation_name'];
+          reservationPhone = diningEvent['reservation_phone'];
 
           // 從聚餐事件中關聯的餐廳獲取信息
           if (diningEvent.containsKey('restaurant')) {
@@ -100,7 +113,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             restaurantCategory = restaurant['category'];
 
             // 構建地圖URL
-
             if (restaurantAddress != null && restaurantName != null) {
               restaurantMapUrl =
                   "https://maps.google.com/?q=${Uri.encodeComponent(restaurantName)}+${Uri.encodeComponent(restaurantAddress)}";
@@ -168,6 +180,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         if (userStatusService.restaurantInfo != null) {
           debugPrint('從 UserStatusService 獲取餐廳信息成功');
         }
+        if (dinnerEventStatus != null) {
+          debugPrint('聚餐事件狀態: $dinnerEventStatus');
+        }
 
         // 更新狀態
         setState(() {
@@ -178,6 +193,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           _restaurantImageUrl = restaurantImageUrl;
           _restaurantCategory = restaurantCategory;
           _restaurantMapUrl = restaurantMapUrl;
+          _dinnerEventStatus = dinnerEventStatus;
+          _reservationName = reservationName;
+          _reservationPhone = reservationPhone;
           _isLoading = false;
         });
       } else {
@@ -263,6 +281,312 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
       default:
         return '';
     }
+  }
+
+  // 根據聚餐事件狀態顯示不同內容的提示卡片
+  Widget _buildStatusPromptCard() {
+    // 如果沒有狀態或不在範圍內，顯示默認卡片
+    if (_dinnerEventStatus == null ||
+        ![
+          'pending_confirmation',
+          'confirming',
+          'confirmed',
+        ].contains(_dinnerEventStatus)) {
+      return _buildDefaultPromptCard();
+    }
+
+    final cardWidth = MediaQuery.of(context).size.width - 48.w;
+
+    switch (_dinnerEventStatus) {
+      case 'pending_confirmation':
+        return Container(
+          width: cardWidth,
+          margin: EdgeInsets.symmetric(vertical: 8.h),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(15.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 5,
+                offset: Offset(0, 2.h),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(15.r),
+              onTap: () {
+                // 顯示確認訂位的 SnackBar
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      '感謝您的熱心！目前功能開發中，敬請期待。',
+                      style: TextStyle(fontFamily: 'OtsutomeFont'),
+                    ),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: EdgeInsets.all(15.h),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 預訂圖標置中 (帶陰影)
+                    SizedBox(
+                      width: 30.w,
+                      height: 30.h,
+                      child: Stack(
+                        children: [
+                          // 底部陰影
+                          Positioned(
+                            left: 0.w,
+                            top: 1.h,
+                            child: Image.asset(
+                              'assets/images/icon/reservation.png',
+                              width: 28.w,
+                              height: 28.h,
+                              color: Colors.black.withOpacity(0.3),
+                              colorBlendMode: BlendMode.srcIn,
+                            ),
+                          ),
+                          // 主圖標
+                          Image.asset(
+                            'assets/images/icon/reservation.png',
+                            width: 28.w,
+                            height: 28.h,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    // 提示內容
+                    Text(
+                      '尚未確認餐廳，你願意幫忙訂位嗎?',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontFamily: 'OtsutomeFont',
+                        color: const Color(0xFF666666),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+      case 'confirming':
+        return Container(
+          width: cardWidth,
+          margin: EdgeInsets.symmetric(vertical: 8.h),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(15.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 5,
+                offset: Offset(0, 2.h),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(15.h),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 等待確認圖標置中 (帶陰影)
+                SizedBox(
+                  width: 30.w,
+                  height: 30.h,
+                  child: Stack(
+                    children: [
+                      // 底部陰影
+                      Positioned(
+                        left: 0.w,
+                        top: 1.h,
+                        child: Image.asset(
+                          'assets/images/icon/checking.png',
+                          width: 28.w,
+                          height: 28.h,
+                          color: Colors.black.withOpacity(0.3),
+                          colorBlendMode: BlendMode.srcIn,
+                        ),
+                      ),
+                      // 主圖標
+                      Image.asset(
+                        'assets/images/icon/checking.png',
+                        width: 28.w,
+                        height: 28.h,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                // 提示內容
+                Text(
+                  '其他用戶正在幫忙訂位中...',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontFamily: 'OtsutomeFont',
+                    color: const Color(0xFF666666),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+
+      case 'confirmed':
+        String message = '';
+        if (_reservationName != null &&
+            _reservationName!.isNotEmpty &&
+            _reservationPhone != null &&
+            _reservationPhone!.isNotEmpty) {
+          message = '$_reservationName幫忙訂位了！ 手機號碼：$_reservationPhone';
+        } else {
+          message = '餐廳已確認！請在聚餐時間到達';
+        }
+
+        return Container(
+          width: cardWidth,
+          margin: EdgeInsets.symmetric(vertical: 8.h),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(15.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 5,
+                offset: Offset(0, 2.h),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(15.h),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 已完成圖標置中 (帶陰影)
+                SizedBox(
+                  width: 30.w,
+                  height: 30.h,
+                  child: Stack(
+                    children: [
+                      // 底部陰影
+                      Positioned(
+                        left: 0.w,
+                        top: 1.h,
+                        child: Image.asset(
+                          'assets/images/icon/done.png',
+                          width: 28.w,
+                          height: 28.h,
+                          color: Colors.black.withOpacity(0.3),
+                          colorBlendMode: BlendMode.srcIn,
+                        ),
+                      ),
+                      // 主圖標
+                      Image.asset(
+                        'assets/images/icon/done.png',
+                        width: 28.w,
+                        height: 28.h,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                // 提示內容
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontFamily: 'OtsutomeFont',
+                    color: const Color(0xFF666666),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+
+      default:
+        return _buildDefaultPromptCard();
+    }
+  }
+
+  // 預設提示卡片
+  Widget _buildDefaultPromptCard() {
+    final cardWidth = MediaQuery.of(context).size.width - 48.w;
+
+    return Container(
+      width: cardWidth,
+      margin: EdgeInsets.symmetric(vertical: 8.h),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(15.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 5,
+            offset: Offset(0, 2.h),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: EdgeInsets.all(15.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 提示圖標置中 (帶陰影)
+              SizedBox(
+                width: 30.w,
+                height: 30.h,
+                child: Stack(
+                  children: [
+                    // 底部陰影
+                    Positioned(
+                      left: 0.w,
+                      top: 1.h,
+                      child: Image.asset(
+                        'assets/images/icon/info.png',
+                        width: 28.w,
+                        height: 28.h,
+                        color: Colors.black.withOpacity(0.3),
+                        colorBlendMode: BlendMode.srcIn,
+                      ),
+                    ),
+                    // 主圖標
+                    Image.asset(
+                      'assets/images/icon/info.png',
+                      width: 28.w,
+                      height: 28.h,
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 8.h),
+              // 提示內容
+              Text(
+                '請在指定時間抵達餐廳。\n如有任何變動，系統將會發送通知。',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontFamily: 'OtsutomeFont',
+                  color: const Color(0xFF666666),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -873,71 +1197,8 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
           SizedBox(height: 20.h),
 
-          // 提示文字卡片 - 確保寬度一致
-          Container(
-            width: cardWidth,
-            margin: EdgeInsets.symmetric(vertical: 8.h),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(15.r),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 5,
-                  offset: Offset(0, 2.h),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: Padding(
-                padding: EdgeInsets.all(15.h),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 提示圖標置中 (帶陰影)
-                    SizedBox(
-                      width: 30.w,
-                      height: 30.h,
-                      child: Stack(
-                        children: [
-                          // 底部陰影
-                          Positioned(
-                            left: 0.w,
-                            top: 1.h,
-                            child: Image.asset(
-                              'assets/images/icon/info.png',
-                              width: 28.w,
-                              height: 28.h,
-                              color: Colors.black.withOpacity(0.3),
-                              colorBlendMode: BlendMode.srcIn,
-                            ),
-                          ),
-                          // 主圖標
-                          Image.asset(
-                            'assets/images/icon/info.png',
-                            width: 28.w,
-                            height: 28.h,
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 8.h),
-                    // 提示內容
-                    Text(
-                      '請在指定時間抵達餐廳。\n如有任何變動，系統將會發送通知。',
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        fontFamily: 'OtsutomeFont',
-                        color: const Color(0xFF666666),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          // 替換舊的提示卡片為根據狀態顯示的卡片
+          _buildStatusPromptCard(),
         ],
       );
     }
