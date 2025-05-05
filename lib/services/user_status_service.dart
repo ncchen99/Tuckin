@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class UserStatusService with ChangeNotifier {
   DateTime? _confirmedDinnerTime;
@@ -8,21 +9,37 @@ class UserStatusService with ChangeNotifier {
   DateTime? _replyDeadline;
   DateTime? _cancelDeadline;
 
+  // 新增欄位
+  String? _matchingGroupId;
+  String? _diningEventId;
+  Map<String, dynamic>? _restaurantInfo;
+
   // SharedPreferences 的鍵值
   static const String _confirmedDinnerTimeKey = 'confirmed_dinner_time';
   static const String _dinnerRestaurantIdKey = 'dinner_restaurant_id';
   static const String _replyDeadlineKey = 'reply_deadline';
   static const String _cancelDeadlineKey = 'cancel_deadline';
 
+  // 新增鍵值
+  static const String _matchingGroupIdKey = 'matching_group_id';
+  static const String _diningEventIdKey = 'dining_event_id';
+  static const String _restaurantInfoKey = 'restaurant_info';
+
   UserStatusService() {
     _loadFromPrefs();
     debugPrint('UserStatusService 已創建，並開始從持久化存儲載入數據');
   }
 
+  // Getter 方法
   DateTime? get confirmedDinnerTime => _confirmedDinnerTime;
   String? get dinnerRestaurantId => _dinnerRestaurantId;
   DateTime? get replyDeadline => _replyDeadline;
   DateTime? get cancelDeadline => _cancelDeadline;
+
+  // 新增的 Getter
+  String? get matchingGroupId => _matchingGroupId;
+  String? get diningEventId => _diningEventId;
+  Map<String, dynamic>? get restaurantInfo => _restaurantInfo;
 
   // 格式化日期時間為可讀字符串
   String get formattedDinnerTime {
@@ -74,6 +91,24 @@ class UserStatusService with ChangeNotifier {
         );
       }
 
+      // 新增：載入配對組ID
+      _matchingGroupId = prefs.getString(_matchingGroupIdKey);
+
+      // 新增：載入聚餐事件ID
+      _diningEventId = prefs.getString(_diningEventIdKey);
+
+      // 新增：載入餐廳詳細信息
+      final restaurantInfoString = prefs.getString(_restaurantInfoKey);
+      if (restaurantInfoString != null) {
+        try {
+          _restaurantInfo =
+              json.decode(restaurantInfoString) as Map<String, dynamic>;
+        } catch (e) {
+          debugPrint('解析餐廳信息時出錯: $e');
+          _restaurantInfo = null;
+        }
+      }
+
       debugPrint('從持久化儲存中載入 UserStatusService 資料:');
       if (_confirmedDinnerTime != null) {
         debugPrint('- 聚餐時間: $formattedDinnerTime');
@@ -81,6 +116,15 @@ class UserStatusService with ChangeNotifier {
       if (_cancelDeadline != null) {
         debugPrint('- 取消截止時間: $formattedCancelDeadline');
         debugPrint('- 可以取消預約: $canCancelReservation');
+      }
+      if (_matchingGroupId != null) {
+        debugPrint('- 配對組ID: $_matchingGroupId');
+      }
+      if (_diningEventId != null) {
+        debugPrint('- 聚餐事件ID: $_diningEventId');
+      }
+      if (_restaurantInfo != null) {
+        debugPrint('- 餐廳信息已載入');
       }
 
       notifyListeners();
@@ -131,6 +175,28 @@ class UserStatusService with ChangeNotifier {
         await prefs.remove(_cancelDeadlineKey);
       }
 
+      // 新增：儲存配對組ID
+      if (_matchingGroupId != null) {
+        await prefs.setString(_matchingGroupIdKey, _matchingGroupId!);
+      } else {
+        await prefs.remove(_matchingGroupIdKey);
+      }
+
+      // 新增：儲存聚餐事件ID
+      if (_diningEventId != null) {
+        await prefs.setString(_diningEventIdKey, _diningEventId!);
+      } else {
+        await prefs.remove(_diningEventIdKey);
+      }
+
+      // 新增：儲存餐廳詳細信息
+      if (_restaurantInfo != null) {
+        final restaurantInfoString = json.encode(_restaurantInfo);
+        await prefs.setString(_restaurantInfoKey, restaurantInfoString);
+      } else {
+        await prefs.remove(_restaurantInfoKey);
+      }
+
       debugPrint('成功將 UserStatusService 資料儲存到持久化儲存');
     } catch (e) {
       debugPrint('儲存 UserStatusService 資料時出錯: $e');
@@ -142,6 +208,9 @@ class UserStatusService with ChangeNotifier {
     String? dinnerRestaurantId,
     DateTime? replyDeadline,
     DateTime? cancelDeadline,
+    String? matchingGroupId,
+    String? diningEventId,
+    Map<String, dynamic>? restaurantInfo,
   }) {
     bool changed = false;
     if (confirmedDinnerTime != null &&
@@ -163,6 +232,28 @@ class UserStatusService with ChangeNotifier {
       changed = true;
     }
 
+    // 新增：更新配對組ID
+    if (matchingGroupId != null && _matchingGroupId != matchingGroupId) {
+      _matchingGroupId = matchingGroupId;
+      changed = true;
+    }
+
+    // 新增：更新聚餐事件ID
+    if (diningEventId != null && _diningEventId != diningEventId) {
+      _diningEventId = diningEventId;
+      changed = true;
+    }
+
+    // 新增：更新餐廳詳細信息
+    if (restaurantInfo != null) {
+      // 由於Map的比較較複雜，這裡簡單判斷是否需要更新
+      if (_restaurantInfo == null ||
+          json.encode(_restaurantInfo) != json.encode(restaurantInfo)) {
+        _restaurantInfo = restaurantInfo;
+        changed = true;
+      }
+    }
+
     if (changed) {
       notifyListeners();
       _saveToPrefs(); // 當資料更新時儲存到持久化儲存
@@ -174,6 +265,15 @@ class UserStatusService with ChangeNotifier {
         debugPrint('- 取消截止時間: $formattedCancelDeadline');
         debugPrint('- 可以取消預約: $canCancelReservation');
       }
+      if (_matchingGroupId != null) {
+        debugPrint('- 配對組ID: $_matchingGroupId');
+      }
+      if (_diningEventId != null) {
+        debugPrint('- 聚餐事件ID: $_diningEventId');
+      }
+      if (_restaurantInfo != null) {
+        debugPrint('- 已更新餐廳信息');
+      }
     }
   }
 
@@ -182,6 +282,9 @@ class UserStatusService with ChangeNotifier {
     _dinnerRestaurantId = null;
     _replyDeadline = null;
     _cancelDeadline = null;
+    _matchingGroupId = null;
+    _diningEventId = null;
+    _restaurantInfo = null;
     notifyListeners();
     _saveToPrefs(); // 清除持久化儲存的資料
     debugPrint('User status cleared and persistence data removed.');

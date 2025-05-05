@@ -418,10 +418,9 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     if (_selectedRestaurantId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: Color(0xFFB33D1C), // 深橘色背景
           content: Text(
             '請選擇一家餐廳',
-            style: TextStyle(fontFamily: 'OtsutomeFont', color: Colors.white),
+            style: TextStyle(fontFamily: 'OtsutomeFont'),
           ),
         ),
       );

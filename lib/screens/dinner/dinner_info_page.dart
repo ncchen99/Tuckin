@@ -74,10 +74,80 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           listen: false,
         );
 
-        // 獲取聚餐時間，若 Provider 中沒有則使用預設值
-        final dinnerTime =
-            userStatusService.confirmedDinnerTime ??
-            DateTime.now().add(const Duration(days: 1));
+        // 獲取當前聚餐事件信息
+        final diningEvent = await _databaseService.getCurrentDiningEvent(
+          currentUser.id,
+        );
+
+        // 從 Provider 中獲取聚餐時間或從 dining_events 中獲取
+        DateTime? dinnerTime;
+        String? restaurantName;
+        String? restaurantAddress;
+        String? restaurantImageUrl;
+        String? restaurantCategory;
+        String? restaurantMapUrl;
+
+        if (diningEvent != null) {
+          // 從聚餐事件中獲取時間
+          dinnerTime = DateTime.parse(diningEvent['date']);
+
+          // 從聚餐事件中關聯的餐廳獲取信息
+          if (diningEvent.containsKey('restaurant')) {
+            final restaurant = diningEvent['restaurant'];
+            restaurantName = restaurant['name'];
+            restaurantAddress = restaurant['address'];
+            restaurantImageUrl = restaurant['image_path'];
+            restaurantCategory = restaurant['category'];
+
+            // 構建地圖URL
+
+            if (restaurantAddress != null && restaurantName != null) {
+              restaurantMapUrl =
+                  "https://maps.google.com/?q=${Uri.encodeComponent(restaurantName)}+${Uri.encodeComponent(restaurantAddress)}";
+            }
+
+            // 更新 UserStatusService 中的數據
+            userStatusService.updateStatus(
+              confirmedDinnerTime: dinnerTime,
+              dinnerRestaurantId: diningEvent['restaurant_id'],
+              cancelDeadline: DateTime.parse(
+                diningEvent['status_change_time'] ??
+                    dinnerTime.toIso8601String(),
+              ),
+              // 新增：保存配對組ID、聚餐事件ID和餐廳詳細信息
+              matchingGroupId: diningEvent['matching_group_id'],
+              diningEventId: diningEvent['id'],
+              restaurantInfo: restaurant,
+            );
+          }
+        } else {
+          // 若無聚餐事件，使用 UserStatusService 中的數據或預設值
+          dinnerTime =
+              userStatusService.confirmedDinnerTime ??
+              DateTime.now().add(const Duration(days: 1));
+
+          // 嘗試從 UserStatusService 獲取餐廳信息，如果有的話
+          final cachedRestaurantInfo = userStatusService.restaurantInfo;
+          if (cachedRestaurantInfo != null) {
+            restaurantName = cachedRestaurantInfo['name'];
+            restaurantAddress = cachedRestaurantInfo['address'];
+            restaurantImageUrl = cachedRestaurantInfo['image_path'];
+            restaurantCategory = cachedRestaurantInfo['category'];
+
+            // 構建地圖URL
+            if (restaurantAddress != null && restaurantName != null) {
+              restaurantMapUrl =
+                  "https://maps.google.com/?q=${Uri.encodeComponent(restaurantName)}+${Uri.encodeComponent(restaurantAddress)}";
+            }
+          } else {
+            // 使用預設餐廳數據（臨時）
+            restaurantName = "查無餐廳";
+            restaurantAddress = "查無地址";
+            restaurantImageUrl = "assets/images/placeholder/restaurant.jpg";
+            restaurantCategory = "未知種類";
+            restaurantMapUrl = "https://maps.google.com/";
+          }
+        }
 
         debugPrint(
           '從 UserStatusService 獲取聚餐時間: ${userStatusService.formattedDinnerTime}',
@@ -85,17 +155,29 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         debugPrint(
           '從 UserStatusService 獲取取消截止時間: ${userStatusService.formattedCancelDeadline}',
         );
+        if (userStatusService.matchingGroupId != null) {
+          debugPrint(
+            '從 UserStatusService 獲取配對組ID: ${userStatusService.matchingGroupId}',
+          );
+        }
+        if (userStatusService.diningEventId != null) {
+          debugPrint(
+            '從 UserStatusService 獲取聚餐事件ID: ${userStatusService.diningEventId}',
+          );
+        }
+        if (userStatusService.restaurantInfo != null) {
+          debugPrint('從 UserStatusService 獲取餐廳信息成功');
+        }
 
         // 更新狀態
         setState(() {
           _userStatus = status;
           _dinnerTime = dinnerTime;
-          _restaurantName = "Serendipity 不經意的美好 10199";
-          _restaurantAddress = "台北市信義區松仁路 100 號 1F 之 1";
-          _restaurantImageUrl =
-              "https://images.unsplash.com/photo-1552566626-52f8b828add9?q=80&w=2070"; // Unsplash 餐廳圖片
-          _restaurantCategory = "日式料理";
-          _restaurantMapUrl = "https://maps.google.com/?q=台北市信義區松仁路100號1F之1";
+          _restaurantName = restaurantName;
+          _restaurantAddress = restaurantAddress;
+          _restaurantImageUrl = restaurantImageUrl;
+          _restaurantCategory = restaurantCategory;
+          _restaurantMapUrl = restaurantMapUrl;
           _isLoading = false;
         });
       } else {
@@ -109,11 +191,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         _isLoading = false;
       });
     }
-  }
-
-  // 處理用戶頭像點擊
-  void _handleProfileTap() {
-    _navigationService.navigateToProfile(context);
   }
 
   // 獲取狀態相關的提示文字

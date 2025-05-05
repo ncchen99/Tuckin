@@ -508,4 +508,57 @@ class DatabaseService {
       },
     );
   }
+
+  /// 根據用戶ID獲取當前聚餐事件信息
+  ///
+  /// [userId] 用戶ID
+  Future<Map<String, dynamic>?> getCurrentDiningEvent(String userId) async {
+    return _apiService.handleRequest(
+      request: () async {
+        // 透過 user_matching_info 表獲取用戶的配對組信息
+        final userMatchingInfo =
+            await _supabaseService.client
+                .from('user_matching_info')
+                .select()
+                .eq('user_id', userId)
+                .order('created_at', ascending: false)
+                .limit(1)
+                .maybeSingle();
+
+        if (userMatchingInfo == null) {
+          debugPrint('未找到用戶的配對信息: $userId');
+          return null;
+        }
+
+        final groupId = userMatchingInfo['matching_group_id'];
+
+        // 獲取與該配對組相關的聚餐事件
+        final diningEventData =
+            await _supabaseService.client
+                .from('dining_events')
+                .select()
+                .eq('matching_group_id', groupId)
+                .order('created_at', ascending: false)
+                .limit(1)
+                .maybeSingle();
+
+        if (diningEventData == null) {
+          debugPrint('未找到與配對組相關的聚餐事件: $groupId');
+          return null;
+        }
+
+        // 獲取餐廳信息
+        final restaurantId = diningEventData['restaurant_id'];
+        if (restaurantId != null) {
+          final restaurantData = await getRestaurantInfo(restaurantId);
+          if (restaurantData != null) {
+            // 將餐廳信息加入聚餐事件數據
+            diningEventData['restaurant'] = restaurantData;
+          }
+        }
+
+        return diningEventData;
+      },
+    );
+  }
 }
