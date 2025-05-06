@@ -491,11 +491,79 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
     }
   }
 
+  // 添加檢查聚餐事件狀態的方法
+  Future<bool> _checkDiningEventStatus() async {
+    try {
+      // 1. 獲取當前用戶
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null) {
+        throw Exception('用戶未登入');
+      }
+
+      // 2. 從資料庫獲取最新的聚餐事件資訊
+      final diningEvent = await _databaseService.getCurrentDiningEvent(
+        currentUser.id,
+      );
+
+      if (diningEvent == null) {
+        throw Exception('未找到當前聚餐事件');
+      }
+
+      // 3. 獲取最新狀態
+      final latestStatus = diningEvent['status'];
+      debugPrint('從資料庫獲取到的最新聚餐狀態: $latestStatus');
+
+      // 4. 檢查狀態是否為confirming
+      if (latestStatus != 'confirming') {
+        // 如果狀態不是confirming，顯示提示訊息
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '餐廳狀態已變更為：$latestStatus，無法進行操作',
+                style: const TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+            ),
+          );
+
+          // 導航回晚餐信息頁面
+          _navigationService.navigateToDinnerInfo(context);
+        }
+        return false;
+      }
+
+      // 5. 如果狀態是confirming，更新Provider中的狀態
+      if (mounted) {
+        final userStatusService = Provider.of<UserStatusService>(
+          context,
+          listen: false,
+        );
+        userStatusService.updateStatus(eventStatus: latestStatus);
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('檢查聚餐事件狀態時出錯: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '檢查聚餐事件狀態失敗: $e',
+              style: const TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
   Future<void> _handleReservationConfirm() async {
     try {
-      if (!mounted) {
-        debugPrint('_handleReservationConfirm: Widget已卸載，取消操作');
-        return;
+      // 先檢查聚餐事件狀態
+      bool isStatusValid = await _checkDiningEventStatus();
+      if (!isStatusValid) {
+        return; // 如果狀態不是confirming，直接返回
       }
 
       // 獲取UserStatusService
@@ -528,6 +596,130 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
         );
       }
     }
+  }
+
+  Future<void> _handleCannotReserve() async {
+    try {
+      // 先檢查聚餐事件狀態
+      bool isStatusValid = await _checkDiningEventStatus();
+      if (!isStatusValid) {
+        return; // 如果狀態不是confirming，直接返回
+      }
+
+      // 獲取UserStatusService
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
+      );
+
+      // 獲取聚餐事件ID
+      final diningEventId = userStatusService.diningEventId;
+      if (diningEventId == null) {
+        throw Exception('無法獲取聚餐事件ID');
+      }
+
+      // 使用自定義確認對話框
+      bool? confirmChange = await showCustomConfirmationDialog(
+        context: context,
+        iconPath: 'assets/images/icon/failed.png',
+        content: '確定要更換另一家餐廳嗎？系統將從候選餐廳中選擇下一間！',
+        cancelButtonText: '取消',
+        confirmButtonText: '確定',
+        barrierDismissible: true, // 正常狀態可點擊空白處關閉
+        onCancel: () {
+          Navigator.of(context).pop(false);
+        },
+        onConfirm: () async {
+          try {
+            // 調用API更換餐廳
+            final diningService = DiningService();
+            final response = await diningService.changeRestaurant(
+              diningEventId,
+            );
+
+            // 檢查回應中是否有新餐廳資訊
+            if (response.containsKey('restaurant') &&
+                response['restaurant'] != null) {
+              final restaurant = response['restaurant'];
+
+              // 更新UserStatusService中的餐廳資訊
+              userStatusService.updateStatus(
+                restaurantInfo: restaurant,
+                dinnerRestaurantId: restaurant['id'],
+              );
+
+              // 更新幫忙訂位開始時間
+              userStatusService.updateHelpingReservationStartTime();
+
+              debugPrint('成功更換餐廳，新餐廳：${restaurant['name']}');
+
+              // 重新加載頁面數據
+              if (mounted) await _loadRestaurantInfo();
+
+              // 重置計時器 - 重新設置596秒倒計時
+              if (mounted) await _setupRedirectTimer();
+
+              // 顯示成功訊息
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '已成功更換為：${restaurant['name']}',
+                      style: const TextStyle(fontFamily: 'OtsutomeFont'),
+                    ),
+                  ),
+                );
+              }
+
+              // 返回true表示更換成功
+              Navigator.of(context).pop(true);
+            } else {
+              throw Exception('無法獲取新餐廳資訊');
+            }
+          } catch (e) {
+            _handleApiError(context, e);
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('準備更換餐廳時出錯: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '更換餐廳失敗: $e',
+              style: const TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  // 添加錯誤處理輔助函數
+  void _handleApiError(BuildContext dialogContext, dynamic e) {
+    debugPrint('API請求發生錯誤: $e');
+
+    if (!mounted) {
+      debugPrint('頁面已卸載，取消錯誤處理');
+      return;
+    }
+
+    // 確保對話框關閉（如果存在）
+    if (Navigator.of(dialogContext).canPop()) {
+      Navigator.of(dialogContext).pop();
+    }
+
+    // 顯示錯誤消息
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '操作失敗: $e',
+          style: const TextStyle(fontFamily: 'OtsutomeFont'),
+        ),
+      ),
+    );
   }
 
   // 顯示輸入預訂資訊的對話框
@@ -1069,124 +1261,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
 
     // 呼叫顯示對話框
     return showProcessingDialog();
-  }
-
-  Future<void> _handleCannotReserve() async {
-    try {
-      // 獲取UserStatusService
-      final userStatusService = Provider.of<UserStatusService>(
-        context,
-        listen: false,
-      );
-
-      // 獲取聚餐事件ID
-      final diningEventId = userStatusService.diningEventId;
-      if (diningEventId == null) {
-        throw Exception('無法獲取聚餐事件ID');
-      }
-
-      // 使用自定義確認對話框
-      bool? confirmChange = await showCustomConfirmationDialog(
-        context: context,
-        iconPath: 'assets/images/icon/failed.png',
-        content: '確定要更換另一家餐廳嗎？系統將從候選餐廳中選擇下一間！',
-        cancelButtonText: '取消',
-        confirmButtonText: '確定',
-        barrierDismissible: true, // 正常狀態可點擊空白處關閉
-        onCancel: () {
-          Navigator.of(context).pop(false);
-        },
-        onConfirm: () async {
-          try {
-            // 調用API更換餐廳
-            final diningService = DiningService();
-            final response = await diningService.changeRestaurant(
-              diningEventId,
-            );
-
-            // 檢查回應中是否有新餐廳資訊
-            if (response.containsKey('restaurant') &&
-                response['restaurant'] != null) {
-              final restaurant = response['restaurant'];
-
-              // 更新UserStatusService中的餐廳資訊
-              userStatusService.updateStatus(
-                restaurantInfo: restaurant,
-                dinnerRestaurantId: restaurant['id'],
-              );
-
-              // 更新幫忙訂位開始時間
-              userStatusService.updateHelpingReservationStartTime();
-
-              debugPrint('成功更換餐廳，新餐廳：${restaurant['name']}');
-
-              // 重新加載頁面數據
-              if (mounted) await _loadRestaurantInfo();
-
-              // 重置計時器 - 重新設置596秒倒計時
-              if (mounted) await _setupRedirectTimer();
-
-              // 顯示成功訊息
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '已成功更換為：${restaurant['name']}',
-                      style: const TextStyle(fontFamily: 'OtsutomeFont'),
-                    ),
-                  ),
-                );
-              }
-
-              // 返回true表示更換成功
-              Navigator.of(context).pop(true);
-            } else {
-              throw Exception('無法獲取新餐廳資訊');
-            }
-          } catch (e) {
-            _handleApiError(context, e);
-          }
-        },
-      );
-    } catch (e) {
-      debugPrint('準備更換餐廳時出錯: $e');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '更換餐廳失敗: $e',
-              style: const TextStyle(fontFamily: 'OtsutomeFont'),
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  // 添加錯誤處理輔助函數
-  void _handleApiError(BuildContext dialogContext, dynamic e) {
-    debugPrint('API請求發生錯誤: $e');
-
-    if (!mounted) {
-      debugPrint('頁面已卸載，取消錯誤處理');
-      return;
-    }
-
-    // 確保對話框關閉（如果存在）
-    if (Navigator.of(dialogContext).canPop()) {
-      Navigator.of(dialogContext).pop();
-    }
-
-    // 顯示錯誤消息
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '操作失敗: $e',
-          style: const TextStyle(fontFamily: 'OtsutomeFont'),
-        ),
-      ),
-    );
   }
 
   @override
