@@ -153,35 +153,12 @@ class DiningService {
         throw Exception('無法獲取用戶登入資訊，請重新登入');
       }
 
-      // 獲取聚餐事件詳情以獲取參與人數
-      final eventDetailsResponse =
-          await _supabaseService.client
-              .from('dining_events')
-              .select('matching_group_id')
-              .eq('id', eventId)
-              .single();
-
-      // 獲取配對組詳細資訊
-      final matchingGroupId = eventDetailsResponse['matching_group_id'];
-      final groupResponse =
-          await _supabaseService.client
-              .from('matching_groups')
-              .select('user_ids')
-              .eq('id', matchingGroupId)
-              .single();
-
-      // 計算參與人數
-      final attendeeCount = (groupResponse['user_ids'] as List).length;
-
       // 構建請求體
       final Map<String, dynamic> requestBody = {
         // 確保總是傳遞這些參數，即使為空值
         'reservation_name': reservationName ?? '',
         'reservation_phone': reservationPhone ?? '',
-        'attendee_count': attendeeCount,
       };
-
-      debugPrint('準備發送確認餐廳請求，參數: $requestBody');
 
       // 構建API請求
       final endpoint = '/dining/confirm-restaurant/$eventId';
@@ -209,7 +186,6 @@ class DiningService {
         try {
           final errorData = jsonDecode(utf8.decode(response.bodyBytes));
           errorMessage = errorData['detail'] ?? '操作失敗 (${response.statusCode})';
-          debugPrint('API錯誤詳情: $errorData');
         } catch (_) {
           errorMessage = '操作失敗 (${response.statusCode})';
         }
