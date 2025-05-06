@@ -323,6 +323,14 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
         await _databaseService.updateUserStatus(currentUser.id, 'booking');
 
         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '評分成功！！',
+                style: const TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+            ),
+          );
           // 更新UserStatusService
           final userStatusService = Provider.of<UserStatusService>(
             context,
