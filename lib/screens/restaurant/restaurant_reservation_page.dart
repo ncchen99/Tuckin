@@ -51,8 +51,16 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
     _loadRestaurantInfo();
     _setupRedirectTimer(); // 設置重定向計時器
 
+    // 在Provider中設置用戶正在幫忙訂位的狀態
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        final userStatusService = Provider.of<UserStatusService>(
+          context,
+          listen: false,
+        );
+        userStatusService.setHelpingWithReservation(true);
+        debugPrint('已設置用戶正在幫忙訂位狀態');
+
         setState(() {
           _isPageMounted = true;
         });
@@ -199,6 +207,16 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
             debugPrint('清除入口時間記錄時出錯: $e');
           });
 
+      // 重置用戶幫忙訂位的狀態
+      if (mounted) {
+        final userStatusService = Provider.of<UserStatusService>(
+          context,
+          listen: false,
+        );
+        userStatusService.setHelpingWithReservation(false);
+        debugPrint('已重置用戶幫忙訂位狀態');
+      }
+
       // 使用Future.microtask確保在當前渲染幀完成後再執行導航
       Future.microtask(() {
         if (mounted) {
@@ -308,8 +326,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                       ? "https://maps.google.com/?q=${Uri.encodeComponent(restaurant['name'])}+${Uri.encodeComponent(restaurant['address'])}"
                       : null;
               _restaurantPhone = restaurant['phone'] ?? "未提供";
-              _restaurantWebsite =
-                  restaurant['website'] ?? "https://example.com/restaurant";
+              _restaurantWebsite = restaurant['website'] ?? "未提供";
               _restaurantReservationNote =
                   restaurant['reservation_note'] ?? "請提前預訂。";
               _isLoading = false;
@@ -474,10 +491,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
   }
 
   Future<void> _handleReservationConfirm() async {
-    setState(() {
-      _isConfirming = true;
-    });
-
     try {
       if (!mounted) {
         debugPrint('_handleReservationConfirm: Widget已卸載，取消操作');
@@ -504,9 +517,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
     } catch (e) {
       debugPrint('確認預訂時出錯: $e');
       if (mounted) {
-        setState(() {
-          _isConfirming = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -604,11 +614,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
               ),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                if (mounted) {
-                  setState(() {
-                    _isConfirming = false;
-                  });
-                }
               },
             ),
             TextButton(
@@ -696,10 +701,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                       rootNavigator: true,
                     ).popUntil((route) => route.isFirst);
 
-                    setState(() {
-                      _isConfirming = false;
-                    });
-
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -719,11 +720,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
   }
 
   Future<void> _handleCannotReserve() async {
-    // 顯示加載中UI
-    setState(() {
-      _isConfirming = true;
-    });
-
     try {
       // 獲取UserStatusService
       final userStatusService = Provider.of<UserStatusService>(
@@ -746,32 +742,8 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
         confirmButtonText: '確定',
         onCancel: () {
           Navigator.of(context).pop(false);
-          setState(() {
-            _isConfirming = false;
-          });
         },
         onConfirm: () async {
-          // 顯示加載中對話框
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return const AlertDialog(
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text(
-                      '正在更換餐廳...',
-                      style: TextStyle(fontFamily: 'OtsutomeFont'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-
           try {
             // 調用API更換餐廳
             final diningService = DiningService();
@@ -784,14 +756,14 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                 response['restaurant'] != null) {
               final restaurant = response['restaurant'];
 
-              // 關閉加載中對話框
-              if (mounted) Navigator.of(context).pop();
-
               // 更新UserStatusService中的餐廳資訊
               userStatusService.updateStatus(
                 restaurantInfo: restaurant,
                 dinnerRestaurantId: restaurant['id'],
               );
+
+              // 更新幫忙訂位開始時間
+              userStatusService.updateHelpingReservationStartTime();
 
               debugPrint('成功更換餐廳，新餐廳：${restaurant['name']}');
 
@@ -820,13 +792,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
             }
           } catch (e) {
             debugPrint('更換餐廳時出錯: $e');
-            // 關閉加載中對話框（如果存在）
-            if (mounted) {
-              Navigator.of(
-                context,
-                rootNavigator: true,
-              ).popUntil((route) => route.isFirst);
-            }
 
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -844,13 +809,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
           }
         },
       );
-
-      // 如果用戶沒有確認更換（取消了操作）
-      if (confirmChange != true) {
-        setState(() {
-          _isConfirming = false;
-        });
-      }
     } catch (e) {
       debugPrint('準備更換餐廳時出錯: $e');
 
@@ -863,13 +821,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
             ),
           ),
         );
-      }
-    } finally {
-      // 重置確認狀態
-      if (mounted) {
-        setState(() {
-          _isConfirming = false;
-        });
       }
     }
   }
@@ -929,7 +880,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                         SizedBox(height: 20.h),
                         // 標題
                         Text(
-                          '確認餐廳',
+                          '確認有營業',
                           style: TextStyle(
                             fontSize: 24.sp,
                             fontFamily: 'OtsutomeFont',
@@ -940,7 +891,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                         SizedBox(height: 10.h),
                         // 小標題
                         Text(
-                          '確認營業時間，可以的話幫忙預定',
+                          '可以的話幫忙訂位',
                           style: TextStyle(
                             fontSize: 16.sp,
                             fontFamily: 'OtsutomeFont',
@@ -966,27 +917,43 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                           ),
                           child: Column(
                             children: [
-                              // 餐廳圖片 - 恢復原始設計
-                              ClipRRect(
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(15.r),
-                                  topRight: Radius.circular(15.r),
-                                ),
-                                child: GestureDetector(
-                                  onTap: () => _openMap(_restaurantMapUrl),
-                                  child:
-                                      _restaurantImageUrl != null
-                                          ? Image.network(
-                                            _restaurantImageUrl!,
-                                            width: double.infinity,
-                                            height: 150.h,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (
-                                              context,
-                                              error,
-                                              stackTrace,
-                                            ) {
-                                              return Container(
+                              // 餐廳圖片和上半部分 - 整體可點擊
+                              GestureDetector(
+                                onTap: () => _openMap(_restaurantMapUrl),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // 餐廳圖片
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: Radius.circular(15.r),
+                                        topRight: Radius.circular(15.r),
+                                      ),
+                                      child:
+                                          _restaurantImageUrl != null
+                                              ? Image.network(
+                                                _restaurantImageUrl!,
+                                                width: double.infinity,
+                                                height: 150.h,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (
+                                                  context,
+                                                  error,
+                                                  stackTrace,
+                                                ) {
+                                                  return Container(
+                                                    width: double.infinity,
+                                                    height: 150.h,
+                                                    color: Colors.grey[300],
+                                                    child: Icon(
+                                                      Icons.restaurant,
+                                                      color: Colors.grey[600],
+                                                      size: 50.sp,
+                                                    ),
+                                                  );
+                                                },
+                                              )
+                                              : Container(
                                                 width: double.infinity,
                                                 height: 150.h,
                                                 color: Colors.grey[300],
@@ -995,64 +962,250 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                   color: Colors.grey[600],
                                                   size: 50.sp,
                                                 ),
-                                              );
-                                            },
-                                          )
-                                          : Container(
-                                            width: double.infinity,
-                                            height: 150.h,
-                                            color: Colors.grey[300],
-                                            child: Icon(
-                                              Icons.restaurant,
-                                              color: Colors.grey[600],
-                                              size: 50.sp,
+                                              ),
+                                    ),
+
+                                    // 餐廳詳細資訊
+                                    Padding(
+                                      padding: EdgeInsets.all(15.h),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // 餐廳名稱
+                                          Text(
+                                            _restaurantName ?? '未指定餐廳',
+                                            style: TextStyle(
+                                              fontSize: 20.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
+
+                                          SizedBox(height: 10.h),
+                                          // 餐廳地址
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  _restaurantAddress ?? '地址未提供',
+                                                  style: TextStyle(
+                                                    fontSize: 14.sp,
+                                                    fontFamily: 'OtsutomeFont',
+                                                    color: const Color(
+                                                      0xFF23456B,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
 
-                              // 餐廳詳細資訊
+                              // 分隔線
+                              Container(
+                                height: 1,
+                                color: Colors.grey[300],
+                                margin: EdgeInsets.symmetric(horizontal: 12.w),
+                              ),
+
+                              // 聚餐時間和人數部分
                               Padding(
-                                padding: EdgeInsets.all(15.h),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 15.h,
+                                  vertical: 15.h,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
                                   children: [
-                                    // 餐廳名稱
-                                    Text(
-                                      _restaurantName ?? '未指定餐廳',
-                                      style: TextStyle(
-                                        fontSize: 20.sp,
-                                        fontFamily: 'OtsutomeFont',
-                                        color: const Color(0xFF23456B),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-
-                                    SizedBox(height: 5.h),
-                                    // 餐廳類別
-                                    Text(
-                                      _restaurantCategory ?? '未分類',
-                                      style: TextStyle(
-                                        fontSize: 16.sp,
-                                        fontFamily: 'OtsutomeFont',
-                                        color: const Color(0xFF666666),
-                                      ),
-                                    ),
-
-                                    SizedBox(height: 10.h),
-                                    // 餐廳地址 - 可點擊
-                                    GestureDetector(
-                                      onTap: () => _openMap(_restaurantMapUrl),
+                                    // 左側聚餐時間
+                                    SizedBox(
+                                      width: cardWidth * 0.4,
                                       child: Row(
                                         children: [
-                                          Expanded(
-                                            child: Text(
-                                              _restaurantAddress ?? '地址未提供',
-                                              style: TextStyle(
-                                                fontSize: 14.sp,
-                                                fontFamily: 'OtsutomeFont',
-                                                color: const Color(0xFF23456B),
+                                          // 時間圖標
+                                          Padding(
+                                            padding: EdgeInsets.only(
+                                              bottom: 5.h,
+                                            ),
+                                            child: SizedBox(
+                                              width: 35.w,
+                                              height: 35.h,
+                                              child: Stack(
+                                                clipBehavior: Clip.none,
+                                                children: [
+                                                  // 底部陰影
+                                                  Positioned(
+                                                    left: 0,
+                                                    top: 2.h,
+                                                    child: Image.asset(
+                                                      'assets/images/icon/clock.png',
+                                                      width: 35.w,
+                                                      height: 35.h,
+                                                      color: Colors.black
+                                                          .withOpacity(0.4),
+                                                      colorBlendMode:
+                                                          BlendMode.srcIn,
+                                                    ),
+                                                  ),
+                                                  // 主圖標
+                                                  Image.asset(
+                                                    'assets/images/icon/clock.png',
+                                                    width: 35.w,
+                                                    height: 35.h,
+                                                  ),
+                                                ],
                                               ),
+                                            ),
+                                          ),
+
+                                          SizedBox(width: 10.w),
+
+                                          // 時間資訊文字
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '聚餐時間',
+                                                  style: TextStyle(
+                                                    fontSize: 16.sp,
+                                                    fontFamily: 'OtsutomeFont',
+                                                    color: const Color(
+                                                      0xFF23456B,
+                                                    ),
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                SizedBox(height: 2.h),
+                                                Consumer<UserStatusService>(
+                                                  builder: (
+                                                    context,
+                                                    userStatusService,
+                                                    child,
+                                                  ) {
+                                                    final dinnerTime =
+                                                        userStatusService
+                                                            .confirmedDinnerTime;
+                                                    return Text(
+                                                      dinnerTime != null
+                                                          ? '${dinnerTime.month}月${dinnerTime.day}日 ${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}'
+                                                          : '時間待定',
+                                                      style: TextStyle(
+                                                        fontSize: 12.sp,
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                        color: const Color(
+                                                          0xFF666666,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // 垂直分隔線
+                                    Container(
+                                      height: 45.h,
+                                      width: 1.w,
+                                      color: Colors.grey[300],
+                                    ),
+
+                                    // 右側人數部分
+                                    SizedBox(
+                                      width: cardWidth * 0.4,
+                                      child: Row(
+                                        children: [
+                                          // 人數圖標
+                                          Padding(
+                                            padding: EdgeInsets.only(
+                                              bottom: 5.h,
+                                            ),
+                                            child: SizedBox(
+                                              width: 35.w,
+                                              height: 35.h,
+                                              child: Stack(
+                                                clipBehavior: Clip.none,
+                                                children: [
+                                                  // 底部陰影
+                                                  Positioned(
+                                                    left: 0,
+                                                    top: 2.h,
+                                                    child: Image.asset(
+                                                      'assets/images/icon/attendee.png',
+                                                      width: 35.w,
+                                                      height: 35.h,
+                                                      color: Colors.black
+                                                          .withOpacity(0.4),
+                                                      colorBlendMode:
+                                                          BlendMode.srcIn,
+                                                    ),
+                                                  ),
+                                                  // 主圖標
+                                                  Image.asset(
+                                                    'assets/images/icon/attendee.png',
+                                                    width: 35.w,
+                                                    height: 35.h,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(width: 10.w),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '用餐人數',
+                                                  style: TextStyle(
+                                                    fontSize: 16.sp,
+                                                    fontFamily: 'OtsutomeFont',
+                                                    color: const Color(
+                                                      0xFF23456B,
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(height: 2.h),
+                                                Consumer<UserStatusService>(
+                                                  builder: (
+                                                    context,
+                                                    userStatusService,
+                                                    child,
+                                                  ) {
+                                                    // 從UserStatusService獲取人數，如未設置則顯示2人
+                                                    final attendees =
+                                                        userStatusService
+                                                            .attendees ??
+                                                        2;
+                                                    return Text(
+                                                      '$attendees人',
+                                                      style: TextStyle(
+                                                        fontSize: 12.sp,
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                        color: const Color(
+                                                          0xFF666666,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
@@ -1069,7 +1222,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                 margin: EdgeInsets.symmetric(horizontal: 12.w),
                               ),
 
-                              // 聯絡資訊部分 - 分左右兩區塊
+                              // 聯絡資訊部分 - 電話和網站
                               Padding(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 15.h,
@@ -1180,7 +1333,8 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                       width: cardWidth * 0.4,
                                       child: InkWell(
                                         onTap: () {
-                                          if (_restaurantWebsite != null) {
+                                          if (_restaurantWebsite != null &&
+                                              _restaurantWebsite != "未提供") {
                                             _openWebsite(_restaurantWebsite!);
                                           }
                                         },
@@ -1240,7 +1394,10 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                   ),
                                                   SizedBox(height: 2.h),
                                                   Text(
-                                                    _restaurantWebsite != null
+                                                    _restaurantWebsite !=
+                                                                null &&
+                                                            _restaurantWebsite !=
+                                                                "未提供"
                                                         ? '點擊前往'
                                                         : '未提供',
                                                     style: TextStyle(
@@ -1266,41 +1423,32 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                           ),
                         ),
 
-                        SizedBox(height: 60.h),
+                        SizedBox(height: 40.h),
 
                         // 確認按鈕
                         Center(
-                          child:
-                              _isConfirming
-                                  ? LoadingImage(
-                                    width: 60.w,
-                                    height: 60.h,
-                                    color: const Color(0xFF23456B),
-                                  )
-                                  : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      // 左側藍色按鈕 - 這間無法
-                                      ImageButton(
-                                        text: '這間無法',
-                                        imagePath:
-                                            'assets/images/ui/button/blue_l.png',
-                                        width: 150.w,
-                                        height: 70.h,
-                                        onPressed: _handleCannotReserve,
-                                      ),
-                                      SizedBox(width: 20.w),
-                                      // 右側橘色按鈕 - 已確認
-                                      ImageButton(
-                                        text: '已確認',
-                                        imagePath:
-                                            'assets/images/ui/button/red_m.png',
-                                        width: 150.w,
-                                        height: 70.h,
-                                        onPressed: _handleReservationConfirm,
-                                      ),
-                                    ],
-                                  ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // 左側藍色按鈕 - 這間無法
+                              ImageButton(
+                                text: '這間無法',
+                                imagePath: 'assets/images/ui/button/blue_l.png',
+                                width: 150.w,
+                                height: 70.h,
+                                onPressed: _handleCannotReserve,
+                              ),
+                              SizedBox(width: 20.w),
+                              // 右側橘色按鈕 - 已確認
+                              ImageButton(
+                                text: '已確認',
+                                imagePath: 'assets/images/ui/button/red_m.png',
+                                width: 150.w,
+                                height: 70.h,
+                                onPressed: _handleReservationConfirm,
+                              ),
+                            ],
+                          ),
                         ),
 
                         SizedBox(height: 30.h),

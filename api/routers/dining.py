@@ -50,14 +50,27 @@ async def reset_confirming_status_task(event_id: str, supabase: Client):
             # 確保從資料庫獲取的時間是帶時區的
             if isinstance(event_data["status_change_time"], str):
                 # 處理字符串格式的時間
-                if "Z" in event_data["status_change_time"]:
-                    status_change_time = datetime.fromisoformat(event_data["status_change_time"].replace("Z", "+00:00"))
-                elif "+" in event_data["status_change_time"] or "-" in event_data["status_change_time"]:
-                    # 已經有時區信息
-                    status_change_time = datetime.fromisoformat(event_data["status_change_time"])
-                else:
-                    # 沒有時區信息，假設為UTC
-                    status_change_time = datetime.fromisoformat(event_data["status_change_time"]).replace(tzinfo=timezone.utc)
+                try:
+                    if "Z" in event_data["status_change_time"]:
+                        status_change_time = datetime.fromisoformat(event_data["status_change_time"].replace("Z", "+00:00"))
+                    elif "+" in event_data["status_change_time"] or "-" in event_data["status_change_time"]:
+                        # 已經有時區信息，但可能格式有問題，嘗試修復常見問題
+                        time_str = event_data["status_change_time"]
+                        # 處理小數秒位數問題 (如果有小數第6位)
+                        parts = time_str.split(".")
+                        if len(parts) == 2 and "+" in parts[1]:
+                            second_parts = parts[1].split("+")
+                            if len(second_parts[0]) > 6:  # 如果小數秒超過6位
+                                time_str = f"{parts[0]}.{second_parts[0][:6]}+{second_parts[1]}"
+                        
+                        status_change_time = datetime.fromisoformat(time_str)
+                    else:
+                        # 沒有時區信息，假設為UTC
+                        status_change_time = datetime.fromisoformat(event_data["status_change_time"]).replace(tzinfo=timezone.utc)
+                except ValueError as e:
+                    # 如果解析失敗，使用當前時間減去9分鐘作為fallback
+                    logger.warning(f"無法解析時間字符串 '{event_data['status_change_time']}': {str(e)}，使用當前時間減去9分鐘")
+                    status_change_time = datetime.now(timezone.utc) - timedelta(minutes=9)
             else:
                 # 如果已經是datetime對象，確保有時區信息
                 status_change_time = event_data["status_change_time"]
@@ -619,12 +632,32 @@ async def submit_rating(
         expires_at_str = session_data["expires_at"]
         
         # 確保expires_at字符串有時區信息
-        if "Z" in expires_at_str:
-            # UTC時區標記為Z的情況
-            expires_at_str = expires_at_str.replace("Z", "+00:00")
+        try:
+            if "Z" in expires_at_str:
+                # UTC時區標記為Z的情況
+                expires_at_str = expires_at_str.replace("Z", "+00:00")
+            
+            # 處理小數秒位數問題
+            parts = expires_at_str.split(".")
+            if len(parts) == 2 and ("+" in parts[1] or "-" in parts[1]):
+                # 分離小數秒和時區部分
+                decimal_part = parts[1].split("+")[0].split("-")[0]
+                timezone_part = parts[1][len(decimal_part):]
+                
+                # 限制小數秒位數為6位
+                if len(decimal_part) > 6:
+                    decimal_part = decimal_part[:6]
+                    
+                # 重建時間字符串
+                expires_at_str = f"{parts[0]}.{decimal_part}{timezone_part}"
+            
+            # 解析時間字符串為帶時區的datetime對象
+            expires_at = datetime.fromisoformat(expires_at_str)
+        except ValueError as e:
+            # 如果解析失敗，設置為一個較早的過期時間（1小時前）
+            logger.warning(f"無法解析時間字符串 '{expires_at_str}': {str(e)}，設置為一小時前")
+            expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
         
-        # 解析時間字符串為帶時區的datetime對象
-        expires_at = datetime.fromisoformat(expires_at_str)
         now = datetime.now(timezone.utc)
         
         if now > expires_at:

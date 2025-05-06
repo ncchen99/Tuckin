@@ -165,9 +165,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
               final diningService = DiningService();
               await diningService.startConfirming(diningEventId);
 
-              // 更新Provider中的事件狀態為confirming
-              userStatusService.updateStatus(eventStatus: 'confirming');
-              debugPrint('已更新Provider中的事件狀態為confirming');
+              // 更新Provider中的事件狀態為confirming和幫忙訂位狀態
+              userStatusService.updateStatus(
+                eventStatus: 'confirming',
+                isHelpingWithReservation: true,
+              );
+              debugPrint('已更新Provider中的事件狀態為confirming並設置幫忙訂位狀態');
 
               // 關閉對話框
               if (!mounted) {
@@ -362,6 +365,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         String? dinnerEventStatus;
         String? reservationName;
         String? reservationPhone;
+        int? attendeeCount; // 新增變數存儲用餐人數
 
         if (diningEvent != null) {
           // 從聚餐事件中獲取時間
@@ -371,6 +375,10 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           dinnerEventStatus = diningEvent['status'];
           reservationName = diningEvent['reservation_name'];
           reservationPhone = diningEvent['reservation_phone'];
+
+          // 獲取用餐人數
+          attendeeCount = diningEvent['attendee_count'];
+          debugPrint('從聚餐事件中獲取到用餐人數: $attendeeCount');
 
           // 從聚餐事件中關聯的餐廳獲取信息
           if (diningEvent.containsKey('restaurant')) {
@@ -401,6 +409,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
               eventStatus: dinnerEventStatus, // 保存聚餐事件狀態
               reservationName: reservationName, // 保存預訂人姓名
               reservationPhone: reservationPhone, // 保存預訂人電話
+              attendees: attendeeCount, // 保存用餐人數
             );
 
             debugPrint('已更新UserStatusService中的餐廳信息: ${restaurant['name']}');
@@ -484,6 +493,19 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           _reservationPhone = reservationPhone;
           _isLoading = false;
         });
+
+        debugPrint('餐廳資訊已更新: $_restaurantName, $_restaurantCategory');
+
+        // 檢查用戶是否正在幫忙訂位，如果是且事件狀態為confirming，則導航到餐廳預訂頁面
+        if (mounted &&
+            userStatusService.isHelpingWithReservation &&
+            userStatusService.isHelpingReservationValid &&
+            dinnerEventStatus == 'confirming') {
+          debugPrint('用戶正在幫忙訂位且事件狀態為confirming，導航到餐廳預訂頁面');
+          Future.microtask(
+            () => _navigationService.navigateToRestaurantReservation(context),
+          );
+        }
       } else {
         if (!mounted) {
           debugPrint('_loadUserAndDinnerInfo: 用戶為空時Widget已卸載，取消更新');

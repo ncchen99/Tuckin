@@ -20,6 +20,13 @@ class UserStatusService with ChangeNotifier {
   String? _reservationPhone; // 預訂人電話
   String? _userStatus; // 用戶狀態
 
+  // 新增幫忙訂位狀態
+  bool _isHelpingWithReservation = false; // 是否正在幫忙訂位
+  DateTime? _helpingReservationStartTime; // 開始幫忙訂位的時間戳
+
+  // 新增用餐人數
+  int? _attendees;
+
   // SharedPreferences 的鍵值
   static const String _confirmedDinnerTimeKey = 'confirmed_dinner_time';
   static const String _dinnerRestaurantIdKey = 'dinner_restaurant_id';
@@ -34,6 +41,14 @@ class UserStatusService with ChangeNotifier {
   static const String _reservationNameKey = 'reservation_name';
   static const String _reservationPhoneKey = 'reservation_phone';
   static const String _userStatusKey = 'user_status';
+  static const String _isHelpingWithReservationKey =
+      'is_helping_with_reservation'; // 新增幫忙訂位狀態的鍵值
+  static const String _helpingReservationStartTimeKey =
+      'helping_reservation_start_time'; // 新增幫忙訂位開始時間的鍵值
+  static const String _attendeesKey = 'attendees'; // 新增用餐人數的鍵值
+
+  // 幫忙訂位的有效時間(秒)
+  static const int helpingReservationValiditySeconds = 596; // 9分56秒
 
   UserStatusService() {
     _loadFromPrefs();
@@ -54,6 +69,9 @@ class UserStatusService with ChangeNotifier {
   String? get reservationName => _reservationName;
   String? get reservationPhone => _reservationPhone;
   String? get userStatus => _userStatus;
+  bool get isHelpingWithReservation => _isHelpingWithReservation;
+  DateTime? get helpingReservationStartTime => _helpingReservationStartTime;
+  int? get attendees => _attendees; // 用餐人數的getter
 
   // 格式化日期時間為可讀字符串
   String get formattedDinnerTime {
@@ -71,6 +89,19 @@ class UserStatusService with ChangeNotifier {
   bool get canCancelReservation {
     if (_cancelDeadline == null) return false;
     return DateTime.now().isBefore(_cancelDeadline!);
+  }
+
+  // 判斷幫忙訂位時間是否有效
+  bool get isHelpingReservationValid {
+    if (_helpingReservationStartTime == null || !_isHelpingWithReservation) {
+      return false;
+    }
+
+    // 檢查訂位開始時間是否在有效期內（596秒）
+    final validUntil = _helpingReservationStartTime!.add(
+      Duration(seconds: helpingReservationValiditySeconds),
+    );
+    return DateTime.now().isBefore(validUntil);
   }
 
   // 從 SharedPreferences 載入資料
@@ -135,6 +166,21 @@ class UserStatusService with ChangeNotifier {
       // 新增：載入用戶狀態
       _userStatus = prefs.getString(_userStatusKey);
 
+      // 新增：載入幫忙訂位狀態
+      _isHelpingWithReservation =
+          prefs.getBool(_isHelpingWithReservationKey) ?? false;
+
+      // 新增：載入幫忙訂位開始時間
+      final startTimeMillis = prefs.getInt(_helpingReservationStartTimeKey);
+      if (startTimeMillis != null) {
+        _helpingReservationStartTime = DateTime.fromMillisecondsSinceEpoch(
+          startTimeMillis,
+        );
+      }
+
+      // 新增：載入用餐人數
+      _attendees = prefs.getInt(_attendeesKey);
+
       debugPrint('從持久化儲存中載入 UserStatusService 資料:');
       if (_confirmedDinnerTime != null) {
         debugPrint('- 聚餐時間: $formattedDinnerTime');
@@ -160,6 +206,20 @@ class UserStatusService with ChangeNotifier {
       }
       if (_userStatus != null) {
         debugPrint('- 用戶狀態: $_userStatus');
+      }
+      if (_isHelpingWithReservation) {
+        debugPrint('- 正在幫忙訂位');
+        if (_helpingReservationStartTime != null) {
+          final isValid = isHelpingReservationValid;
+          final formattedTime = DateFormat(
+            'yyyy-MM-dd HH:mm:ss',
+          ).format(_helpingReservationStartTime!);
+          debugPrint('- 幫忙訂位開始時間: $formattedTime, 是否有效: $isValid');
+        }
+      }
+
+      if (_attendees != null) {
+        debugPrint('- 用餐人數: $_attendees');
       }
 
       notifyListeners();
@@ -260,6 +320,29 @@ class UserStatusService with ChangeNotifier {
         await prefs.remove(_userStatusKey);
       }
 
+      // 新增：儲存幫忙訂位狀態
+      await prefs.setBool(
+        _isHelpingWithReservationKey,
+        _isHelpingWithReservation,
+      );
+
+      // 新增：儲存幫忙訂位開始時間
+      if (_helpingReservationStartTime != null) {
+        await prefs.setInt(
+          _helpingReservationStartTimeKey,
+          _helpingReservationStartTime!.millisecondsSinceEpoch,
+        );
+      } else {
+        await prefs.remove(_helpingReservationStartTimeKey);
+      }
+
+      // 儲存用餐人數
+      if (_attendees != null) {
+        await prefs.setInt(_attendeesKey, _attendees!);
+      } else {
+        await prefs.remove(_attendeesKey);
+      }
+
       debugPrint('成功將 UserStatusService 資料儲存到持久化儲存');
     } catch (e) {
       debugPrint('儲存 UserStatusService 資料時出錯: $e');
@@ -270,6 +353,40 @@ class UserStatusService with ChangeNotifier {
   void setUserStatus(String status) {
     if (_userStatus != status) {
       _userStatus = status;
+      _saveToPrefs();
+      notifyListeners();
+    }
+  }
+
+  // 設置幫忙訂位狀態
+  void setHelpingWithReservation(bool isHelping) {
+    if (_isHelpingWithReservation != isHelping) {
+      _isHelpingWithReservation = isHelping;
+
+      // 當設置為true時，同時設置開始時間
+      if (isHelping) {
+        _helpingReservationStartTime = DateTime.now();
+        debugPrint(
+          '設置幫忙訂位開始時間: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_helpingReservationStartTime!)}',
+        );
+      } else {
+        _helpingReservationStartTime = null;
+        debugPrint('清除幫忙訂位開始時間');
+      }
+
+      _saveToPrefs();
+      notifyListeners();
+      debugPrint('已更新幫忙訂位狀態為: $isHelping');
+    }
+  }
+
+  // 更新幫忙訂位開始時間
+  void updateHelpingReservationStartTime() {
+    if (_isHelpingWithReservation) {
+      _helpingReservationStartTime = DateTime.now();
+      debugPrint(
+        '更新幫忙訂位開始時間: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_helpingReservationStartTime!)}',
+      );
       _saveToPrefs();
       notifyListeners();
     }
@@ -286,6 +403,9 @@ class UserStatusService with ChangeNotifier {
     String? eventStatus,
     String? reservationName,
     String? reservationPhone,
+    bool? isHelpingWithReservation,
+    DateTime? helpingReservationStartTime,
+    int? attendees, // 新增用餐人數參數
   }) {
     bool changed = false;
     if (confirmedDinnerTime != null &&
@@ -347,6 +467,42 @@ class UserStatusService with ChangeNotifier {
       }
     }
 
+    // 新增：更新幫忙訂位狀態
+    if (isHelpingWithReservation != null &&
+        _isHelpingWithReservation != isHelpingWithReservation) {
+      _isHelpingWithReservation = isHelpingWithReservation;
+
+      // 當設置為true時，同時設置開始時間
+      if (isHelpingWithReservation && helpingReservationStartTime == null) {
+        _helpingReservationStartTime = DateTime.now();
+        debugPrint(
+          '在updateStatus中設置幫忙訂位開始時間: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_helpingReservationStartTime!)}',
+        );
+      } else if (!isHelpingWithReservation) {
+        _helpingReservationStartTime = null;
+        debugPrint('在updateStatus中清除幫忙訂位開始時間');
+      }
+
+      changed = true;
+      debugPrint('已更新幫忙訂位狀態為: $isHelpingWithReservation');
+    }
+
+    // 新增：更新幫忙訂位開始時間
+    if (helpingReservationStartTime != null &&
+        _helpingReservationStartTime != helpingReservationStartTime) {
+      _helpingReservationStartTime = helpingReservationStartTime;
+      changed = true;
+      debugPrint(
+        '已更新幫忙訂位開始時間: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_helpingReservationStartTime!)}',
+      );
+    }
+
+    // 更新用餐人數
+    if (attendees != null) {
+      _attendees = attendees;
+      debugPrint('已更新用餐人數: $attendees');
+    }
+
     if (changed) {
       _saveToPrefs();
       notifyListeners();
@@ -365,6 +521,9 @@ class UserStatusService with ChangeNotifier {
     _eventStatus = null;
     _reservationName = null;
     _reservationPhone = null;
+    _isHelpingWithReservation = false;
+    _helpingReservationStartTime = null;
+    _attendees = null;
 
     await _saveToPrefs();
     notifyListeners();
