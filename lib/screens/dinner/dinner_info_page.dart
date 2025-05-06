@@ -1217,6 +1217,8 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                           color: const Color(0xFF23456B),
                           fontWeight: FontWeight.bold,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
                       ),
 
                       SizedBox(height: 5.h),
