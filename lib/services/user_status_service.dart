@@ -166,16 +166,36 @@ class UserStatusService with ChangeNotifier {
       // 新增：載入用戶狀態
       _userStatus = prefs.getString(_userStatusKey);
 
-      // 新增：載入幫忙訂位狀態
-      _isHelpingWithReservation =
-          prefs.getBool(_isHelpingWithReservationKey) ?? false;
-
-      // 新增：載入幫忙訂位開始時間
+      // 新增：載入幫忙訂位開始時間（需要在載入訂位狀態前先載入時間戳）
       final startTimeMillis = prefs.getInt(_helpingReservationStartTimeKey);
       if (startTimeMillis != null) {
         _helpingReservationStartTime = DateTime.fromMillisecondsSinceEpoch(
           startTimeMillis,
         );
+      }
+
+      // 新增：載入幫忙訂位狀態，並檢查時間有效性
+      _isHelpingWithReservation =
+          prefs.getBool(_isHelpingWithReservationKey) ?? false;
+
+      // 如果標記為正在幫忙訂位，但時間戳無效或已過期，則重置狀態
+      if (_isHelpingWithReservation) {
+        bool isValid = false;
+        if (_helpingReservationStartTime != null) {
+          final validUntil = _helpingReservationStartTime!.add(
+            Duration(seconds: helpingReservationValiditySeconds),
+          );
+          isValid = DateTime.now().isBefore(validUntil);
+        }
+
+        if (!isValid) {
+          debugPrint('幫忙訂位狀態已過期，重置狀態');
+          _isHelpingWithReservation = false;
+          _helpingReservationStartTime = null;
+          // 立即保存更新後的狀態
+          await prefs.setBool(_isHelpingWithReservationKey, false);
+          await prefs.remove(_helpingReservationStartTimeKey);
+        }
       }
 
       // 新增：載入用餐人數
@@ -358,26 +378,27 @@ class UserStatusService with ChangeNotifier {
     }
   }
 
-  // 設置幫忙訂位狀態
-  void setHelpingWithReservation(bool isHelping) {
-    if (_isHelpingWithReservation != isHelping) {
-      _isHelpingWithReservation = isHelping;
+  // 設置用戶是否正在幫忙訂位
+  void setHelpingWithReservation(bool value, {bool updateStartTime = true}) {
+    _isHelpingWithReservation = value;
 
-      // 當設置為true時，同時設置開始時間
-      if (isHelping) {
-        _helpingReservationStartTime = DateTime.now();
-        debugPrint(
-          '設置幫忙訂位開始時間: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_helpingReservationStartTime!)}',
-        );
-      } else {
-        _helpingReservationStartTime = null;
-        debugPrint('清除幫忙訂位開始時間');
-      }
-
-      _saveToPrefs();
-      notifyListeners();
-      debugPrint('已更新幫忙訂位狀態為: $isHelping');
+    // 當設置為true且updateStartTime為true時，更新開始時間
+    if (value && updateStartTime) {
+      _helpingReservationStartTime = DateTime.now();
+      debugPrint(
+        '設置用戶正在幫忙訂位，並更新開始時間為: ${_helpingReservationStartTime!.toIso8601String()}',
+      );
+    } else if (!value) {
+      // 當設置為false時，清除開始時間
+      _helpingReservationStartTime = null;
+      debugPrint('重置用戶幫忙訂位狀態和開始時間');
+    } else {
+      debugPrint('設置用戶正在幫忙訂位，但不更新開始時間');
     }
+
+    // 保存狀態
+    _saveToPrefs();
+    notifyListeners();
   }
 
   // 更新幫忙訂位開始時間

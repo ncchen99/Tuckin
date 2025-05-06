@@ -499,12 +499,18 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         // 檢查用戶是否正在幫忙訂位，如果是且事件狀態為confirming，則導航到餐廳預訂頁面
         if (mounted &&
             userStatusService.isHelpingWithReservation &&
-            userStatusService.isHelpingReservationValid &&
             dinnerEventStatus == 'confirming') {
-          debugPrint('用戶正在幫忙訂位且事件狀態為confirming，導航到餐廳預訂頁面');
-          Future.microtask(
-            () => _navigationService.navigateToRestaurantReservation(context),
-          );
+          // 檢查幫忙訂位時間是否有效
+          if (userStatusService.isHelpingReservationValid) {
+            debugPrint('用戶正在幫忙訂位且事件狀態為confirming，時間戳有效，導航到餐廳預訂頁面');
+            Future.microtask(
+              () => _navigationService.navigateToRestaurantReservation(context),
+            );
+          } else {
+            debugPrint('幫忙訂位時間已過期，不自動導航到餐廳預訂頁面');
+            // 重置幫忙訂位狀態
+            userStatusService.setHelpingWithReservation(false);
+          }
         }
       } else {
         if (!mounted) {

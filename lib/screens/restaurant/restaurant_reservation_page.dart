@@ -625,29 +625,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                 try {
                   Navigator.of(dialogContext).pop();
 
-                  // 顯示加載中對話框
-                  if (mounted) {
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (BuildContext context) {
-                        return const AlertDialog(
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CircularProgressIndicator(),
-                              SizedBox(height: 16),
-                              Text(
-                                '正在提交預訂資訊...',
-                                style: TextStyle(fontFamily: 'OtsutomeFont'),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  }
-
                   // 獲取輸入的預訂資訊
                   final reservationName = nameController.text.trim();
                   final reservationPhone = phoneController.text.trim();
@@ -658,11 +635,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                     reservationName: reservationName,
                     reservationPhone: reservationPhone,
                   );
-
-                  // 關閉加載中對話框
-                  if (mounted) {
-                    Navigator.of(context).pop();
-                  }
 
                   // 更新UserStatusService中的資訊
                   if (mounted) {
@@ -695,12 +667,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                 } catch (e) {
                   debugPrint('確認餐廳預訂時出錯: $e');
                   if (mounted) {
-                    // 關閉加載中對話框（如果存在）
-                    Navigator.of(
-                      context,
-                      rootNavigator: true,
-                    ).popUntil((route) => route.isFirst);
-
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
