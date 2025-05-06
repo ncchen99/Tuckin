@@ -6,6 +6,7 @@ import 'package:tuckin/utils/index.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/services/user_status_service.dart';
 import 'package:provider/provider.dart';
+import 'package:tuckin/services/dining_service.dart';
 
 class DinnerInfoPage extends StatefulWidget {
   const DinnerInfoPage({super.key});
@@ -21,6 +22,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   bool _isLoading = true;
   bool _isPageMounted = false; // 追蹤頁面是否完全掛載
   String _userStatus = ''; // 用戶當前狀態
+  bool _hasShownBookingDialog = false; // 追蹤是否已顯示過訂位對話框
 
   // 聚餐相關資訊
   final Map<String, dynamic> _dinnerInfo = {};
@@ -47,6 +49,186 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           _isPageMounted = true;
         });
         debugPrint('DinnerInfoPage 完全渲染');
+
+        // 在頁面掛載完成後檢查餐廳確認狀態
+        _checkPendingConfirmation();
+      }
+    });
+  }
+
+  // 檢查是否需要顯示幫忙訂位對話框
+  void _checkPendingConfirmation() {
+    // 延遲4秒後執行，確保UI已完全渲染
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted &&
+          _dinnerEventStatus == 'pending_confirmation' &&
+          !_hasShownBookingDialog) {
+        _showBookingConfirmationDialog();
+      }
+    });
+  }
+
+  // 顯示幫忙訂位確認對話框
+  void _showBookingConfirmationDialog() {
+    // 設置已顯示對話框標記，僅表示系統自動顯示對話框時不要重複顯示
+    setState(() {
+      _hasShownBookingDialog = true;
+    });
+
+    showCustomConfirmationDialog(
+      context: context,
+      iconPath: 'assets/images/icon/reservation.png',
+      title: '',
+      content: '你願意幫忙確認餐廳營業時間，\n並協助訂位嗎？',
+      cancelButtonText: '不要',
+      confirmButtonText: '好哇',
+      onCancel: () {
+        // 用戶點擊"不要"時，重置標記，允許再次點擊卡片顯示對話框
+        setState(() {
+          _hasShownBookingDialog = false;
+        });
+        Navigator.of(context).pop();
+      },
+      onConfirm: () async {
+        try {
+          // 1. 先從資料庫獲取當前用戶的最新聚餐事件資訊
+          final currentUser = await _authService.getCurrentUser();
+          if (currentUser == null) {
+            throw Exception('用戶未登入');
+          }
+
+          // 從資料庫獲取最新的聚餐事件資訊
+          final diningEvent = await _databaseService.getCurrentDiningEvent(
+            currentUser.id,
+          );
+
+          if (diningEvent == null) {
+            throw Exception('未找到當前聚餐事件');
+          }
+
+          // 2. 更新本地狀態變數
+          final latestStatus = diningEvent['status'];
+          debugPrint('從資料庫獲取到的最新聚餐狀態: $latestStatus，原狀態: $_dinnerEventStatus');
+
+          // 3. 根據最新聚餐事件狀態採取不同行動
+          switch (latestStatus) {
+            case 'pending_confirmation':
+              final diningEventId = diningEvent['id'];
+              if (diningEventId == null) {
+                throw Exception('聚餐事件ID無效');
+              }
+
+              // 發送API請求，開始確認餐廳
+              final diningService = DiningService();
+              await diningService.startConfirming(diningEventId);
+
+              // 關閉對話框
+              if (mounted) Navigator.of(context).pop();
+
+              // 導航到餐廳預訂頁面
+              if (mounted) {
+                _navigationService.navigateToRestaurantReservation(context);
+              }
+              break;
+
+            case 'confirming':
+              // 關閉對話框
+              Navigator.of(context).pop();
+
+              // 顯示SnackBar提示其他用戶正在協助訂位
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      '其他用戶正在協助訂位中，請稍候...',
+                      style: TextStyle(fontFamily: 'OtsutomeFont'),
+                    ),
+                  ),
+                );
+              }
+
+              // 更新本地狀態
+              setState(() {
+                _dinnerEventStatus = latestStatus;
+              });
+
+              // 重新加載頁面數據
+              if (mounted) {
+                await _loadUserAndDinnerInfo();
+              }
+              break;
+
+            case 'confirmed':
+              // 關閉對話框
+              Navigator.of(context).pop();
+
+              // 顯示SnackBar提示已經完成訂位
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      '餐廳已由其他用戶協助完成訂位',
+                      style: TextStyle(fontFamily: 'OtsutomeFont'),
+                    ),
+                  ),
+                );
+              }
+
+              // 更新本地狀態
+              setState(() {
+                _dinnerEventStatus = latestStatus;
+              });
+
+              // 重新加載頁面數據
+              if (mounted) {
+                await _loadUserAndDinnerInfo();
+              }
+              break;
+
+            default:
+              // 未知狀態，關閉對話框
+              Navigator.of(context).pop();
+
+              // 更新本地狀態
+              setState(() {
+                _dinnerEventStatus = latestStatus;
+              });
+
+              // 重新加載用戶數據
+              if (mounted) {
+                await _loadUserAndDinnerInfo();
+              }
+              break;
+          }
+        } catch (e) {
+          // 關閉對話框
+          if (mounted) Navigator.of(context).pop();
+
+          // 顯示錯誤提示
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '操作失敗: $e',
+                  style: const TextStyle(fontFamily: 'OtsutomeFont'),
+                ),
+              ),
+            );
+          }
+
+          // 重置標記，允許用戶再次點擊
+          setState(() {
+            _hasShownBookingDialog = false;
+          });
+        }
+      },
+    ).then((_) {
+      // 對話框關閉時檢查頁面是否仍然掛載，然後重置標記
+      // 這將處理用戶點擊空白處關閉對話框的情況
+      if (mounted) {
+        setState(() {
+          _hasShownBookingDialog = false;
+        });
       }
     });
   }
@@ -318,15 +500,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             child: InkWell(
               borderRadius: BorderRadius.circular(15.r),
               onTap: () {
-                // 顯示確認訂位的 SnackBar
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      '感謝您的熱心！目前功能開發中，敬請期待。',
-                      style: TextStyle(fontFamily: 'OtsutomeFont'),
-                    ),
-                  ),
-                );
+                if (!_hasShownBookingDialog) {
+                  _showBookingConfirmationDialog();
+                }
               },
               child: Padding(
                 padding: EdgeInsets.all(15.h),
@@ -363,7 +539,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                     SizedBox(height: 8.h),
                     // 提示內容
                     Text(
-                      '尚未確認餐廳，你願意幫忙訂位嗎?',
+                      '尚未確認餐廳，需要小幫手協助訂位！',
                       style: TextStyle(
                         fontSize: 14.sp,
                         fontFamily: 'OtsutomeFont',
@@ -428,7 +604,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 SizedBox(height: 8.h),
                 // 提示內容
                 Text(
-                  '其他用戶正在幫忙訂位中...',
+                  '正在由其他用戶幫忙訂位中...',
                   style: TextStyle(
                     fontSize: 14.sp,
                     fontFamily: 'OtsutomeFont',
