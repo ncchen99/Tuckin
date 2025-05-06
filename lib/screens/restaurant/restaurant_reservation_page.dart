@@ -543,493 +543,532 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
     // 創建TextEditingController
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
-    bool _isProcessing = false; // 添加狀態變量跟踪按鈕是否在處理中
 
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          // 使用StatefulBuilder以便在對話框內更新狀態
-          builder: (context, setState) {
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              insetPadding: EdgeInsets.symmetric(horizontal: 20.w),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                child: Container(
-                  width: 320.w,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(20.r),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 15,
-                        spreadRadius: 1,
-                        offset: Offset(0, 8.h),
+    // 使用外部變量來控制處理狀態
+    bool isProcessing = false;
+
+    // 封裝顯示對話框的函數，當isProcessing變化時可以重新呼叫
+    Future<void> showProcessingDialog() async {
+      return showDialog<void>(
+        context: context,
+        barrierDismissible: !isProcessing, // 根據處理狀態決定是否可點擊空白處關閉
+        builder: (BuildContext dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return WillPopScope(
+                onWillPop: () async => !isProcessing, // 處理中時禁止返回鍵關閉
+                child: Dialog(
+                  backgroundColor: Colors.transparent,
+                  insetPadding: EdgeInsets.symmetric(horizontal: 20.w),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                    child: Container(
+                      width: 320.w,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(20.r),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 15,
+                            spreadRadius: 1,
+                            offset: Offset(0, 8.h),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(height: 30.h),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(height: 30.h),
 
-                      // 對話框圖標
-                      SizedBox(
-                        width: 55.w,
-                        height: 55.h,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            // 底部陰影
-                            Positioned(
-                              left: 0,
-                              top: 3.h,
-                              child: Image.asset(
-                                'assets/images/icon/checking.png',
-                                width: 55.w,
-                                height: 55.h,
-                                color: Colors.black.withOpacity(0.4),
-                                colorBlendMode: BlendMode.srcIn,
-                              ),
-                            ),
-                            // 主圖像
-                            Positioned(
-                              top: 0,
-                              left: 0,
-                              child: Image.asset(
-                                'assets/images/icon/checking.png',
-                                width: 55.w,
-                                height: 55.h,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: 15.h),
-
-                      // 標題
-                      Text(
-                        '訂位資訊',
-                        style: TextStyle(
-                          fontSize: 20.sp,
-                          fontFamily: 'OtsutomeFont',
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF23456B),
-                        ),
-                      ),
-
-                      // 刪除了說明文字
-                      SizedBox(height: 18.h),
-
-                      // 預訂人姓名輸入框
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 30.w),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(left: 8.w, bottom: 4.h),
-                              child: Text(
-                                '預訂人稱呼',
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontFamily: 'OtsutomeFont',
-                                  color: const Color(0xFF23456B),
-                                  fontWeight: FontWeight.bold,
+                          // 對話框圖標
+                          SizedBox(
+                            width: 55.w,
+                            height: 55.h,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                // 底部陰影
+                                Positioned(
+                                  left: 0,
+                                  top: 3.h,
+                                  child: Image.asset(
+                                    'assets/images/icon/checking.png',
+                                    width: 55.w,
+                                    height: 55.h,
+                                    color: Colors.black.withOpacity(0.4),
+                                    colorBlendMode: BlendMode.srcIn,
+                                  ),
                                 ),
-                              ),
-                            ),
-                            Container(
-                              margin: EdgeInsets.only(bottom: 10.h),
-                              padding: EdgeInsets.only(left: 12.w, right: 8.w),
-                              height: 50.h,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12.r),
-                                border: Border.all(
-                                  color: const Color(0xFF23456B),
-                                  width: 2,
+                                // 主圖像
+                                Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  child: Image.asset(
+                                    'assets/images/icon/checking.png',
+                                    width: 55.w,
+                                    height: 55.h,
+                                  ),
                                 ),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: nameController,
-                                      style: TextStyle(
-                                        fontFamily: 'OtsutomeFont',
-                                        fontSize: 16.sp,
-                                        height: 1.2,
-                                      ),
-                                      decoration: InputDecoration(
-                                        hintText: 'e.g. 陳先生',
-                                        border: InputBorder.none,
-                                        hintStyle: TextStyle(
-                                          color: Colors.grey,
-                                          fontFamily: 'OtsutomeFont',
-                                          fontSize: 14.sp,
-                                          height: 1.2,
-                                        ),
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 15.h,
-                                        ),
-                                        isDense: true,
-                                        alignLabelWithHint: true,
-                                      ),
-                                      textAlignVertical:
-                                          TextAlignVertical.center,
+                              ],
+                            ),
+                          ),
+
+                          SizedBox(height: 15.h),
+
+                          // 標題
+                          Text(
+                            '訂位資訊',
+                            style: TextStyle(
+                              fontSize: 20.sp,
+                              fontFamily: 'OtsutomeFont',
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF23456B),
+                            ),
+                          ),
+
+                          // 刪除了說明文字
+                          SizedBox(height: 18.h),
+
+                          // 預訂人姓名輸入框
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 30.w),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    left: 8.w,
+                                    bottom: 4.h,
+                                  ),
+                                  child: Text(
+                                    '預訂人稱呼',
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(width: 5.w),
-                                  // 帶陰影的圖標
-                                  SizedBox(
-                                    width: 28.w,
-                                    height: 28.h,
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      alignment: Alignment.center,
-                                      children: [
-                                        // 底部陰影圖片
-                                        Positioned(
-                                          left: 0,
-                                          top: 2,
-                                          child: Image.asset(
-                                            'assets/images/icon/user_profile.png',
-                                            width: 25.w,
-                                            height: 25.h,
-                                            fit: BoxFit.contain,
-                                            color: Colors.black.withOpacity(
-                                              0.4,
+                                ),
+                                Container(
+                                  margin: EdgeInsets.only(bottom: 10.h),
+                                  padding: EdgeInsets.only(
+                                    left: 12.w,
+                                    right: 8.w,
+                                  ),
+                                  height: 50.h,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    border: Border.all(
+                                      color: const Color(0xFF23456B),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: nameController,
+                                          style: TextStyle(
+                                            fontFamily: 'OtsutomeFont',
+                                            fontSize: 16.sp,
+                                            height: 1.2,
+                                          ),
+                                          decoration: InputDecoration(
+                                            hintText: 'e.g. 陳先生',
+                                            border: InputBorder.none,
+                                            hintStyle: TextStyle(
+                                              color: Colors.grey,
+                                              fontFamily: 'OtsutomeFont',
+                                              fontSize: 14.sp,
+                                              height: 1.2,
                                             ),
-                                            colorBlendMode: BlendMode.srcIn,
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  vertical: 15.h,
+                                                ),
+                                            isDense: true,
+                                            alignLabelWithHint: true,
                                           ),
+                                          textAlignVertical:
+                                              TextAlignVertical.center,
                                         ),
-                                        // 圖片主圖層
-                                        Positioned(
-                                          left: 0,
-                                          top: 0,
-                                          child: Image.asset(
-                                            'assets/images/icon/user_profile.png',
-                                            width: 25.w,
-                                            height: 25.h,
-                                            fit: BoxFit.contain,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      // 聯絡電話輸入框
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 30.w),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(left: 8.w, bottom: 4.h),
-                              child: Text(
-                                '電話末三碼',
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontFamily: 'OtsutomeFont',
-                                  color: const Color(0xFF23456B),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              margin: EdgeInsets.only(bottom: 15.h),
-                              padding: EdgeInsets.only(left: 12.w, right: 8.w),
-                              height: 50.h,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12.r),
-                                border: Border.all(
-                                  color: const Color(0xFF23456B),
-                                  width: 2,
-                                ),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: phoneController,
-                                      keyboardType: TextInputType.phone,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                      ],
-                                      style: TextStyle(
-                                        fontFamily: 'OtsutomeFont',
-                                        fontSize: 16.sp,
-                                        height: 1.2,
                                       ),
-                                      decoration: InputDecoration(
-                                        hintText: 'e.g. 870',
-                                        border: InputBorder.none,
-                                        hintStyle: TextStyle(
-                                          color: Colors.grey,
-                                          fontFamily: 'OtsutomeFont',
-                                          fontSize: 14.sp,
-                                          height: 1.2,
-                                        ),
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 15.h,
-                                        ),
-                                        isDense: true,
-                                        alignLabelWithHint: true,
-                                      ),
-                                      textAlignVertical:
-                                          TextAlignVertical.center,
-                                    ),
-                                  ),
-                                  SizedBox(width: 5.w),
-                                  // 帶陰影的圖標
-                                  SizedBox(
-                                    width: 28.w,
-                                    height: 28.h,
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      alignment: Alignment.center,
-                                      children: [
-                                        // 底部陰影圖片
-                                        Positioned(
-                                          left: 0,
-                                          top: 2,
-                                          child: Image.asset(
-                                            'assets/images/icon/phone.png',
-                                            width: 25.w,
-                                            height: 25.h,
-                                            fit: BoxFit.contain,
-                                            color: Colors.black.withOpacity(
-                                              0.4,
+                                      SizedBox(width: 5.w),
+                                      // 帶陰影的圖標
+                                      SizedBox(
+                                        width: 28.w,
+                                        height: 28.h,
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          alignment: Alignment.center,
+                                          children: [
+                                            // 底部陰影圖片
+                                            Positioned(
+                                              left: 0,
+                                              top: 2,
+                                              child: Image.asset(
+                                                'assets/images/icon/user_profile.png',
+                                                width: 25.w,
+                                                height: 25.h,
+                                                fit: BoxFit.contain,
+                                                color: Colors.black.withOpacity(
+                                                  0.4,
+                                                ),
+                                                colorBlendMode: BlendMode.srcIn,
+                                              ),
                                             ),
-                                            colorBlendMode: BlendMode.srcIn,
-                                          ),
+                                            // 圖片主圖層
+                                            Positioned(
+                                              left: 0,
+                                              top: 0,
+                                              child: Image.asset(
+                                                'assets/images/icon/user_profile.png',
+                                                width: 25.w,
+                                                height: 25.h,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        // 圖片主圖層
-                                        Positioned(
-                                          left: 0,
-                                          top: 0,
-                                          child: Image.asset(
-                                            'assets/images/icon/phone.png',
-                                            width: 25.w,
-                                            height: 25.h,
-                                            fit: BoxFit.contain,
-                                          ),
-                                        ),
-                                      ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 8.h),
+                          // 聯絡電話輸入框
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 30.w),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    left: 8.w,
+                                    bottom: 4.h,
+                                  ),
+                                  child: Text(
+                                    '電話末三碼',
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: 15.h),
-
-                      // 按鈕區域
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 25.h),
-                        child:
-                            _isProcessing
-                                ? Center(
-                                  child: LoadingImage(
-                                    width: 60.w,
-                                    height: 60.h,
-                                    color: const Color(0xFFB33D1C),
+                                ),
+                                Container(
+                                  margin: EdgeInsets.only(bottom: 15.h),
+                                  padding: EdgeInsets.only(
+                                    left: 12.w,
+                                    right: 8.w,
                                   ),
-                                )
-                                : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    // 左側按鈕 - 不接受訂位
-                                    ImageButton(
-                                      text: '不接受訂位',
-                                      imagePath:
-                                          'assets/images/ui/button/blue_l.png',
-                                      width: 120.w,
-                                      height: 55.h,
-                                      onPressed: () async {
-                                        try {
-                                          // 顯示處理中狀態
-                                          setState(() {
-                                            _isProcessing = true;
-                                          });
+                                  height: 50.h,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    border: Border.all(
+                                      color: const Color(0xFF23456B),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: phoneController,
+                                          keyboardType: TextInputType.phone,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter
+                                                .digitsOnly,
+                                          ],
+                                          style: TextStyle(
+                                            fontFamily: 'OtsutomeFont',
+                                            fontSize: 16.sp,
+                                            height: 1.2,
+                                          ),
+                                          decoration: InputDecoration(
+                                            hintText: 'e.g. 870',
+                                            border: InputBorder.none,
+                                            hintStyle: TextStyle(
+                                              color: Colors.grey,
+                                              fontFamily: 'OtsutomeFont',
+                                              fontSize: 14.sp,
+                                              height: 1.2,
+                                            ),
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  vertical: 15.h,
+                                                ),
+                                            isDense: true,
+                                            alignLabelWithHint: true,
+                                          ),
+                                          textAlignVertical:
+                                              TextAlignVertical.center,
+                                        ),
+                                      ),
+                                      SizedBox(width: 5.w),
+                                      // 帶陰影的圖標
+                                      SizedBox(
+                                        width: 28.w,
+                                        height: 28.h,
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          alignment: Alignment.center,
+                                          children: [
+                                            // 底部陰影圖片
+                                            Positioned(
+                                              left: 0,
+                                              top: 2,
+                                              child: Image.asset(
+                                                'assets/images/icon/phone.png',
+                                                width: 25.w,
+                                                height: 25.h,
+                                                fit: BoxFit.contain,
+                                                color: Colors.black.withOpacity(
+                                                  0.4,
+                                                ),
+                                                colorBlendMode: BlendMode.srcIn,
+                                              ),
+                                            ),
+                                            // 圖片主圖層
+                                            Positioned(
+                                              left: 0,
+                                              top: 0,
+                                              child: Image.asset(
+                                                'assets/images/icon/phone.png',
+                                                width: 25.w,
+                                                height: 25.h,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
 
-                                          // 使用空字符串作為訂位資訊
-                                          final response = await diningService
-                                              .confirmRestaurant(
-                                                eventId,
-                                                reservationName: "",
-                                                reservationPhone: "",
-                                              );
+                          SizedBox(height: 15.h),
 
-                                          // 更新UserStatusService中的資訊
-                                          if (mounted) {
-                                            final userStatusService =
-                                                Provider.of<UserStatusService>(
-                                                  context,
-                                                  listen: false,
+                          // 按鈕區域
+                          Padding(
+                            padding: EdgeInsets.only(bottom: 25.h),
+                            child:
+                                isProcessing
+                                    ? Center(
+                                      child: LoadingImage(
+                                        width: 60.w,
+                                        height: 60.h,
+                                        color: const Color(0xFFB33D1C),
+                                      ),
+                                    )
+                                    : Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        // 左側按鈕 - 不接受訂位
+                                        ImageButton(
+                                          text: '不接受訂位',
+                                          imagePath:
+                                              'assets/images/ui/button/blue_l.png',
+                                          width: 120.w,
+                                          height: 55.h,
+                                          onPressed: () async {
+                                            try {
+                                              // 顯示處理中狀態
+                                              setDialogState(() {
+                                                isProcessing = true;
+                                              });
+
+                                              // 使用空字符串作為訂位資訊
+                                              final response =
+                                                  await diningService
+                                                      .confirmRestaurant(
+                                                        eventId,
+                                                        reservationName: "",
+                                                        reservationPhone: "",
+                                                      );
+
+                                              // 更新UserStatusService中的資訊
+                                              if (mounted) {
+                                                final userStatusService =
+                                                    Provider.of<
+                                                      UserStatusService
+                                                    >(context, listen: false);
+
+                                                userStatusService.updateStatus(
+                                                  eventStatus: 'confirmed',
+                                                  reservationName: "",
+                                                  reservationPhone: "",
                                                 );
 
-                                            userStatusService.updateStatus(
-                                              eventStatus: 'confirmed',
-                                              reservationName: "",
-                                              reservationPhone: "",
-                                            );
+                                                // 關閉對話框
+                                                Navigator.of(
+                                                  dialogContext,
+                                                ).pop();
 
-                                            // 關閉對話框
-                                            Navigator.of(dialogContext).pop();
-
-                                            // 顯示成功訊息
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  '已確認不接受訂位',
-                                                  style: TextStyle(
-                                                    fontFamily: 'OtsutomeFont',
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-
-                                            // 導航到下一個頁面
-                                            _navigationService
-                                                .navigateToDinnerInfo(context);
-                                          }
-                                        } catch (e) {
-                                          // 重置處理狀態
-                                          setState(() {
-                                            _isProcessing = false;
-                                          });
-
-                                          _handleApiError(dialogContext, e);
-                                        }
-                                      },
-                                      textStyle: TextStyle(
-                                        color: Colors.white,
-                                        fontFamily: 'OtsutomeFont',
-                                        fontSize: 14.sp,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-
-                                    SizedBox(width: 20.w),
-
-                                    // 右側按鈕 - 已訂位
-                                    ImageButton(
-                                      text: '已訂位',
-                                      imagePath:
-                                          'assets/images/ui/button/red_m.png',
-                                      width: 120.w,
-                                      height: 55.h,
-                                      onPressed: () async {
-                                        try {
-                                          // 顯示處理中狀態
-                                          setState(() {
-                                            _isProcessing = true;
-                                          });
-
-                                          // 獲取輸入的預訂資訊
-                                          final reservationName =
-                                              nameController.text.trim();
-                                          final reservationPhone =
-                                              phoneController.text.trim();
-
-                                          // 調用API確認餐廳預訂
-                                          final response = await diningService
-                                              .confirmRestaurant(
-                                                eventId,
-                                                reservationName:
-                                                    reservationName,
-                                                reservationPhone:
-                                                    reservationPhone,
-                                              );
-
-                                          // 更新UserStatusService中的資訊
-                                          if (mounted) {
-                                            final userStatusService =
-                                                Provider.of<UserStatusService>(
+                                                // 顯示成功訊息
+                                                ScaffoldMessenger.of(
                                                   context,
-                                                  listen: false,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      '已確認不接受訂位',
+                                                      style: TextStyle(
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                      ),
+                                                    ),
+                                                  ),
                                                 );
 
-                                            userStatusService.updateStatus(
-                                              eventStatus: 'confirmed',
-                                              reservationName: reservationName,
-                                              reservationPhone:
-                                                  reservationPhone,
-                                            );
+                                                // 導航到下一個頁面
+                                                _navigationService
+                                                    .navigateToDinnerInfo(
+                                                      context,
+                                                    );
+                                              }
+                                            } catch (e) {
+                                              // 重置處理狀態
+                                              setDialogState(() {
+                                                isProcessing = false;
+                                              });
 
-                                            debugPrint(
-                                              '已更新聚餐事件狀態為confirmed，預訂人：$reservationName',
-                                            );
+                                              _handleApiError(dialogContext, e);
+                                            }
+                                          },
+                                          textStyle: TextStyle(
+                                            color: Colors.white,
+                                            fontFamily: 'OtsutomeFont',
+                                            fontSize: 14.sp,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
 
-                                            // 關閉對話框
-                                            Navigator.of(dialogContext).pop();
+                                        SizedBox(width: 20.w),
 
-                                            // 顯示成功訊息
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  '餐廳預訂資訊已確認',
-                                                  style: TextStyle(
-                                                    fontFamily: 'OtsutomeFont',
+                                        // 右側按鈕 - 已訂位
+                                        ImageButton(
+                                          text: '已訂位',
+                                          imagePath:
+                                              'assets/images/ui/button/red_m.png',
+                                          width: 120.w,
+                                          height: 55.h,
+                                          onPressed: () async {
+                                            try {
+                                              // 顯示處理中狀態
+                                              setDialogState(() {
+                                                isProcessing = true;
+                                              });
+
+                                              // 獲取輸入的預訂資訊
+                                              final reservationName =
+                                                  nameController.text.trim();
+                                              final reservationPhone =
+                                                  phoneController.text.trim();
+
+                                              // 調用API確認餐廳預訂
+                                              final response =
+                                                  await diningService
+                                                      .confirmRestaurant(
+                                                        eventId,
+                                                        reservationName:
+                                                            reservationName,
+                                                        reservationPhone:
+                                                            reservationPhone,
+                                                      );
+
+                                              // 更新UserStatusService中的資訊
+                                              if (mounted) {
+                                                final userStatusService =
+                                                    Provider.of<
+                                                      UserStatusService
+                                                    >(context, listen: false);
+
+                                                userStatusService.updateStatus(
+                                                  eventStatus: 'confirmed',
+                                                  reservationName:
+                                                      reservationName,
+                                                  reservationPhone:
+                                                      reservationPhone,
+                                                );
+
+                                                debugPrint(
+                                                  '已更新聚餐事件狀態為confirmed，預訂人：$reservationName',
+                                                );
+
+                                                // 關閉對話框
+                                                Navigator.of(
+                                                  dialogContext,
+                                                ).pop();
+
+                                                // 顯示成功訊息
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      '餐廳預訂資訊已確認',
+                                                      style: TextStyle(
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              ),
-                                            );
+                                                );
 
-                                            // 導航到下一個頁面
-                                            _navigationService
-                                                .navigateToDinnerInfo(context);
-                                          }
-                                        } catch (e) {
-                                          // 重置處理狀態
-                                          setState(() {
-                                            _isProcessing = false;
-                                          });
+                                                // 導航到下一個頁面
+                                                _navigationService
+                                                    .navigateToDinnerInfo(
+                                                      context,
+                                                    );
+                                              }
+                                            } catch (e) {
+                                              // 重置處理狀態
+                                              setDialogState(() {
+                                                isProcessing = false;
+                                              });
 
-                                          _handleApiError(dialogContext, e);
-                                        }
-                                      },
-                                      textStyle: TextStyle(
-                                        color: Colors.white,
-                                        fontFamily: 'OtsutomeFont',
-                                        fontSize: 14.sp,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                              _handleApiError(dialogContext, e);
+                                            }
+                                          },
+                                          textStyle: TextStyle(
+                                            color: Colors.white,
+                                            fontFamily: 'OtsutomeFont',
+                                            fontSize: 14.sp,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-    );
+              );
+            },
+          );
+        },
+      );
+    }
+
+    // 呼叫顯示對話框
+    return showProcessingDialog();
   }
 
   Future<void> _handleCannotReserve() async {
@@ -1053,6 +1092,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
         content: '確定要更換另一家餐廳嗎？系統將從候選餐廳中選擇下一間！',
         cancelButtonText: '取消',
         confirmButtonText: '確定',
+        barrierDismissible: true, // 正常狀態可點擊空白處關閉
         onCancel: () {
           Navigator.of(context).pop(false);
         },

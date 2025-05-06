@@ -37,7 +37,7 @@
         - [x] 若不願意，pass
 - [x] [前端] 餐廳確認頁面(幫忙檢查營業時間，可以的話幫忙定位)
     - [x] 十分鐘跳轉功能，按這間無法重新跳轉，縱使離開APP再回來，還是惠在正確的時間重新跳轉
-    - [ ] 若確認，跳出輸入訂位資料的對話框，更新餐廳狀態
+    - [x] 若確認，跳出輸入訂位資料的對話框，更新餐廳狀態
     - [x] 若不確認，此頁面換新餐廳，請用戶再確認一下
 - [ ] [前端] 評分葉面
     - [ ] 進入頁面時檢查dining event狀態，如果狀態為pending_confirmation，則跳轉至餐廳確認頁面
@@ -53,7 +53,7 @@
 - [x] [API] 刪除非必要端點
 - [x] [API] 刪除週期資料 rating_sessions、restaurant_votes、matching_groups、dining_events、user_matching_info，遷移 dining_events 資料(包含 ids)
 - [ ] [API] 定時 API 們加入時間檢查
-- [ ] [前端] 音樂會暫停的問題
+- [?] [前端] 音樂會暫停的問題
 
 ** optional **
 - [ ] [API] 後端定時提醒用戶取消預約
