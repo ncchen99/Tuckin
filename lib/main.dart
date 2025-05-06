@@ -209,6 +209,12 @@ void main() async {
       debugShowCheckedModeBanner: false,
       home: LoadingScreen(
         status: '正在初始化...',
+        statusTextStyle: TextStyle(
+          fontSize: 12,
+          color: const Color(0xFF23456B),
+          fontFamily: 'OtsutomeFont',
+          fontWeight: FontWeight.bold,
+        ),
         displayDuration: 500, // 延長顯示時間為 0.5 秒
         onLoadingComplete: () async {
           // 在 LoadingScreen 顯示時，進行所有初始化操作

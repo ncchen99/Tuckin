@@ -5,6 +5,7 @@ import 'package:tuckin/services/supabase_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:math';
 
 /// 聚餐服務 - 處理聚餐事件相關的API請求
 class DiningService {
@@ -212,6 +213,179 @@ class DiningService {
       return response;
     } catch (e) {
       debugPrint('獲取聚餐事件詳情錯誤: $e');
+      rethrow;
+    }
+  }
+
+  /// 獲取評分表單
+  ///
+  /// 獲取需要評分的參與者列表（不含用戶ID）
+  /// 僅當聚餐事件狀態為 completed 時才允許評分
+  Future<Map<String, dynamic>> getRatingForm(String diningEventId) async {
+    try {
+      debugPrint('獲取評分表單，聚餐事件ID: $diningEventId');
+
+      // 獲取當前用戶認證
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null) {
+        throw Exception('用戶未登入');
+      }
+
+      // 獲取 session
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) {
+        throw Exception('無法獲取用戶登入資訊，請重新登入');
+      }
+
+      // 構建API請求
+      final endpoint = '/dining/ratings/form';
+      final apiUrl = '${_apiService.baseUrl}$endpoint';
+
+      // 發送POST請求
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.accessToken}',
+        },
+        body: jsonEncode({'dining_event_id': diningEventId}),
+      );
+
+      // 檢查回應狀態
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // 成功發送請求
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        debugPrint('獲取評分表單成功: $responseData');
+
+        // 儲存 session_token 用於後續評分提交
+        final sessionToken = responseData['session_token'] ?? '';
+
+        // 處理參與者列表格式，轉換為前端使用的格式
+        final List participants = responseData['participants'] ?? [];
+        final List<Map<String, dynamic>> formattedParticipants =
+            participants.map((participant) {
+              // 為每個參與者分配隨機的性別和頭像索引（僅用於UI顯示）
+              final bool isMale = Random().nextBool();
+              final int avatarIndex = Random().nextInt(6) + 1; // 假設有 1-8 個頭像選項
+
+              return {
+                'id': participant['index'].toString(),
+                'nickname': participant['nickname'],
+                'gender': isMale ? 'male' : 'female',
+                'avatar_index': avatarIndex,
+                'selectedRating': null,
+                'index': participant['index'], // 保留原始索引用於提交
+              };
+            }).toList();
+
+        // 返回給前端使用的格式
+        return {
+          'session_token': sessionToken,
+          'participants': formattedParticipants,
+          'success': responseData['success'] ?? false,
+          'message': responseData['message'] ?? '獲取評分表單成功',
+        };
+      } else {
+        // 請求失敗
+        String errorMessage;
+        try {
+          final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+          errorMessage = errorData['detail'] ?? '操作失敗 (${response.statusCode})';
+        } catch (_) {
+          errorMessage = '操作失敗 (${response.statusCode})';
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      debugPrint('獲取評分表單錯誤: $e');
+      rethrow;
+    }
+  }
+
+  /// 提交評分
+  ///
+  /// 提交用戶對聚餐參與者的評分
+  Future<Map<String, dynamic>> submitRating(
+    String diningEventId,
+    List<Map<String, dynamic>> ratings,
+    String sessionToken,
+  ) async {
+    try {
+      debugPrint('提交評分，聚餐事件ID: $diningEventId，評分數據: $ratings');
+
+      // 獲取當前用戶認證
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null) {
+        throw Exception('用戶未登入');
+      }
+
+      // 獲取 session
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) {
+        throw Exception('無法獲取用戶登入資訊，請重新登入');
+      }
+
+      // 將前端的評分格式轉換為API需要的格式
+      final List<Map<String, dynamic>> formattedRatings =
+          ratings.map((rating) {
+            // 轉換評分類型
+            String ratingType;
+            switch (rating['rating']) {
+              case '喜歡':
+                ratingType = 'like';
+                break;
+              case '不喜歡':
+                ratingType = 'dislike';
+                break;
+              case '未出席':
+                ratingType = 'no_show';
+                break;
+              default:
+                ratingType = 'like'; // 默認值
+            }
+
+            return {
+              'index': int.parse(rating['participant_id']), // 使用參與者的index
+              'rating_type': ratingType,
+            };
+          }).toList();
+
+      // 構建API請求
+      final endpoint = '/dining/ratings/submit';
+      final apiUrl = '${_apiService.baseUrl}$endpoint';
+
+      // 發送POST請求
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.accessToken}',
+        },
+        body: jsonEncode({
+          'session_token': sessionToken, // 只需要session_token和ratings
+          'ratings': formattedRatings,
+        }),
+      );
+
+      // 檢查回應狀態
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // 成功發送請求
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        debugPrint('提交評分成功: $responseData');
+        return responseData;
+      } else {
+        // 請求失敗
+        String errorMessage;
+        try {
+          final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+          errorMessage = errorData['detail'] ?? '操作失敗 (${response.statusCode})';
+        } catch (_) {
+          errorMessage = '操作失敗 (${response.statusCode})';
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      debugPrint('提交評分錯誤: $e');
       rethrow;
     }
   }
