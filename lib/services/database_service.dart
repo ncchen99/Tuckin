@@ -499,7 +499,7 @@ class DatabaseService {
             .select()
             .inFilter('id', restaurantIds);
 
-        if (restaurantsData == null || restaurantsData.isEmpty) {
+        if (restaurantsData.isEmpty) {
           debugPrint('未找到任何餐廳資訊');
           return [];
         }

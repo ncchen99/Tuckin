@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -146,7 +145,7 @@ class _RestaurantCardState extends State<RestaurantCard>
                           Row(
                             children: [
                               Expanded(
-                                child: Container(
+                                child: SizedBox(
                                   // 當有投票標籤時，限制文字寬度
                                   width:
                                       (_effectiveVoteCount > 0)

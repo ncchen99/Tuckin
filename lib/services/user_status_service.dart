@@ -14,6 +14,12 @@ class UserStatusService with ChangeNotifier {
   String? _diningEventId;
   Map<String, dynamic>? _restaurantInfo;
 
+  // 新增餐廳預訂相關欄位
+  String? _eventStatus; // 聚餐事件狀態
+  String? _reservationName; // 預訂人姓名
+  String? _reservationPhone; // 預訂人電話
+  String? _userStatus; // 用戶狀態
+
   // SharedPreferences 的鍵值
   static const String _confirmedDinnerTimeKey = 'confirmed_dinner_time';
   static const String _dinnerRestaurantIdKey = 'dinner_restaurant_id';
@@ -24,6 +30,10 @@ class UserStatusService with ChangeNotifier {
   static const String _matchingGroupIdKey = 'matching_group_id';
   static const String _diningEventIdKey = 'dining_event_id';
   static const String _restaurantInfoKey = 'restaurant_info';
+  static const String _eventStatusKey = 'event_status';
+  static const String _reservationNameKey = 'reservation_name';
+  static const String _reservationPhoneKey = 'reservation_phone';
+  static const String _userStatusKey = 'user_status';
 
   UserStatusService() {
     _loadFromPrefs();
@@ -40,6 +50,10 @@ class UserStatusService with ChangeNotifier {
   String? get matchingGroupId => _matchingGroupId;
   String? get diningEventId => _diningEventId;
   Map<String, dynamic>? get restaurantInfo => _restaurantInfo;
+  String? get eventStatus => _eventStatus;
+  String? get reservationName => _reservationName;
+  String? get reservationPhone => _reservationPhone;
+  String? get userStatus => _userStatus;
 
   // 格式化日期時間為可讀字符串
   String get formattedDinnerTime {
@@ -109,6 +123,18 @@ class UserStatusService with ChangeNotifier {
         }
       }
 
+      // 新增：載入聚餐事件狀態
+      _eventStatus = prefs.getString(_eventStatusKey);
+
+      // 新增：載入預訂人姓名
+      _reservationName = prefs.getString(_reservationNameKey);
+
+      // 新增：載入預訂人電話
+      _reservationPhone = prefs.getString(_reservationPhoneKey);
+
+      // 新增：載入用戶狀態
+      _userStatus = prefs.getString(_userStatusKey);
+
       debugPrint('從持久化儲存中載入 UserStatusService 資料:');
       if (_confirmedDinnerTime != null) {
         debugPrint('- 聚餐時間: $formattedDinnerTime');
@@ -125,6 +151,15 @@ class UserStatusService with ChangeNotifier {
       }
       if (_restaurantInfo != null) {
         debugPrint('- 餐廳信息已載入');
+      }
+      if (_eventStatus != null) {
+        debugPrint('- 聚餐事件狀態: $_eventStatus');
+      }
+      if (_reservationName != null) {
+        debugPrint('- 預訂人姓名: $_reservationName');
+      }
+      if (_userStatus != null) {
+        debugPrint('- 用戶狀態: $_userStatus');
       }
 
       notifyListeners();
@@ -197,9 +232,46 @@ class UserStatusService with ChangeNotifier {
         await prefs.remove(_restaurantInfoKey);
       }
 
+      // 新增：儲存聚餐事件狀態
+      if (_eventStatus != null) {
+        await prefs.setString(_eventStatusKey, _eventStatus!);
+      } else {
+        await prefs.remove(_eventStatusKey);
+      }
+
+      // 新增：儲存預訂人姓名
+      if (_reservationName != null) {
+        await prefs.setString(_reservationNameKey, _reservationName!);
+      } else {
+        await prefs.remove(_reservationNameKey);
+      }
+
+      // 新增：儲存預訂人電話
+      if (_reservationPhone != null) {
+        await prefs.setString(_reservationPhoneKey, _reservationPhone!);
+      } else {
+        await prefs.remove(_reservationPhoneKey);
+      }
+
+      // 新增：儲存用戶狀態
+      if (_userStatus != null) {
+        await prefs.setString(_userStatusKey, _userStatus!);
+      } else {
+        await prefs.remove(_userStatusKey);
+      }
+
       debugPrint('成功將 UserStatusService 資料儲存到持久化儲存');
     } catch (e) {
       debugPrint('儲存 UserStatusService 資料時出錯: $e');
+    }
+  }
+
+  // 設置用戶狀態
+  void setUserStatus(String status) {
+    if (_userStatus != status) {
+      _userStatus = status;
+      _saveToPrefs();
+      notifyListeners();
     }
   }
 
@@ -211,6 +283,9 @@ class UserStatusService with ChangeNotifier {
     String? matchingGroupId,
     String? diningEventId,
     Map<String, dynamic>? restaurantInfo,
+    String? eventStatus,
+    String? reservationName,
+    String? reservationPhone,
   }) {
     bool changed = false;
     if (confirmedDinnerTime != null &&
@@ -244,7 +319,25 @@ class UserStatusService with ChangeNotifier {
       changed = true;
     }
 
-    // 新增：更新餐廳詳細信息
+    // 新增：更新聚餐事件狀態
+    if (eventStatus != null && _eventStatus != eventStatus) {
+      _eventStatus = eventStatus;
+      changed = true;
+    }
+
+    // 新增：更新預訂人姓名
+    if (reservationName != null && _reservationName != reservationName) {
+      _reservationName = reservationName;
+      changed = true;
+    }
+
+    // 新增：更新預訂人電話
+    if (reservationPhone != null && _reservationPhone != reservationPhone) {
+      _reservationPhone = reservationPhone;
+      changed = true;
+    }
+
+    // 更新餐廳詳細信息
     if (restaurantInfo != null) {
       // 由於Map的比較較複雜，這裡簡單判斷是否需要更新
       if (_restaurantInfo == null ||
@@ -255,29 +348,13 @@ class UserStatusService with ChangeNotifier {
     }
 
     if (changed) {
+      _saveToPrefs();
       notifyListeners();
-      _saveToPrefs(); // 當資料更新時儲存到持久化儲存
-      debugPrint('UserStatusService 狀態已更新並持久化:');
-      if (_confirmedDinnerTime != null) {
-        debugPrint('- 聚餐時間: $formattedDinnerTime');
-      }
-      if (_cancelDeadline != null) {
-        debugPrint('- 取消截止時間: $formattedCancelDeadline');
-        debugPrint('- 可以取消預約: $canCancelReservation');
-      }
-      if (_matchingGroupId != null) {
-        debugPrint('- 配對組ID: $_matchingGroupId');
-      }
-      if (_diningEventId != null) {
-        debugPrint('- 聚餐事件ID: $_diningEventId');
-      }
-      if (_restaurantInfo != null) {
-        debugPrint('- 已更新餐廳信息');
-      }
     }
   }
 
-  void clearStatus() {
+  // 重置所有聚餐相關資料
+  Future<void> resetDiningData() async {
     _confirmedDinnerTime = null;
     _dinnerRestaurantId = null;
     _replyDeadline = null;
@@ -285,9 +362,13 @@ class UserStatusService with ChangeNotifier {
     _matchingGroupId = null;
     _diningEventId = null;
     _restaurantInfo = null;
+    _eventStatus = null;
+    _reservationName = null;
+    _reservationPhone = null;
+
+    await _saveToPrefs();
     notifyListeners();
-    _saveToPrefs(); // 清除持久化儲存的資料
-    debugPrint('User status cleared and persistence data removed.');
+    debugPrint('已重置所有聚餐相關資料');
   }
 
   // 用於測試持久化邏輯的方法

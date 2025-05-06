@@ -71,6 +71,11 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   // 顯示幫忙訂位確認對話框
   void _showBookingConfirmationDialog() {
     // 設置已顯示對話框標記，僅表示系統自動顯示對話框時不要重複顯示
+    if (!mounted) {
+      debugPrint('_showBookingConfirmationDialog: Widget已卸載，取消顯示對話框');
+      return;
+    }
+
     setState(() {
       _hasShownBookingDialog = true;
     });
@@ -84,6 +89,13 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
       confirmButtonText: '好哇',
       onCancel: () {
         // 用戶點擊"不要"時，重置標記，允許再次點擊卡片顯示對話框
+        if (!mounted) {
+          debugPrint(
+            '_showBookingConfirmationDialog onCancel: Widget已卸載，不處理取消操作',
+          );
+          return;
+        }
+
         setState(() {
           _hasShownBookingDialog = false;
         });
@@ -91,10 +103,24 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
       },
       onConfirm: () async {
         try {
+          if (!mounted) {
+            debugPrint(
+              '_showBookingConfirmationDialog onConfirm: Widget已卸載，不處理確認操作',
+            );
+            return;
+          }
+
           // 1. 先從資料庫獲取當前用戶的最新聚餐事件資訊
           final currentUser = await _authService.getCurrentUser();
           if (currentUser == null) {
             throw Exception('用戶未登入');
+          }
+
+          if (!mounted) {
+            debugPrint(
+              '_showBookingConfirmationDialog onConfirm: 獲取用戶後Widget已卸載',
+            );
+            return;
           }
 
           // 從資料庫獲取最新的聚餐事件資訊
@@ -102,13 +128,30 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             currentUser.id,
           );
 
+          if (!mounted) {
+            debugPrint(
+              '_showBookingConfirmationDialog onConfirm: 獲取聚餐事件後Widget已卸載',
+            );
+            return;
+          }
+
           if (diningEvent == null) {
             throw Exception('未找到當前聚餐事件');
           }
 
-          // 2. 更新本地狀態變數
+          // 獲取UserStatusService以更新狀態
+          final userStatusService = Provider.of<UserStatusService>(
+            context,
+            listen: false,
+          );
+
+          // 2. 更新本地狀態變數和Provider中的狀態
           final latestStatus = diningEvent['status'];
           debugPrint('從資料庫獲取到的最新聚餐狀態: $latestStatus，原狀態: $_dinnerEventStatus');
+
+          // 更新Provider中的事件狀態
+          userStatusService.updateStatus(eventStatus: latestStatus);
+          debugPrint('已更新Provider中的事件狀態: $latestStatus');
 
           // 3. 根據最新聚餐事件狀態採取不同行動
           switch (latestStatus) {
@@ -122,13 +165,25 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
               final diningService = DiningService();
               await diningService.startConfirming(diningEventId);
 
+              // 更新Provider中的事件狀態為confirming
+              userStatusService.updateStatus(eventStatus: 'confirming');
+              debugPrint('已更新Provider中的事件狀態為confirming');
+
               // 關閉對話框
-              if (mounted) Navigator.of(context).pop();
+              if (!mounted) {
+                debugPrint('pending_confirmation: API請求後Widget已卸載');
+                return;
+              }
+
+              Navigator.of(context).pop();
 
               // 導航到餐廳預訂頁面
-              if (mounted) {
-                _navigationService.navigateToRestaurantReservation(context);
+              if (!mounted) {
+                debugPrint('pending_confirmation: 關閉對話框後Widget已卸載');
+                return;
               }
+
+              _navigationService.navigateToRestaurantReservation(context);
               break;
 
             case 'confirming':
@@ -202,10 +257,10 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           }
         } catch (e) {
           // 關閉對話框
-          if (mounted) Navigator.of(context).pop();
-
-          // 顯示錯誤提示
           if (mounted) {
+            Navigator.of(context).pop();
+
+            // 顯示錯誤提示
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
@@ -214,12 +269,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 ),
               ),
             );
-          }
 
-          // 重置標記，允許用戶再次點擊
-          setState(() {
-            _hasShownBookingDialog = false;
-          });
+            // 重置標記，允許用戶再次點擊
+            setState(() {
+              _hasShownBookingDialog = false;
+            });
+          }
         }
       },
     ).then((_) {
@@ -241,10 +296,26 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
   Future<void> _loadUserAndDinnerInfo() async {
     try {
+      if (!mounted) {
+        debugPrint('_loadUserAndDinnerInfo: Widget已卸載，取消加載');
+        return;
+      }
+
       final currentUser = await _authService.getCurrentUser();
+
+      if (!mounted) {
+        debugPrint('_loadUserAndDinnerInfo: 獲取用戶後Widget已卸載，取消後續操作');
+        return;
+      }
+
       if (currentUser != null) {
         // 獲取用戶狀態
         final status = await _databaseService.getUserStatus(currentUser.id);
+
+        if (!mounted) {
+          debugPrint('_loadUserAndDinnerInfo: 獲取狀態後Widget已卸載，取消後續操作');
+          return;
+        }
 
         // 檢查用戶狀態是否是有效的狀態
         if (status != 'waiting_other_users' && status != 'waiting_attendance') {
@@ -256,6 +327,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         }
 
         // 從 UserStatusService 獲取聚餐時間，若無則使用預設值
+        if (!mounted) {
+          debugPrint('_loadUserAndDinnerInfo: 檢查狀態後Widget已卸載，取消後續操作');
+          return;
+        }
+
+        // 獲取UserStatusService
         final userStatusService = Provider.of<UserStatusService>(
           context,
           listen: false,
@@ -265,6 +342,15 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         final diningEvent = await _databaseService.getCurrentDiningEvent(
           currentUser.id,
         );
+
+        if (!mounted) {
+          debugPrint('_loadUserAndDinnerInfo: 獲取聚餐事件後Widget已卸載，取消後續操作');
+          return;
+        }
+
+        // 記錄用戶狀態到provider
+        userStatusService.setUserStatus(status);
+        debugPrint('已將用戶狀態 $status 記錄到Provider');
 
         // 從 Provider 中獲取聚餐時間或從 dining_events 中獲取
         DateTime? dinnerTime;
@@ -312,7 +398,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
               matchingGroupId: diningEvent['matching_group_id'],
               diningEventId: diningEvent['id'],
               restaurantInfo: restaurant,
+              eventStatus: dinnerEventStatus, // 保存聚餐事件狀態
+              reservationName: reservationName, // 保存預訂人姓名
+              reservationPhone: reservationPhone, // 保存預訂人電話
             );
+
+            debugPrint('已更新UserStatusService中的餐廳信息: ${restaurant['name']}');
           }
         } else {
           // 若無聚餐事件，使用 UserStatusService 中的數據或預設值
@@ -322,6 +413,10 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
           // 嘗試從 UserStatusService 獲取餐廳信息，如果有的話
           final cachedRestaurantInfo = userStatusService.restaurantInfo;
+          dinnerEventStatus = userStatusService.eventStatus;
+          reservationName = userStatusService.reservationName;
+          reservationPhone = userStatusService.reservationPhone;
+
           if (cachedRestaurantInfo != null) {
             restaurantName = cachedRestaurantInfo['name'];
             restaurantAddress = cachedRestaurantInfo['address'];
@@ -333,6 +428,8 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
               restaurantMapUrl =
                   "https://maps.google.com/?q=${Uri.encodeComponent(restaurantName)}+${Uri.encodeComponent(restaurantAddress)}";
             }
+
+            debugPrint('從UserStatusService獲取到餐廳信息: $restaurantName');
           } else {
             // 使用預設餐廳數據（臨時）
             restaurantName = "查無餐廳";
@@ -340,6 +437,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             restaurantImageUrl = "assets/images/placeholder/restaurant.jpg";
             restaurantCategory = "未知種類";
             restaurantMapUrl = "https://maps.google.com/";
+            debugPrint('無法獲取餐廳信息，使用預設值');
           }
         }
 
@@ -366,6 +464,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           debugPrint('聚餐事件狀態: $dinnerEventStatus');
         }
 
+        // 更新狀態前再次檢查mounted
+        if (!mounted) {
+          debugPrint('_loadUserAndDinnerInfo: 準備更新狀態時Widget已卸載，取消更新');
+          return;
+        }
+
         // 更新狀態
         setState(() {
           _userStatus = status;
@@ -381,15 +485,22 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           _isLoading = false;
         });
       } else {
+        if (!mounted) {
+          debugPrint('_loadUserAndDinnerInfo: 用戶為空時Widget已卸載，取消更新');
+          return;
+        }
+
         setState(() {
           _isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('獲取用戶和聚餐資訊時出錯: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

@@ -112,7 +112,7 @@ class RestaurantService {
               .rpc('get_group_votes', params: {'group_uuid': groupId})
               .select();
 
-      if (result == null || result.isEmpty) {
+      if (result.isEmpty) {
         debugPrint('沒有找到群組 $groupId 的餐廳投票數據');
         return [];
       }

@@ -74,6 +74,131 @@ class DiningService {
     }
   }
 
+  /// 更換餐廳
+  ///
+  /// 當當前餐廳不可預訂時，從候選餐廳列表中選擇下一個餐廳
+  Future<Map<String, dynamic>> changeRestaurant(String eventId) async {
+    try {
+      debugPrint('更換餐廳，聚餐事件ID: $eventId');
+
+      // 獲取當前用戶認證
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null) {
+        throw Exception('用戶未登入');
+      }
+
+      // 獲取 session
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) {
+        throw Exception('無法獲取用戶登入資訊，請重新登入');
+      }
+
+      // 構建API請求
+      final endpoint = '/dining/change-restaurant/$eventId';
+      final apiUrl = '${_apiService.baseUrl}$endpoint';
+
+      // 發送POST請求
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.accessToken}',
+        },
+        body: jsonEncode({}), // 空的請求體，因為所有信息都在URL中
+      );
+
+      // 檢查回應狀態
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // 成功發送請求
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        debugPrint('更換餐廳請求成功: $responseData');
+        return responseData;
+      } else {
+        // 請求失敗
+        String errorMessage;
+        try {
+          final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+          errorMessage = errorData['detail'] ?? '操作失敗 (${response.statusCode})';
+        } catch (_) {
+          errorMessage = '操作失敗 (${response.statusCode})';
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      debugPrint('更換餐廳請求錯誤: $e');
+      rethrow;
+    }
+  }
+
+  /// 確認餐廳預訂成功
+  ///
+  /// 將聚餐事件狀態更新為confirmed，完成餐廳預訂流程
+  Future<Map<String, dynamic>> confirmRestaurant(
+    String eventId, {
+    String? reservationName,
+    String? reservationPhone,
+  }) async {
+    try {
+      debugPrint('確認餐廳預訂成功，聚餐事件ID: $eventId');
+
+      // 獲取當前用戶認證
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null) {
+        throw Exception('用戶未登入');
+      }
+
+      // 獲取 session
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) {
+        throw Exception('無法獲取用戶登入資訊，請重新登入');
+      }
+
+      // 構建請求體
+      final Map<String, dynamic> requestBody = {};
+      if (reservationName != null && reservationName.isNotEmpty) {
+        requestBody['reservation_name'] = reservationName;
+      }
+      if (reservationPhone != null && reservationPhone.isNotEmpty) {
+        requestBody['reservation_phone'] = reservationPhone;
+      }
+
+      // 構建API請求
+      final endpoint = '/dining/confirm-restaurant/$eventId';
+      final apiUrl = '${_apiService.baseUrl}$endpoint';
+
+      // 發送POST請求
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.accessToken}',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      // 檢查回應狀態
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // 成功發送請求
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        debugPrint('確認餐廳預訂請求成功: $responseData');
+        return responseData;
+      } else {
+        // 請求失敗
+        String errorMessage;
+        try {
+          final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+          errorMessage = errorData['detail'] ?? '操作失敗 (${response.statusCode})';
+        } catch (_) {
+          errorMessage = '操作失敗 (${response.statusCode})';
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      debugPrint('確認餐廳預訂請求錯誤: $e');
+      rethrow;
+    }
+  }
+
   /// 獲取聚餐事件詳情
   Future<Map<String, dynamic>> getDiningEventDetails(String eventId) async {
     try {
