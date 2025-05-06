@@ -308,7 +308,6 @@ async def confirm_restaurant(
                 "status": "confirmed", 
                 "reservation_name": request.reservation_name,
                 "reservation_phone": request.reservation_phone,
-                "attendee_count": request.attendee_count,
                 "updated_at": datetime.utcnow().isoformat()
             }) \
             .eq("id", str(event_id)) \
