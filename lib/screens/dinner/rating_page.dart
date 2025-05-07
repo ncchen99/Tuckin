@@ -76,11 +76,9 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     // 釋放所有動畫控制器
-    if (_animationControllers != null) {
-      for (var controllers in _animationControllers) {
-        for (var controller in controllers) {
-          controller.dispose();
-        }
+    for (var controllers in _animationControllers) {
+      for (var controller in controllers) {
+        controller.dispose();
       }
     }
     super.dispose();
@@ -513,7 +511,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                 ),
                 SizedBox(height: 6.h),
                 // 暱稱 - 添加截斷功能
-                Container(
+                SizedBox(
                   width: 70.w, // 設定固定寬度
                   child: Text(
                     participant['nickname'],

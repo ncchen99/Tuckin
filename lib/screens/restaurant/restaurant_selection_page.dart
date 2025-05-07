@@ -562,9 +562,6 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                   );
                                 }),
 
-                                if (_userRecommendedRestaurant == null)
-                                  SizedBox(height: 12.h),
-
                                 // 用戶推薦的餐廳（如果有）
                                 if (_userRecommendedRestaurant != null)
                                   RestaurantCard(
@@ -591,7 +588,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                     onTap: _handleRecommendRestaurant,
                                   ),
 
-                                SizedBox(height: 60.h),
+                                SizedBox(height: 40.h),
 
                                 // 提交按鈕
                                 Center(

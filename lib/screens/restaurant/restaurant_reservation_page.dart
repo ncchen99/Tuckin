@@ -27,7 +27,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
   final NavigationService _navigationService = NavigationService();
   bool _isLoading = true;
   bool _isPageMounted = false;
-  bool _isConfirming = false;
+  final bool _isConfirming = false;
 
   // 新增計時器相關變數
   Timer? _redirectTimer;
