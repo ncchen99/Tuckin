@@ -91,7 +91,7 @@
 - [ ] [前端] lib\screens\dinner\dinner_reservation_page.dart 要加入時間的取得是使用ntp 去取得而不是透過裝置的時間，並且使用台灣台北時間
 - [ ] [前端] CUJ 整合測試 v2
 - [ ] [API] 大量用戶測試
-- [?] [前端] 音樂會暫停的問題
+- [ ] [前端] 音樂會暫停的問題，葉面完全窄入時暫停
 - [ ] 設定 Cloud scheduler 定時任務
 - [ ] 整理需求文件、API端點、SQL表格v、邏輯流程v(deepwiki)
 - [ ] 完成 QA 至 Github
