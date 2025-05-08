@@ -82,9 +82,14 @@
 - [x] [API] 刪除非必要端點
 - [x] [API] 刪除週期資料 rating_sessions、restaurant_votes、matching_groups、dining_events、user_matching_info，遷移 dining_events 資料(包含 ids)
 - [ ] [API] 挑選餐廳，儲存餐廳推薦清單
+- [ ] [前端] CUJ 整合測試 v2
+- [ ] [API] 修正 rating 資料取得需要 gender 
+- [ ] [API] 停權帳號 （狀態） 
+- [ ] [API] 修改 matching preference 的權限 只能後端更改 表現後端驗證 或是資料庫有檢查 （目前看起來資料庫有檢查）
+- [ ] [前端] 留言版（尋人功能，或尋友密語：你也是來認識新朋友的嘛？
 - [ ] [API] 定時 API 們加入時間檢查
 - [ ] [前端] lib\screens\dinner\dinner_reservation_page.dart 要加入時間的取得是使用ntp 去取得而不是透過裝置的時間，並且使用台灣台北時間
-- [ ] [前端] CUJ 整合測試
+- [ ] [前端] CUJ 整合測試 v2
 - [ ] [API] 大量用戶測試
 - [?] [前端] 音樂會暫停的問題
 - [ ] 設定 Cloud scheduler 定時任務
