@@ -94,7 +94,7 @@
 - [ ] [前端] 音樂會暫停的問題，葉面完全窄入時暫停
 - [ ] 設定 Cloud scheduler 定時任務
 - [ ] 整理需求文件、API端點、SQL表格v、邏輯流程v(deepwiki)
-- [ ] 完成 QA 至 Github
+- [x] 完成 QA 至 Github
 - [ ] 完成上架所需文件，意式圖、文案、隱私政策、使用者協議
 - [ ] 上架 Google Play
 - [ ] 邀請朋友幫忙內測
