@@ -557,22 +557,27 @@ async def get_rating_form(
                 "participants": []
             }
         
-        # 獲取參與者暱稱
+        # 獲取參與者暱稱與性別
         profiles = supabase.table("user_profiles") \
-            .select("user_id, nickname") \
+            .select("user_id, nickname, gender") \
             .in_("user_id", participant_ids) \
             .execute()
         
         # 建立用戶映射
-        id_to_nickname = {p["user_id"]: p["nickname"] for p in profiles.data}
+        id_to_profile = {p["user_id"]: {"nickname": p["nickname"], "gender": p["gender"]} for p in profiles.data}
         
         # 生成隨機順序的參與者列表
         random_order = participant_ids.copy()
         random.shuffle(random_order)
         
-        # 創建前端顯示用的序列（只包含索引和暱稱）
+        # 創建前端顯示用的序列（包含索引、暱稱和性別）
         user_sequence = [
-            {"index": i, "nickname": id_to_nickname.get(uid, "未知用戶")}
+            {
+                "index": i, 
+                "nickname": id_to_profile.get(uid, {}).get("nickname", "未知用戶"),
+                "gender": id_to_profile.get(uid, {}).get("gender", "male"),
+                "avatar_index": (i % 6) + 1  # 可選：生成1-6範圍的隨機頭像索引
+            }
             for i, uid in enumerate(random_order)
         ]
         
@@ -597,9 +602,14 @@ async def get_rating_form(
             "expires_at": expires_at.isoformat()
         }).execute()
         
-        # 轉換為API響應格式
+        # 轉換為API響應格式 - 包含必要的性別資訊和頭像索引
         participants_response = [
-            {"index": item["index"], "nickname": item["nickname"]} 
+            {
+                "index": item["index"], 
+                "nickname": item["nickname"],
+                "gender": item["gender"],
+                "avatar_index": item["avatar_index"]
+            } 
             for item in user_sequence
         ]
         
