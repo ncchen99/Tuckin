@@ -129,7 +129,7 @@ class DinnerTimeUtils:
             current_week_target.year,
             current_week_target.month,
             current_week_target.day,
-            19,  # 聚餐時間：晚上7點
+            18,  # 聚餐時間：晚上6點
             0,
         )
         # 將時間設置為臺灣時區
@@ -142,7 +142,7 @@ class DinnerTimeUtils:
                 next_week_target.year,
                 next_week_target.month,
                 next_week_target.day,
-                19,  # 聚餐時間：晚上7點
+                18,  # 聚餐時間：晚上6點
                 0,
             ))
             selected_dinner_date = next_week_target
@@ -154,7 +154,7 @@ class DinnerTimeUtils:
                     after_next_week_target.year,
                     after_next_week_target.month,
                     after_next_week_target.day,
-                    19,  # 聚餐時間：晚上7點
+                    18,  # 聚餐時間：晚上6點
                     0,
                 ))
                 selected_dinner_date = after_next_week_target
@@ -165,10 +165,10 @@ class DinnerTimeUtils:
             print('選擇本週聚餐')
 
         # 根據選定的聚餐日期計算餐廳選擇時段的開始時間和結束時間
-        # 餐廳選擇時段開始：聚餐前61小時
-        # 餐廳選擇時段結束：聚餐前37小時
-        restaurant_selection_start = dinner_date_time - timedelta(hours=61)
-        restaurant_selection_end = dinner_date_time - timedelta(hours=37)
+        # 餐廳選擇時段開始：聚餐前60小時
+        # 餐廳選擇時段結束：聚餐前36小時
+        restaurant_selection_start = dinner_date_time - timedelta(hours=60)
+        restaurant_selection_end = dinner_date_time - timedelta(hours=36)
 
         # 計算取消預約的截止時間
         cancel_deadline = TW_TIMEZONE.localize(datetime(

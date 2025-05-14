@@ -37,7 +37,6 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
     {'id': 10, 'name': '印度料理', 'image': 'assets/images/dish/indian.png'},
     {'id': 11, 'name': '墨西哥菜', 'image': 'assets/images/dish/mexican.png'},
     {'id': 12, 'name': '越南料理', 'image': 'assets/images/dish/vietnamese.png'},
-    {'id': 13, 'name': '素食料理', 'image': 'assets/images/dish/vegetarian.png'},
     {'id': 14, 'name': '漢堡速食', 'image': 'assets/images/dish/burger.png'},
     {'id': 15, 'name': '披薩料理', 'image': 'assets/images/dish/pizza.png'},
     {'id': 16, 'name': '燒烤料理', 'image': 'assets/images/dish/barbecue.png'},

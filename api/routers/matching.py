@@ -1016,10 +1016,10 @@ async def select_recommended_restaurants(
 
 def is_restaurant_open(business_hours_json, weekday, hour, minute):
     """
-    檢查餐廳在指定時間是否營業
+    檢查餐廳在指定時間及之後1.5小時內是否營業
     
     Args:
-        business_hours_json: 餐廳營業時間的JSON字符串或物件
+        business_hours_json: 餐廳營業時間的JSON字符串或物件，NULL表示餐廳不營業
         weekday: 星期幾 (0=星期日, 6=星期六)
         hour: 小時 (0-23)
         minute: 分鐘 (0-59)
@@ -1028,9 +1028,9 @@ def is_restaurant_open(business_hours_json, weekday, hour, minute):
         bool: 餐廳是否營業
     """
     try:
-        # 如果沒有營業時間數據，預設為營業
-        if not business_hours_json:
-            return True
+        # 如果沒有營業時間數據，表示餐廳不營業
+        if business_hours_json is None:
+            return False
             
         # 嘗試解析營業時間數據
         business_hours = None
@@ -1052,21 +1052,36 @@ def is_restaurant_open(business_hours_json, weekday, hour, minute):
                         business_hours = json.loads(corrected_json)
                     except Exception:
                         logger.warning(f"無法解析營業時間數據: {business_hours_json}")
-                        return True
+                        return False
             else:
                 try:
                     business_hours = json.loads(business_hours_json)
                 except json.JSONDecodeError:
                     logger.warning(f"無法解析營業時間數據: {business_hours_json}")
-                    return True
+                    return False
         else:
             # 已經是字典或其他對象
             business_hours = business_hours_json
             
-        # 如果沒有periods字段，預設為營業
+        # 如果沒有periods字段，表示餐廳不營業
         if not isinstance(business_hours, dict) or "periods" not in business_hours:
-            return True
+            return False
             
+        # 計算聚餐結束時間 (聚餐開始時間 + 1.5小時)
+        end_hour = hour
+        end_minute = minute + 90  # 加1.5小時 = 90分鐘
+        
+        # 處理分鐘溢出
+        if end_minute >= 60:
+            end_hour += end_minute // 60
+            end_minute = end_minute % 60
+        
+        # 處理小時溢出（跨日）
+        end_weekday = weekday
+        if end_hour >= 24:
+            end_hour = end_hour % 24
+            end_weekday = (weekday + 1) % 7  # 0-6，對應週日到週六
+        
         # 檢查當天是否有營業時間安排
         for period in business_hours["periods"]:
             # 檢查是否為當天營業
@@ -1080,14 +1095,26 @@ def is_restaurant_open(business_hours_json, weekday, hour, minute):
                     
                 closing_hour = period["close"].get("hour", 23)
                 closing_minute = period["close"].get("minute", 59)
+                closing_day = period["close"].get("day", weekday)
                 
-                # 現在時間轉換為分鐘表示
-                current_time_in_minutes = hour * 60 + minute
+                # 現在將時間轉換為分鐘表示
                 opening_time_in_minutes = opening_hour * 60 + opening_minute
-                closing_time_in_minutes = closing_hour * 60 + closing_minute
+                dinner_start_in_minutes = hour * 60 + minute
                 
-                # 檢查是否在營業時間內
-                if opening_time_in_minutes <= current_time_in_minutes < closing_time_in_minutes:
+                # 檢查跨日的情況
+                if closing_day != weekday or closing_hour < opening_hour or (closing_hour == opening_hour and closing_minute < opening_minute):
+                    # 結束時間是第二天，所以我們將它加上24小時
+                    closing_time_in_minutes = closing_hour * 60 + closing_minute + (24 * 60 if closing_day != weekday else 0)
+                else:
+                    closing_time_in_minutes = closing_hour * 60 + closing_minute
+                
+                # 計算聚餐結束時間
+                dinner_end_in_minutes = end_hour * 60 + end_minute
+                if end_weekday != weekday:
+                    dinner_end_in_minutes += 24 * 60  # 加一天
+                
+                # 檢查餐廳是否在整個聚餐時間內都營業
+                if opening_time_in_minutes <= dinner_start_in_minutes and closing_time_in_minutes >= dinner_end_in_minutes:
                     return True
                     
         # 如果沒有找到匹配的營業時間段，則視為不營業
@@ -1095,5 +1122,5 @@ def is_restaurant_open(business_hours_json, weekday, hour, minute):
         
     except Exception as e:
         logger.error(f"檢查餐廳營業時間出錯: {str(e)}")
-        # 出錯時預設為營業，避免篩選掉太多餐廳
-        return True 
+        # 出錯時預設為不營業，保守處理
+        return False 

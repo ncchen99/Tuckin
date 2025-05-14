@@ -81,13 +81,13 @@
 - [x] [API] 定時更改狀態成 rating
 - [x] [API] 刪除非必要端點
 - [x] [API] 刪除週期資料 rating_sessions、restaurant_votes、matching_groups、dining_events、user_matching_info，遷移 dining_events 資料(包含 ids)
-- [ ] [前端] 移除素食餐廳選項
-- [ ] [API] [前端] 提早用餐時間到 18:00 
-- [ ] [API] 餐廳邏輯增加篩選餐廳是否已經永久停業
+- [x] [前端] 移除素食餐廳選項
+- [x] [API] [前端] 提早用餐時間到 18:00 
+- [x] [API] 餐廳邏輯增加篩選餐廳是否已經永久停業
 - [ ] [API] 挑選餐廳，儲存餐廳推薦清單
 - [ ] [前端] CUJ 整合測試 v2
 - [ ] [API] 修正 rating 資料取得需要 gender 
-- [ ] [API] 停權帳號 （狀態） 
+
 - [ ] [API] 修改 matching preference 的權限 只能後端更改 表現後端驗證 或是資料庫有檢查 （目前看起來資料庫有檢查）
 - [ ] [前端] 留言版（尋人功能，或尋友密語：你也是來認識新朋友的嘛？
 - [ ] [API] 定時 API 們加入時間檢查
@@ -95,7 +95,6 @@
 - [ ] [前端] CUJ 整合測試 v2
 - [ ] [API] 大量用戶測試
 - [ ] [前端] 音樂會暫停的問題，葉面完全窄入時暫停
-- [ ] [API] 修正 rating 資料取得需要 gender 
 - [ ] 設定 Cloud scheduler 定時任務
 - [ ] 整理需求文件、API端點、SQL表格v、邏輯流程v(deepwiki)
 - [x] 完成 QA 至 Github
@@ -122,3 +121,4 @@
 - [ ] [新功能] dining_events realtime 更新餐廳資訊頁面
 - [ ] [新功能] 將用戶互評分數加入配對系統
 - [ ] [新功能] 多次未到停權處理，停權的使用者狀態與前端
+- [ ] [API] 停權帳號 （狀態） 

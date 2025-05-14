@@ -142,7 +142,7 @@ class DinnerTimeUtils {
       currentWeekTarget.year,
       currentWeekTarget.month,
       currentWeekTarget.day,
-      19, // 聚餐時間：晚上7點
+      18, // 聚餐時間：晚上6點
       0,
     );
     Duration timeUntilDinner = dinnerDateTime.difference(now);
@@ -152,7 +152,7 @@ class DinnerTimeUtils {
       nextWeekTarget.year,
       nextWeekTarget.month,
       nextWeekTarget.day,
-      19, // 聚餐時間：晚上7點
+      18, // 聚餐時間：晚上6點
       0,
     );
     Duration timeUntilNextDinner = nextDinnerDateTime.difference(now);
@@ -182,15 +182,15 @@ class DinnerTimeUtils {
       selectedDinnerDate.year,
       selectedDinnerDate.month,
       selectedDinnerDate.day,
-      19, // 聚餐時間：晚上7點
+      18, // 聚餐時間：晚上6點
       0,
     );
 
     // 根據選定的聚餐日期計算參加階段的開始時間和結束時間
-    // 參加階段開始：聚餐前61小時 (即聚餐前兩天+13小時，前兩天早上6點)
+    // 參加階段開始：聚餐前60小時 (即聚餐前兩天+13小時，前兩天早上6點)
     // 參加階段結束：聚餐前37小時 (即聚餐前一天+13小時，前一天早上6點)
-    DateTime joinPhaseStart = dinnerTime.subtract(const Duration(hours: 61));
-    DateTime joinPhaseEnd = dinnerTime.subtract(const Duration(hours: 37));
+    DateTime joinPhaseStart = dinnerTime.subtract(const Duration(hours: 60));
+    DateTime joinPhaseEnd = dinnerTime.subtract(const Duration(hours: 36));
 
     // 計算取消預約的截止時間 (與joinPhaseStart相同，即聚餐前兩天早上6點)
     // 這是一個重要時間點，用戶必須在此時間前取消預約，否則將計入缺席紀錄
