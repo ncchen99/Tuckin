@@ -494,7 +494,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                                   context,
                                   _dinnerTimeInfo!.weekdayText,
                                   iconPath,
-                                  '19:00',
+                                  DateFormat(
+                                    'HH:mm',
+                                  ).format(_dinnerTimeInfo!.nextDinnerTime),
                                   DateFormat(
                                     'MM/dd',
                                   ).format(_dinnerTimeInfo!.nextDinnerDate),

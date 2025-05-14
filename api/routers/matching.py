@@ -940,17 +940,32 @@ async def select_recommended_restaurants(
         logger.info(f"聚餐時間：星期 {google_weekday}，{dinner_hour}:{dinner_minute}")
         
         # 查詢所有餐廳並檢查營業時間
-        all_restaurants = supabase.table("restaurants") \
+        # 只選擇系統內建餐廳（is_user_added 為 FALSE 或 NULL）
+        # 使用兩次查詢並合併結果，處理 is_user_added = FALSE 或 is_user_added IS NULL 的情況
+        system_restaurants_false = supabase.table("restaurants") \
             .select("id, name, category, business_hours") \
+            .eq("is_user_added", False) \
             .execute()
             
-        if not all_restaurants.data:
-            logger.warning("找不到任何餐廳")
+        system_restaurants_null = supabase.table("restaurants") \
+            .select("id, name, category, business_hours") \
+            .is_("is_user_added", "null") \
+            .execute()
+            
+        # 合併查詢結果
+        all_restaurants_data = []
+        if system_restaurants_false.data:
+            all_restaurants_data.extend(system_restaurants_false.data)
+        if system_restaurants_null.data:
+            all_restaurants_data.extend(system_restaurants_null.data)
+            
+        if not all_restaurants_data:
+            logger.warning("找不到任何系統內建餐廳")
             return []
             
         # 過濾出營業中的餐廳
         open_restaurants = []
-        for restaurant in all_restaurants.data:
+        for restaurant in all_restaurants_data:
             restaurant_id = restaurant["id"]
             restaurant_name = restaurant["name"]
             business_hours = restaurant.get("business_hours")
@@ -962,7 +977,7 @@ async def select_recommended_restaurants(
                 logger.info(f"餐廳 {restaurant_name} 在聚餐時間不營業")
                 
         if not open_restaurants:
-            logger.warning("找不到聚餐時間營業的餐廳")
+            logger.warning("找不到聚餐時間營業的系統內建餐廳")
             return []
             
         # 如果沒有偏好資料，隨機選擇營業中的餐廳

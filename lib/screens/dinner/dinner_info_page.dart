@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/services/user_status_service.dart';
 import 'package:provider/provider.dart';
 import 'package:tuckin/services/dining_service.dart';
+import 'dart:math';
 
 class DinnerInfoPage extends StatefulWidget {
   const DinnerInfoPage({super.key});
@@ -19,6 +20,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   final NavigationService _navigationService = NavigationService();
+  final Random _random = Random();
   bool _isLoading = true;
   bool _isPageMounted = false; // 追蹤頁面是否完全掛載
   String _userStatus = ''; // 用戶當前狀態
@@ -764,7 +766,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             _reservationPhone!.isNotEmpty) {
           message = '$_reservationName幫忙訂位了！ 手機號碼：$_reservationPhone';
         } else {
-          message = '餐廳已確認！請在聚餐時間到達';
+          message = '餐廳無法訂位，可能需要候位，請使用以下密語找到聚餐伙伴：\n\n${_getRandomPassphrase()}';
         }
 
         return Container(
@@ -902,6 +904,18 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         ),
       ),
     );
+  }
+
+  String _getRandomPassphrase() {
+    final List<String> passphrases = [
+      '不好意思，你可以幫我拍照嗎',
+      '不好意思，可以跟你借衛生紙嗎',
+      '不好意思，請問火車站怎麼走',
+      '不好意思，你有在排隊嗎',
+      '想問你有吃過這家店嗎',
+      '你好，你也在等朋友嗎',
+    ];
+    return passphrases[_random.nextInt(passphrases.length)];
   }
 
   @override
