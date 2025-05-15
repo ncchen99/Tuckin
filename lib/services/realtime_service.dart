@@ -22,6 +22,7 @@ class RealtimeService with WidgetsBindingObserver {
 
   // 實時通道
   RealtimeChannel? _userStatusChannel;
+  RealtimeChannel? _diningEventsChannel;
 
   // 用於儲存用戶ID
   String? _userId;
@@ -31,6 +32,7 @@ class RealtimeService with WidgetsBindingObserver {
 
   // 訂閱狀態
   bool _isSubscribed = false;
+  bool _isDiningEventsSubscribed = false;
   bool _isInitialized = false;
 
   // 保存上一個用戶狀態
@@ -373,10 +375,119 @@ class RealtimeService with WidgetsBindingObserver {
     }
   }
 
+  // 新增: 訂閱特定聚餐事件變更
+  Future<void> subscribeToDiningEvent(String diningEventId) async {
+    if (diningEventId.isEmpty) {
+      debugPrint('RealtimeService: 聚餐事件ID為空，無法訂閱');
+      return;
+    }
+
+    // 取消先前的訂閱
+    await _diningEventsChannel?.unsubscribe();
+
+    try {
+      debugPrint('RealtimeService: 開始訂閱聚餐事件狀態 - 事件ID: $diningEventId');
+
+      // 創建實時通道
+      _diningEventsChannel = _supabaseService.client
+          .channel('dining_event_changes')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'dining_events',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'id',
+              value: diningEventId,
+            ),
+            callback: (PostgresChangePayload payload) {
+              _handleDiningEventChange(payload);
+            },
+          );
+
+      // 啟動訂閱
+      debugPrint('RealtimeService: 正在啟動聚餐事件訂閱...');
+      _diningEventsChannel?.subscribe();
+      _isDiningEventsSubscribed = true;
+
+      debugPrint(
+        'RealtimeService: 聚餐事件訂閱成功! 監聽 dining_events 表格中 id=$diningEventId 的變更',
+      );
+    } catch (e) {
+      _isDiningEventsSubscribed = false;
+      debugPrint('RealtimeService: 訂閱聚餐事件狀態失敗 - $e');
+
+      // 重試機制
+      Future.delayed(const Duration(seconds: 10), () {
+        if (!_isDiningEventsSubscribed) {
+          debugPrint('RealtimeService: 嘗試重新訂閱聚餐事件狀態');
+          subscribeToDiningEvent(diningEventId);
+        }
+      });
+    }
+  }
+
+  // 新增: 處理聚餐事件變更
+  void _handleDiningEventChange(PostgresChangePayload payload) {
+    debugPrint('RealtimeService: 收到聚餐事件變更事件');
+    debugPrint('RealtimeService: 聚餐事件詳情 - ${payload.toString()}');
+
+    try {
+      final newRecord = payload.newRecord;
+      final diningStatus = newRecord['status'] as String?;
+      final diningEventId = newRecord['id'] as String?;
+      final reservationName = newRecord['reservation_name'] as String?;
+      final reservationPhone = newRecord['reservation_phone'] as String?;
+
+      // 創建變更事件數據
+      Map<String, dynamic> eventData = {
+        'status': diningStatus,
+        'id': diningEventId,
+        'reservation_name': reservationName,
+        'reservation_phone': reservationPhone,
+      };
+
+      debugPrint('RealtimeService: 聚餐事件狀態變更 - 新狀態: $diningStatus');
+
+      // 廣播聚餐事件變更通知
+      _notifyDiningEventListeners(eventData);
+    } catch (e) {
+      debugPrint('RealtimeService: 處理聚餐事件變更時發生錯誤 - $e');
+    }
+  }
+
+  // 聚餐事件監聽器集合
+  final Map<String, Function(Map<String, dynamic>)> _diningEventListeners = {};
+
+  // 新增: 添加聚餐事件監聽器
+  void addDiningEventListener(
+    String listenerId,
+    Function(Map<String, dynamic>) listener,
+  ) {
+    _diningEventListeners[listenerId] = listener;
+    debugPrint('RealtimeService: 添加聚餐事件監聽器 - ID: $listenerId');
+  }
+
+  // 新增: 移除聚餐事件監聽器
+  void removeDiningEventListener(String listenerId) {
+    _diningEventListeners.remove(listenerId);
+    debugPrint('RealtimeService: 移除聚餐事件監聽器 - ID: $listenerId');
+  }
+
+  // 新增: 通知所有聚餐事件監聽器
+  void _notifyDiningEventListeners(Map<String, dynamic> eventData) {
+    for (var callback in _diningEventListeners.values) {
+      callback(eventData);
+    }
+  }
+
   // 銷毀實時服務
   void dispose() {
     _userStatusChannel?.unsubscribe();
+    _diningEventsChannel?.unsubscribe();
     _isSubscribed = false;
+    _isDiningEventsSubscribed = false;
+    _diningEventListeners.clear();
     WidgetsBinding.instance.removeObserver(this);
     debugPrint('RealtimeService: 已銷毀');
   }

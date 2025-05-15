@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/services/user_status_service.dart';
 import 'package:provider/provider.dart';
 import 'package:tuckin/services/dining_service.dart';
+import 'package:tuckin/services/realtime_service.dart';
 import 'dart:math';
 
 class DinnerInfoPage extends StatefulWidget {
@@ -20,6 +21,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   final NavigationService _navigationService = NavigationService();
+  final RealtimeService _realtimeService = RealtimeService();
   final Random _random = Random();
   bool _isLoading = true;
   bool _isPageMounted = false; // 追蹤頁面是否完全掛載
@@ -39,6 +41,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   String? _dinnerEventStatus;
   String? _reservationName;
   String? _reservationPhone;
+  String? _diningEventId; // 新增: 保存聚餐事件ID用於訂閱
 
   @override
   void initState() {
@@ -295,8 +298,95 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
   @override
   void dispose() {
+    // 移除聚餐事件監聽器
+    if (_diningEventId != null) {
+      _realtimeService.removeDiningEventListener('dinner_info_page');
+    }
     _isPageMounted = false;
     super.dispose();
+  }
+
+  // 訂閱聚餐事件狀態變更
+  void _subscribeToDiningEvent(String diningEventId) {
+    if (diningEventId.isEmpty) {
+      debugPrint('無法訂閱聚餐事件：ID為空');
+      return;
+    }
+
+    // 保存聚餐事件ID
+    _diningEventId = diningEventId;
+
+    // 添加監聽器
+    _realtimeService.addDiningEventListener(
+      'dinner_info_page',
+      _onDiningEventChange,
+    );
+
+    // 訂閱聚餐事件
+    _realtimeService.subscribeToDiningEvent(diningEventId);
+    debugPrint('已訂閱聚餐事件：$diningEventId');
+  }
+
+  // 處理聚餐事件變更
+  void _onDiningEventChange(Map<String, dynamic> eventData) {
+    debugPrint('接收到聚餐事件變更：$eventData');
+
+    // 如果頁面已卸載，忽略事件
+    if (!mounted) {
+      debugPrint('頁面已卸載，忽略聚餐事件變更');
+      return;
+    }
+
+    final newStatus = eventData['status'] as String?;
+    final newReservationName = eventData['reservation_name'] as String?;
+    final newReservationPhone = eventData['reservation_phone'] as String?;
+
+    // 檢查是否需要更新狀態
+    bool needsUpdate = false;
+
+    if (newStatus != null && newStatus != _dinnerEventStatus) {
+      needsUpdate = true;
+      debugPrint('聚餐事件狀態變更：$_dinnerEventStatus -> $newStatus');
+    }
+
+    if (newReservationName != null && newReservationName != _reservationName) {
+      needsUpdate = true;
+      debugPrint('訂位人姓名變更：$_reservationName -> $newReservationName');
+    }
+
+    if (newReservationPhone != null &&
+        newReservationPhone != _reservationPhone) {
+      needsUpdate = true;
+      debugPrint('訂位人電話變更：$_reservationPhone -> $newReservationPhone');
+    }
+
+    // 如果需要更新，則更新狀態並重新加載頁面數據
+    if (needsUpdate) {
+      // 獲取 UserStatusService 以更新 Provider 中的狀態
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
+      );
+
+      // 更新 Provider 中的聚餐事件狀態
+      userStatusService.updateStatus(
+        eventStatus: newStatus,
+        reservationName: newReservationName,
+        reservationPhone: newReservationPhone,
+      );
+
+      // 更新本地狀態
+      setState(() {
+        _dinnerEventStatus = newStatus ?? _dinnerEventStatus;
+        _reservationName = newReservationName ?? _reservationName;
+        _reservationPhone = newReservationPhone ?? _reservationPhone;
+      });
+
+      // 根據新狀態可能需要顯示相關對話框
+      if (newStatus == 'pending_confirmation' && !_hasShownBookingDialog) {
+        _showBookingConfirmationDialog();
+      }
+    }
   }
 
   Future<void> _loadUserAndDinnerInfo() async {
@@ -331,7 +421,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           return;
         }
 
-        // 從 UserStatusService 獲取聚餐時間，若無則使用預設值
         if (!mounted) {
           debugPrint('_loadUserAndDinnerInfo: 檢查狀態後Widget已卸載，取消後續操作');
           return;
@@ -368,6 +457,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         String? reservationName;
         String? reservationPhone;
         int? attendeeCount; // 新增變數存儲用餐人數
+        String? diningEventId; // 新增: 保存聚餐事件ID
 
         if (diningEvent != null) {
           // 從聚餐事件中獲取時間
@@ -377,6 +467,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           dinnerEventStatus = diningEvent['status'];
           reservationName = diningEvent['reservation_name'];
           reservationPhone = diningEvent['reservation_phone'];
+
+          // 獲取聚餐事件ID並訂閱
+          diningEventId = diningEvent['id'];
+          if (diningEventId != null) {
+            _subscribeToDiningEvent(diningEventId);
+          }
 
           // 獲取用餐人數
           attendeeCount = diningEvent['attendee_count'];
@@ -406,12 +502,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
               ),
               // 新增：保存配對組ID、聚餐事件ID和餐廳詳細信息
               matchingGroupId: diningEvent['matching_group_id'],
-              diningEventId: diningEvent['id'],
+              diningEventId: diningEventId, // 使用新變數
               restaurantInfo: restaurant,
-              eventStatus: dinnerEventStatus, // 保存聚餐事件狀態
-              reservationName: reservationName, // 保存預訂人姓名
-              reservationPhone: reservationPhone, // 保存預訂人電話
-              attendees: attendeeCount, // 保存用餐人數
+              eventStatus: dinnerEventStatus,
+              reservationName: reservationName,
+              reservationPhone: reservationPhone,
+              attendees: attendeeCount,
             );
 
             debugPrint('已更新UserStatusService中的餐廳信息: ${restaurant['name']}');
@@ -427,6 +523,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           dinnerEventStatus = userStatusService.eventStatus;
           reservationName = userStatusService.reservationName;
           reservationPhone = userStatusService.reservationPhone;
+
+          // 嘗試從 UserStatusService 獲取聚餐事件ID
+          diningEventId = userStatusService.diningEventId;
+          if (diningEventId != null) {
+            _subscribeToDiningEvent(diningEventId);
+          }
 
           if (cachedRestaurantInfo != null) {
             restaurantName = cachedRestaurantInfo['name'];
@@ -493,6 +595,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           _dinnerEventStatus = dinnerEventStatus;
           _reservationName = reservationName;
           _reservationPhone = reservationPhone;
+          _diningEventId = diningEventId; // 新增: 保存聚餐事件ID
           _isLoading = false;
         });
 
