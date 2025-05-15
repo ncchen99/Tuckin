@@ -124,7 +124,7 @@ class DinnerTimeUtils:
         current_week_target = this_week_target
 
         # 決定要顯示的聚餐日期（這週、下週或下下週）
-        # 根據用戶要求，只需判斷聚餐時間是否已過
+        # 根據用戶要求，只需判斷聚餐時間是否已過或即將到來
         dinner_date_time = datetime(
             current_week_target.year,
             current_week_target.month,
@@ -135,9 +135,13 @@ class DinnerTimeUtils:
         # 將時間設置為臺灣時區
         dinner_date_time = TW_TIMEZONE.localize(dinner_date_time)
 
-        # 簡化判斷邏輯：只判斷當前時間是否已過本週聚餐時間
-        if now > dinner_date_time:
-            # 如果已經過了本週聚餐時間，顯示下週聚餐
+        # 計算距離聚餐時間的小時數
+        time_until_dinner = dinner_date_time - now
+        time_until_dinner_hours = time_until_dinner.total_seconds() / 3600
+
+        # 修改判斷邏輯：判斷當前時間是否已過本週聚餐時間或距離聚餐時間小於61小時
+        if now > dinner_date_time or time_until_dinner_hours < 61:
+            # 如果已經過了本週聚餐時間或時間太近，顯示下週聚餐
             dinner_date_time = TW_TIMEZONE.localize(datetime(
                 next_week_target.year,
                 next_week_target.month,
@@ -146,10 +150,13 @@ class DinnerTimeUtils:
                 0,
             ))
             selected_dinner_date = next_week_target
-            print('選擇下週聚餐，因為本週聚餐時間已過')
             
-            # 如果下週聚餐時間也已過（不太可能但以防萬一）
-            if now > dinner_date_time:
+            # 計算距離下週聚餐時間的小時數
+            time_until_next_dinner = dinner_date_time - now
+            time_until_next_dinner_hours = time_until_next_dinner.total_seconds() / 3600
+            
+            # 如果下週聚餐時間也已過或時間太近
+            if now > dinner_date_time or time_until_next_dinner_hours < 61:
                 dinner_date_time = TW_TIMEZONE.localize(datetime(
                     after_next_week_target.year,
                     after_next_week_target.month,
@@ -158,7 +165,9 @@ class DinnerTimeUtils:
                     0,
                 ))
                 selected_dinner_date = after_next_week_target
-                print('選擇下下週聚餐，因為下週聚餐時間也已過')
+                print('選擇下下週聚餐，因為下週聚餐時間也過近')
+            else:
+                print('選擇下週聚餐，因為本週聚餐時間過近')
         else:
             # 顯示本週聚餐
             selected_dinner_date = current_week_target

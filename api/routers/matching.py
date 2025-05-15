@@ -582,7 +582,11 @@ async def _save_matching_groups_to_db(
     supabase: Client, 
     result_groups: List[Dict], 
     notification_service: NotificationService,
-    confirm_deadline: datetime
+    confirm_deadline: datetime,
+    open_restaurants: List[Dict] = None,  # 新增參數：營業中餐廳列表
+    dinner_weekday: int = None,           # 新增參數：聚餐星期幾
+    dinner_hour: int = None,              # 新增參數：聚餐小時
+    dinner_minute: int = None             # 新增參數：聚餐分鐘
 ) -> Tuple[int, int]:
     """
     將配對結果保存到數據庫，更新用戶狀態，發送通知 (已重構)
@@ -634,9 +638,25 @@ async def _save_matching_groups_to_db(
             else:
                  logger.warning(f"更新用戶 {user_id} 加入組別 {group_id} 的狀態失敗")
         
-        # 為群組推薦餐廳
+        # 為群組推薦餐廳 (使用預先獲取的營業中餐廳列表)
         try:
-            await recommend_restaurants_for_group(supabase, group_id, group["user_ids"])
+            if open_restaurants is not None:
+                # 使用已過濾的營業中餐廳列表
+                food_preferences = await get_group_food_preferences(supabase, user_ids)
+                recommended_restaurants = await select_recommended_restaurants_from_list(
+                    food_preferences, 
+                    open_restaurants
+                )
+                
+                if recommended_restaurants:
+                    await save_recommended_restaurants(
+                        supabase, 
+                        group_id, 
+                        recommended_restaurants
+                    )
+            else:
+                # 如果沒有預先獲取的列表，使用原來的方法
+                await recommend_restaurants_for_group(supabase, group_id, user_ids)
         except Exception as e:
             logger.error(f"為群組 {group_id} 推薦餐廳時出錯: {str(e)}")
     
@@ -761,7 +781,31 @@ async def process_batch_matching(supabase: Client):
         notification_service = NotificationService(use_service_role=True)
         # 使用 DinnerTimeUtils 計算確認期限
         dinner_time_info = DinnerTimeUtils.calculate_dinner_time_info()
-        created_groups, total_matched_users = await _save_matching_groups_to_db(supabase, result_groups, notification_service, dinner_time_info.cancel_deadline)
+        
+        # 優化：預先獲取營業中的餐廳，用於所有組的餐廳推薦
+        dinner_time = dinner_time_info.next_dinner_time
+        dinner_weekday = dinner_time.weekday()  # 0=星期一, 6=星期日
+        dinner_hour = dinner_time.hour
+        dinner_minute = dinner_time.minute
+        
+        open_restaurants = await get_open_restaurants(
+            supabase, 
+            dinner_weekday, 
+            dinner_hour, 
+            dinner_minute
+        )
+        logger.info(f"找到 {len(open_restaurants)} 家營業中的餐廳，用於所有組推薦")
+        
+        created_groups, total_matched_users = await _save_matching_groups_to_db(
+            supabase, 
+            result_groups, 
+            notification_service, 
+            dinner_time_info.cancel_deadline,
+            open_restaurants,  # 傳遞營業中餐廳列表
+            dinner_weekday,
+            dinner_hour,
+            dinner_minute
+        )
         
         result_message = f"批量配對完成：共創建 {created_groups} 個組別"
         logger.info(result_message)
@@ -804,46 +848,167 @@ async def process_batch_matching(supabase: Client):
             "total_users_processed": None
         }
 
-# 在文件末尾添加餐廳推薦相關函數
-async def recommend_restaurants_for_group(supabase: Client, group_id: str, user_ids: List[str]) -> bool:
+# 新增函數：獲取所有營業中的餐廳
+async def get_open_restaurants(
+    supabase: Client, 
+    dinner_weekday: int, 
+    dinner_hour: int, 
+    dinner_minute: int
+) -> List[Dict]:
     """
-    為群組推薦餐廳並保存到restaurant_votes表
+    獲取所有在指定時間營業的系統內建餐廳
     
-    基於群組成員的食物偏好和餐廳營業時間，推薦2家餐廳
+    Args:
+        supabase: Supabase客戶端
+        dinner_weekday: 聚餐星期幾 (0=星期一, 6=星期日)
+        dinner_hour: 聚餐小時 (0-23)
+        dinner_minute: 聚餐分鐘 (0-59)
+        
+    Returns:
+        List[Dict]: 營業中的餐廳列表
     """
     try:
-        logger.info(f"為群組 {group_id} 推薦餐廳")
+        # 調整星期幾的表示方式，使其與 Google Places API 一致 (0=星期日, 6=星期六)
+        google_weekday = (dinner_weekday + 1) % 7
+        logger.info(f"獲取營業中餐廳：聚餐時間為星期 {google_weekday}，{dinner_hour}:{dinner_minute}")
         
-        # 1. 獲取群組成員的食物偏好
-        food_preferences = await get_group_food_preferences(supabase, user_ids)
+        # 查詢所有餐廳 - 只選擇系統內建餐廳（is_user_added 為 FALSE 或 NULL）
+        system_restaurants_false = supabase.table("restaurants") \
+            .select("id, name, category, business_hours") \
+            .eq("is_user_added", False) \
+            .execute()
+            
+        system_restaurants_null = supabase.table("restaurants") \
+            .select("id, name, category, business_hours") \
+            .is_("is_user_added", "null") \
+            .execute()
+            
+        # 合併查詢結果
+        all_restaurants_data = []
+        if system_restaurants_false.data:
+            all_restaurants_data.extend(system_restaurants_false.data)
+        if system_restaurants_null.data:
+            all_restaurants_data.extend(system_restaurants_null.data)
+            
+        if not all_restaurants_data:
+            logger.warning("找不到任何系統內建餐廳")
+            return []
+            
+        # 過濾出營業中的餐廳
+        open_restaurants = []
+        for restaurant in all_restaurants_data:
+            restaurant_id = restaurant["id"]
+            restaurant_name = restaurant["name"]
+            business_hours = restaurant.get("business_hours")
+            
+            if is_restaurant_open(business_hours, google_weekday, dinner_hour, dinner_minute):
+                open_restaurants.append(restaurant)
+                logger.info(f"餐廳 {restaurant_name} 在聚餐時間營業")
+            else:
+                logger.debug(f"餐廳 {restaurant_name} 在聚餐時間不營業")
+                
+        logger.info(f"共找到 {len(open_restaurants)}/{len(all_restaurants_data)} 家營業中的餐廳")
+        return open_restaurants
+        
+    except Exception as e:
+        logger.error(f"獲取營業中餐廳時出錯: {str(e)}")
+        return []
+
+# 新增函數：從已過濾的營業中餐廳列表中選擇推薦餐廳
+async def select_recommended_restaurants_from_list(
+    food_preferences: Dict[str, int],
+    open_restaurants: List[Dict],
+    limit: int = 2
+) -> List[str]:
+    """
+    從已過濾的營業中餐廳列表中，基於食物偏好選擇推薦餐廳
+    
+    Args:
+        food_preferences: 食物偏好計數字典，格式: {'台灣料理': 3, '日式料理': 2, ...}
+        open_restaurants: 營業中的餐廳列表
+        limit: 推薦餐廳數量限制
+        
+    Returns:
+        List[str]: 推薦餐廳ID列表
+    """
+    try:
+        if not open_restaurants:
+            logger.warning("沒有營業中的餐廳可供推薦")
+            return []
+            
+        # 如果沒有偏好資料，隨機選擇營業中的餐廳
         if not food_preferences:
-            logger.warning(f"無法獲取群組 {group_id} 成員的食物偏好")
-            return False
+            random_restaurants = random.sample(open_restaurants, min(limit, len(open_restaurants)))
+            return [r["id"] for r in random_restaurants]
         
-        # 2. 獲取聚餐時間資訊
-        dinner_time_info = DinnerTimeUtils.calculate_dinner_time_info()
-        dinner_time = dinner_time_info.next_dinner_time
-        dinner_weekday = dinner_time.weekday()  # 0=星期一, 6=星期日
-        dinner_hour = dinner_time.hour
-        dinner_minute = dinner_time.minute
+        # 按偏好度排序類別
+        sorted_preferences = sorted(food_preferences.items(), key=lambda x: x[1], reverse=True)
         
-        logger.info(f"聚餐時間: {dinner_time.strftime('%Y-%m-%d %H:%M')}, 星期{dinner_weekday+1}, 時間: {dinner_hour}:{dinner_minute}")
+        # 選擇排名前 limit*2 的類別，增加多樣性
+        top_categories = [category for category, _ in sorted_preferences[:limit*2]]
+        
+        if not top_categories:
+            # 如果沒有類別偏好，隨機選擇營業中的餐廳
+            random_restaurants = random.sample(open_restaurants, min(limit, len(open_restaurants)))
+            return [r["id"] for r in random_restaurants]
             
-        # 3. 根據偏好和營業時間選擇兩家餐廳
-        recommended_restaurants = await select_recommended_restaurants(
-            supabase, 
-            food_preferences,
-            dinner_weekday,
-            dinner_hour,
-            dinner_minute
-        )
+        # 從營業中的餐廳和偏好類別中選擇推薦
+        recommended_ids = []
+        for category in top_categories:
+            if len(recommended_ids) >= limit:
+                break
+                
+            # 從營業中的餐廳中查找符合類別的餐廳
+            category_restaurants = [r for r in open_restaurants if r.get("category") == category]
+            
+            if category_restaurants:
+                # 隨機選擇一家符合條件的餐廳
+                restaurant = random.choice(category_restaurants)
+                restaurant_id = restaurant["id"]
+                if restaurant_id not in recommended_ids:
+                    recommended_ids.append(restaurant_id)
         
-        if not recommended_restaurants or len(recommended_restaurants) == 0:
-            logger.warning(f"無法為群組 {group_id} 推薦餐廳")
+        # 如果推薦不足，從其他營業中的餐廳中隨機補充
+        if len(recommended_ids) < limit:
+            remaining = limit - len(recommended_ids)
+            
+            # 排除已選擇的餐廳
+            remaining_restaurants = [r for r in open_restaurants if r["id"] not in recommended_ids]
+            
+            if remaining_restaurants:
+                random_picks = random.sample(remaining_restaurants, min(remaining, len(remaining_restaurants)))
+                for r in random_picks:
+                    recommended_ids.append(r["id"])
+        
+        return recommended_ids
+        
+    except Exception as e:
+        logger.error(f"從營業餐廳列表中選擇推薦時出錯: {str(e)}")
+        return []
+
+# 新增函數：保存推薦餐廳到數據庫
+async def save_recommended_restaurants(
+    supabase: Client, 
+    group_id: str, 
+    restaurant_ids: List[str]
+) -> bool:
+    """
+    將推薦餐廳保存到restaurant_votes表
+    
+    Args:
+        supabase: Supabase客戶端
+        group_id: 群組ID
+        restaurant_ids: 推薦餐廳ID列表
+        
+    Returns:
+        bool: 是否成功保存
+    """
+    try:
+        if not restaurant_ids:
+            logger.warning(f"沒有餐廳可推薦給群組 {group_id}")
             return False
             
-        # 4. 將推薦餐廳保存到restaurant_votes表
-        for restaurant_id in recommended_restaurants:
+        for restaurant_id in restaurant_ids:
             # 檢查是否已存在記錄
             existing_vote = supabase.table("restaurant_votes") \
                 .select("id") \
@@ -869,6 +1034,60 @@ async def recommend_restaurants_for_group(supabase: Client, group_id: str, user_
             logger.info(f"成功為群組 {group_id} 推薦餐廳 {restaurant_id}")
         
         return True
+        
+    except Exception as e:
+        logger.error(f"保存推薦餐廳時出錯: {str(e)}")
+        return False
+
+# 修改原函數，引用新實現
+async def recommend_restaurants_for_group(supabase: Client, group_id: str, user_ids: List[str]) -> bool:
+    """
+    為群組推薦餐廳並保存到restaurant_votes表
+    
+    基於群組成員的食物偏好和餐廳營業時間，推薦2家餐廳
+    """
+    try:
+        logger.info(f"為群組 {group_id} 推薦餐廳")
+        
+        # 1. 獲取群組成員的食物偏好
+        food_preferences = await get_group_food_preferences(supabase, user_ids)
+        if not food_preferences:
+            logger.warning(f"無法獲取群組 {group_id} 成員的食物偏好")
+            return False
+        
+        # 2. 獲取聚餐時間資訊
+        dinner_time_info = DinnerTimeUtils.calculate_dinner_time_info()
+        dinner_time = dinner_time_info.next_dinner_time
+        dinner_weekday = dinner_time.weekday()  # 0=星期一, 6=星期日
+        dinner_hour = dinner_time.hour
+        dinner_minute = dinner_time.minute
+        
+        logger.info(f"聚餐時間: {dinner_time.strftime('%Y-%m-%d %H:%M')}, 星期{dinner_weekday+1}, 時間: {dinner_hour}:{dinner_minute}")
+            
+        # 3. 獲取營業中的餐廳
+        open_restaurants = await get_open_restaurants(
+            supabase, 
+            dinner_weekday, 
+            dinner_hour, 
+            dinner_minute
+        )
+        
+        if not open_restaurants:
+            logger.warning(f"找不到營業中的餐廳，無法為群組 {group_id} 推薦餐廳")
+            return False
+            
+        # 4. 從營業中的餐廳中選擇推薦餐廳
+        recommended_ids = await select_recommended_restaurants_from_list(
+            food_preferences, 
+            open_restaurants
+        )
+        
+        if not recommended_ids:
+            logger.warning(f"無法為群組 {group_id} 推薦餐廳")
+            return False
+            
+        # 5. 保存推薦餐廳
+        return await save_recommended_restaurants(supabase, group_id, recommended_ids)
         
     except Exception as e:
         logger.error(f"推薦餐廳時出錯: {str(e)}")
@@ -916,118 +1135,6 @@ async def get_group_food_preferences(supabase: Client, user_ids: List[str]) -> D
     except Exception as e:
         logger.error(f"獲取群組食物偏好時出錯: {str(e)}")
         return {}
-
-async def select_recommended_restaurants(
-    supabase: Client, 
-    food_preferences: Dict[str, int],
-    dinner_weekday: int,
-    dinner_hour: int,
-    dinner_minute: int,
-    limit: int = 2
-) -> List[str]:
-    """
-    基於食物偏好和營業時間選擇推薦餐廳
-    
-    策略:
-    1. 過濾聚餐時間有營業的餐廳
-    2. 如果有共同偏好，優先選擇符合最受歡迎類別的餐廳
-    3. 如果偏好多樣化，選擇覆蓋多數用戶偏好的餐廳
-    4. 如果沒有偏好資料，隨機選擇營業中的餐廳
-    """
-    try:
-        # 調整星期幾的表示方式，使其與 Google Places API 一致 (0=星期日, 6=星期六)
-        google_weekday = (dinner_weekday + 1) % 7
-        logger.info(f"聚餐時間：星期 {google_weekday}，{dinner_hour}:{dinner_minute}")
-        
-        # 查詢所有餐廳並檢查營業時間
-        # 只選擇系統內建餐廳（is_user_added 為 FALSE 或 NULL）
-        # 使用兩次查詢並合併結果，處理 is_user_added = FALSE 或 is_user_added IS NULL 的情況
-        system_restaurants_false = supabase.table("restaurants") \
-            .select("id, name, category, business_hours") \
-            .eq("is_user_added", False) \
-            .execute()
-            
-        system_restaurants_null = supabase.table("restaurants") \
-            .select("id, name, category, business_hours") \
-            .is_("is_user_added", "null") \
-            .execute()
-            
-        # 合併查詢結果
-        all_restaurants_data = []
-        if system_restaurants_false.data:
-            all_restaurants_data.extend(system_restaurants_false.data)
-        if system_restaurants_null.data:
-            all_restaurants_data.extend(system_restaurants_null.data)
-            
-        if not all_restaurants_data:
-            logger.warning("找不到任何系統內建餐廳")
-            return []
-            
-        # 過濾出營業中的餐廳
-        open_restaurants = []
-        for restaurant in all_restaurants_data:
-            restaurant_id = restaurant["id"]
-            restaurant_name = restaurant["name"]
-            business_hours = restaurant.get("business_hours")
-            
-            if is_restaurant_open(business_hours, google_weekday, dinner_hour, dinner_minute):
-                open_restaurants.append(restaurant)
-                logger.info(f"餐廳 {restaurant_name} 在聚餐時間營業")
-            else:
-                logger.info(f"餐廳 {restaurant_name} 在聚餐時間不營業")
-                
-        if not open_restaurants:
-            logger.warning("找不到聚餐時間營業的系統內建餐廳")
-            return []
-            
-        # 如果沒有偏好資料，隨機選擇營業中的餐廳
-        if not food_preferences:
-            random.shuffle(open_restaurants)
-            return [r["id"] for r in open_restaurants[:limit]]
-        
-        # 按偏好度排序類別
-        sorted_preferences = sorted(food_preferences.items(), key=lambda x: x[1], reverse=True)
-        
-        # 選擇排名前 limit*2 的類別，增加多樣性
-        top_categories = [category for category, _ in sorted_preferences[:limit*2]]
-        
-        if not top_categories:
-            # 如果沒有類別偏好，隨機選擇營業中的餐廳
-            random.shuffle(open_restaurants)
-            return [r["id"] for r in open_restaurants[:limit]]
-            
-        # 從營業中的餐廳和偏好類別中選擇推薦
-        recommended_ids = []
-        for category in top_categories:
-            if len(recommended_ids) >= limit:
-                break
-                
-            # 從營業中的餐廳中查找符合類別的餐廳
-            category_restaurants = [r for r in open_restaurants if r.get("category") == category]
-            
-            if category_restaurants:
-                # 隨機選擇一家符合條件的餐廳
-                restaurant = random.choice(category_restaurants)
-                restaurant_id = restaurant["id"]
-                if restaurant_id not in recommended_ids:
-                    recommended_ids.append(restaurant_id)
-        
-        # 如果推薦不足，從其他營業中的餐廳中隨機補充
-        if len(recommended_ids) < limit:
-            remaining = limit - len(recommended_ids)
-            
-            # 排除已選擇的餐廳
-            remaining_restaurants = [r for r in open_restaurants if r["id"] not in recommended_ids]
-            random.shuffle(remaining_restaurants)
-            
-            for i in range(min(remaining, len(remaining_restaurants))):
-                recommended_ids.append(remaining_restaurants[i]["id"])
-        
-        return recommended_ids
-        
-    except Exception as e:
-        logger.error(f"選擇推薦餐廳時出錯: {str(e)}")
-        return []
 
 def is_restaurant_open(business_hours_json, weekday, hour, minute):
     """
