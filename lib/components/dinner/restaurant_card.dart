@@ -365,7 +365,7 @@ class RecommendRestaurantCard extends StatelessWidget {
         margin: EdgeInsets.symmetric(vertical: 12.h, horizontal: 20.w),
         height: 124.h, // 與餐廳卡片高度相符
         decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 255, 255, 255), // 改為橘色背景
+          color: Colors.white.withOpacity(0.9),
           borderRadius: BorderRadius.circular(15.r),
           boxShadow: [
             BoxShadow(
