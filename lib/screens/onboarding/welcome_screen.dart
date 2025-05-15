@@ -95,7 +95,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     super.initState();
 
     // 初始化影片播放器
-    _videoController = VideoPlayerController.asset('assets/video/intro.mp4')
+    _videoController = VideoPlayerController.asset(
+        'assets/video/intro.mp4',
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      )
       ..initialize().then((_) {
         setState(() {
           _isVideoInitialized = true;
