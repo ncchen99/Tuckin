@@ -507,116 +507,100 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                         color: Color(0xFF23456B),
                       ),
                     )
-                    : Column(
-                      children: [
-                        // 頂部導航欄
-                        HeaderBar(title: '餐廳選擇'),
+                    : SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 頂部導航欄 - 移到滾動區域內
+                          HeaderBar(title: '餐廳選擇'),
 
-                        Expanded(
-                          child: SingleChildScrollView(
-                            physics: const BouncingScrollPhysics(),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(height: 20.h),
+                          SizedBox(height: 20.h),
 
-                                // 提示文字
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 20.w,
-                                  ),
-                                  child: Text(
-                                    '請選擇一家餐廳',
-                                    style: TextStyle(
-                                      fontSize: 22.sp,
-                                      fontFamily: 'OtsutomeFont',
-                                      color: const Color(0xFF23456B),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-
-                                SizedBox(height: 15.h),
-
-                                // 餐廳列表
-                                ..._restaurantList.map((restaurant) {
-                                  // 添加調試信息
-                                  debugPrint(
-                                    '餐廳卡片數據: ${restaurant['name']}, 票數: ${restaurant['votes']}',
-                                  );
-
-                                  return RestaurantCard(
-                                    name: restaurant['name'],
-                                    imageUrl: restaurant['imageUrl'],
-                                    category: restaurant['category'],
-                                    address: restaurant['address'],
-                                    isSelected:
-                                        _selectedRestaurantId ==
-                                        restaurant['id'],
-                                    onTap:
-                                        () => _handleRestaurantTap(
-                                          restaurant['id'],
-                                        ),
-                                    mapUrl: restaurant['mapUrl'],
-                                    voteCount: restaurant['votes'],
-                                  );
-                                }),
-
-                                // 用戶推薦的餐廳（如果有）
-                                if (_userRecommendedRestaurant != null)
-                                  RestaurantCard(
-                                    name: _userRecommendedRestaurant!['name'],
-                                    imageUrl:
-                                        _userRecommendedRestaurant!['imageUrl'],
-                                    category:
-                                        _userRecommendedRestaurant!['category'],
-                                    address:
-                                        _userRecommendedRestaurant!['address'],
-                                    isSelected:
-                                        _selectedRestaurantId ==
-                                        _userRecommendedRestaurant!['id'],
-                                    onTap:
-                                        () => _handleRestaurantTap(
-                                          _userRecommendedRestaurant!['id'],
-                                        ),
-                                    mapUrl:
-                                        _userRecommendedRestaurant!['mapUrl'],
-                                  )
-                                else
-                                  // 推薦餐廳卡片
-                                  RecommendRestaurantCard(
-                                    onTap: _handleRecommendRestaurant,
-                                  ),
-
-                                SizedBox(height: 40.h),
-
-                                // 提交按鈕
-                                Center(
-                                  child:
-                                      _isSubmitting
-                                          ? LoadingImage(
-                                            width: 60.w,
-                                            height: 60.h,
-                                            color: const Color(0xFF23456B),
-                                          )
-                                          : ImageButton(
-                                            text: '送出選擇',
-                                            imagePath:
-                                                'assets/images/ui/button/red_l.png',
-                                            width: 160.w,
-                                            height: 70.h,
-                                            onPressed: _handleSubmit,
-                                            isEnabled:
-                                                _selectedRestaurantId != null,
-                                          ),
-                                ),
-
-                                SizedBox(height: 30.h),
-                              ],
+                          // 提示文字
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20.w),
+                            child: Text(
+                              '請選擇一家餐廳',
+                              style: TextStyle(
+                                fontSize: 22.sp,
+                                fontFamily: 'OtsutomeFont',
+                                color: const Color(0xFF23456B),
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+
+                          SizedBox(height: 15.h),
+
+                          // 餐廳列表
+                          ..._restaurantList.map((restaurant) {
+                            // 添加調試信息
+                            debugPrint(
+                              '餐廳卡片數據: ${restaurant['name']}, 票數: ${restaurant['votes']}',
+                            );
+
+                            return RestaurantCard(
+                              name: restaurant['name'],
+                              imageUrl: restaurant['imageUrl'],
+                              category: restaurant['category'],
+                              address: restaurant['address'],
+                              isSelected:
+                                  _selectedRestaurantId == restaurant['id'],
+                              onTap:
+                                  () => _handleRestaurantTap(restaurant['id']),
+                              mapUrl: restaurant['mapUrl'],
+                              voteCount: restaurant['votes'],
+                            );
+                          }),
+
+                          // 用戶推薦的餐廳（如果有）
+                          if (_userRecommendedRestaurant != null)
+                            RestaurantCard(
+                              name: _userRecommendedRestaurant!['name'],
+                              imageUrl: _userRecommendedRestaurant!['imageUrl'],
+                              category: _userRecommendedRestaurant!['category'],
+                              address: _userRecommendedRestaurant!['address'],
+                              isSelected:
+                                  _selectedRestaurantId ==
+                                  _userRecommendedRestaurant!['id'],
+                              onTap:
+                                  () => _handleRestaurantTap(
+                                    _userRecommendedRestaurant!['id'],
+                                  ),
+                              mapUrl: _userRecommendedRestaurant!['mapUrl'],
+                            )
+                          else
+                            // 推薦餐廳卡片
+                            RecommendRestaurantCard(
+                              onTap: _handleRecommendRestaurant,
+                            ),
+
+                          SizedBox(height: 40.h),
+
+                          // 提交按鈕
+                          Center(
+                            child:
+                                _isSubmitting
+                                    ? LoadingImage(
+                                      width: 60.w,
+                                      height: 60.h,
+                                      color: const Color(0xFF23456B),
+                                    )
+                                    : ImageButton(
+                                      text: '送出選擇',
+                                      imagePath:
+                                          'assets/images/ui/button/red_l.png',
+                                      width: 160.w,
+                                      height: 70.h,
+                                      onPressed: _handleSubmit,
+                                      isEnabled: _selectedRestaurantId != null,
+                                    ),
+                          ),
+
+                          SizedBox(height: 30.h),
+                        ],
+                      ),
                     ),
           ),
         ),
