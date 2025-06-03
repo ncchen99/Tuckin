@@ -42,6 +42,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   String? _reservationName;
   String? _reservationPhone;
   String? _diningEventId; // 新增: 保存聚餐事件ID用於訂閱
+  String? _diningEventDescription; // 新增: 保存聚餐事件描述（密語）
 
   @override
   void initState() {
@@ -341,6 +342,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     final newReservationName = eventData['reservation_name'] as String?;
     final newReservationPhone = eventData['reservation_phone'] as String?;
     final newRestaurantId = eventData['restaurant_id'] as String?;
+    final newDescription = eventData['description'] as String?;
 
     // 檢查是否需要更新狀態
     bool needsUpdate = false;
@@ -360,6 +362,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         newReservationPhone != _reservationPhone) {
       needsUpdate = true;
       debugPrint('訂位人電話變更：$_reservationPhone -> $newReservationPhone');
+    }
+
+    // 檢查描述（密語）是否變更
+    if (newDescription != null && newDescription != _diningEventDescription) {
+      needsUpdate = true;
+      debugPrint('聚餐事件描述變更：$_diningEventDescription -> $newDescription');
     }
 
     // 檢查餐廳ID是否變更
@@ -400,6 +408,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         _dinnerEventStatus = newStatus ?? _dinnerEventStatus;
         _reservationName = newReservationName ?? _reservationName;
         _reservationPhone = newReservationPhone ?? _reservationPhone;
+        _diningEventDescription = newDescription ?? _diningEventDescription;
       });
 
       // 如果餐廳ID變更或需要重新載入數據，則重新載入完整頁面數據
@@ -484,6 +493,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         String? reservationPhone;
         int? attendeeCount; // 新增變數存儲用餐人數
         String? diningEventId; // 新增: 保存聚餐事件ID
+        String? diningEventDescription; // 新增: 保存聚餐事件描述
 
         if (diningEvent != null) {
           // 從聚餐事件中獲取時間 - 修正時區處理
@@ -496,6 +506,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           dinnerEventStatus = diningEvent['status'];
           reservationName = diningEvent['reservation_name'];
           reservationPhone = diningEvent['reservation_phone'];
+          diningEventDescription = diningEvent['description'];
 
           // 獲取聚餐事件ID並訂閱
           diningEventId = diningEvent['id'];
@@ -631,6 +642,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           _reservationName = reservationName;
           _reservationPhone = reservationPhone;
           _diningEventId = diningEventId; // 新增: 保存聚餐事件ID
+          _diningEventDescription = diningEventDescription; // 新增: 保存聚餐事件描述
           _isLoading = false;
         });
 
@@ -904,7 +916,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             _reservationPhone!.isNotEmpty) {
           message = '$_reservationName幫忙訂位了！ 手機號碼：$_reservationPhone';
         } else {
-          message = '餐廳無法訂位，可能需要候位，請使用以下密語找到聚餐伙伴：\n\n${_getRandomPassphrase()}';
+          // 優先使用資料庫中的描述（統一密語），如果沒有才隨機生成
+          String passphrase =
+              _diningEventDescription?.isNotEmpty == true
+                  ? _diningEventDescription!
+                  : _getRandomPassphrase();
+          message = '餐廳無法訂位，可能需要候位，\n使用密語找到夥伴：\n\n$passphrase';
         }
 
         return Container(

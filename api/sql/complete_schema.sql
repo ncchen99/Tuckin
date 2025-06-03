@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS rating_sessions (
 -- 創建用戶評價資料表
 CREATE TABLE IF NOT EXISTS user_ratings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    dining_event_id UUID NOT NULL REFERENCES dining_events(id) ON DELETE CASCADE,
+    dining_event_id UUID NOT NULL REFERENCES dining_events(id),
     from_user_id UUID NOT NULL REFERENCES auth.users(id),
     to_user_id UUID NOT NULL REFERENCES auth.users(id),
     rating_type TEXT NOT NULL CHECK (rating_type IN ('like', 'dislike', 'no_show')),
@@ -196,6 +196,7 @@ CREATE TABLE IF NOT EXISTS user_ratings (
 -- 創建聚餐歷史紀錄表
 CREATE TABLE IF NOT EXISTS dining_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    original_event_id UUID NOT NULL UNIQUE, -- 保存原始的dining_event_id
     restaurant_id UUID,
     restaurant_name TEXT,
     event_name TEXT NOT NULL,
@@ -209,6 +210,7 @@ CREATE TABLE IF NOT EXISTS dining_history (
 -- 為歷史紀錄表創建索引以提高查詢效能
 CREATE INDEX IF NOT EXISTS idx_dining_history_user_ids ON dining_history USING GIN (user_ids);
 CREATE INDEX IF NOT EXISTS idx_dining_history_event_date ON dining_history(event_date);
+CREATE INDEX IF NOT EXISTS idx_dining_history_original_event_id ON dining_history(original_event_id);
 
 -- 創建觸發器以自動更新updated_at時間戳
 CREATE OR REPLACE FUNCTION update_timestamp_column()

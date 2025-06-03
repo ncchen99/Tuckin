@@ -302,14 +302,31 @@ async def confirm_restaurant(
                 detail="聚餐事件狀態不是正在確認中，無法進行確認操作"
             )
             
+        # 準備更新資料
+        update_data = {
+            "status": "confirmed", 
+            "reservation_name": request.reservation_name,
+            "reservation_phone": request.reservation_phone,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        # 如果預訂姓名和電話都是空值，表示餐廳無法訂位，生成密語
+        if not request.reservation_name.strip() and not request.reservation_phone.strip():
+            import random
+            passphrases = [
+                '不好意思，你可以幫我拍照嗎',
+                '不好意思，可以跟你借衛生紙嗎',
+                '不好意思，請問火車站怎麼走',
+                '不好意思，你有在排隊嗎',
+                '想問你有吃過這家店嗎',
+                '你好，你也在等朋友嗎',
+            ]
+            passphrase = random.choice(passphrases)
+            update_data["description"] = passphrase
+            
         # 更新狀態為confirmed並保存訂位人資訊
         updated_event = supabase.table("dining_events") \
-            .update({
-                "status": "confirmed", 
-                "reservation_name": request.reservation_name,
-                "reservation_phone": request.reservation_phone,
-                "updated_at": datetime.utcnow().isoformat()
-            }) \
+            .update(update_data) \
             .eq("id", str(event_id)) \
             .execute()
             
@@ -913,6 +930,7 @@ async def finalize_dining_events(supabase: Client):
                 restaurant_id = event.get("restaurant_id")
                 
                 history_records.append({
+                    "original_event_id": event["id"],  # 保存原始的dining_event_id
                     "restaurant_id": restaurant_id,
                     "restaurant_name": restaurant_map.get(restaurant_id) if restaurant_id else None,
                     "event_name": event["name"],

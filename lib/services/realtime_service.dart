@@ -439,6 +439,7 @@ class RealtimeService with WidgetsBindingObserver {
       final reservationName = newRecord['reservation_name'] as String?;
       final reservationPhone = newRecord['reservation_phone'] as String?;
       final restaurantId = newRecord['restaurant_id'] as String?;
+      final description = newRecord['description'] as String?;
 
       // 創建變更事件數據
       Map<String, dynamic> eventData = {
@@ -447,10 +448,11 @@ class RealtimeService with WidgetsBindingObserver {
         'reservation_name': reservationName,
         'reservation_phone': reservationPhone,
         'restaurant_id': restaurantId,
+        'description': description,
       };
 
       debugPrint(
-        'RealtimeService: 聚餐事件狀態變更 - 新狀態: $diningStatus, 餐廳ID: $restaurantId',
+        'RealtimeService: 聚餐事件狀態變更 - 新狀態: $diningStatus, 餐廳ID: $restaurantId, 描述: $description',
       );
 
       // 廣播聚餐事件變更通知
