@@ -117,9 +117,74 @@ class RealtimeService with WidgetsBindingObserver {
         } else {
           debugPrint('RealtimeService: 用戶狀態未改變，保持當前頁面');
         }
+
+        // 新增：如果用戶狀態是 waiting_attendance，訂閱聚餐事件變更
+        if (currentStatus == 'waiting_attendance') {
+          await _handleWaitingAttendanceStatus();
+        }
       }
     } catch (e) {
       debugPrint('RealtimeService: 應用恢復處理錯誤 - $e');
+    }
+  }
+
+  // 新增：處理 waiting_attendance 狀態的聚餐事件訂閱
+  Future<void> _handleWaitingAttendanceStatus() async {
+    try {
+      debugPrint('RealtimeService: 用戶狀態為 waiting_attendance，開始處理聚餐事件訂閱');
+
+      // 獲取用戶當前的聚餐事件資料
+      final diningEvent = await _databaseService.getCurrentDiningEvent(
+        _userId!,
+      );
+
+      if (diningEvent != null) {
+        final diningEventId = diningEvent['id'] as String?;
+
+        if (diningEventId != null && diningEventId.isNotEmpty) {
+          debugPrint('RealtimeService: 找到聚餐事件ID: $diningEventId，開始訂閱');
+
+          // 重新連接聚餐事件訂閱（如果尚未訂閱或需要重新訂閱）
+          if (!_isDiningEventsSubscribed) {
+            await subscribeToDiningEvent(diningEventId);
+          }
+
+          // 檢查聚餐事件的最新狀態，類似用戶狀態的邏輯
+          await _checkDiningEventStatusAndHandle(diningEvent);
+        } else {
+          debugPrint('RealtimeService: 聚餐事件ID為空');
+        }
+      } else {
+        debugPrint('RealtimeService: 未找到用戶的聚餐事件');
+      }
+    } catch (e) {
+      debugPrint('RealtimeService: 處理 waiting_attendance 狀態時發生錯誤 - $e');
+    }
+  }
+
+  // 新增：檢查聚餐事件狀態並處理（類似用戶狀態的邏輯）
+  Future<void> _checkDiningEventStatusAndHandle(
+    Map<String, dynamic> diningEventData,
+  ) async {
+    try {
+      debugPrint('RealtimeService: 檢查到聚餐事件狀態: ${diningEventData['status']}');
+
+      // 創建類似 _handleDiningEventChange 的事件數據
+      Map<String, dynamic> eventData = {
+        'status': diningEventData['status'],
+        'id': diningEventData['id'],
+        'reservation_name': diningEventData['reservation_name'],
+        'reservation_phone': diningEventData['reservation_phone'],
+        'restaurant_id': diningEventData['restaurant_id'],
+        'description': diningEventData['description'],
+      };
+
+      // 通知聚餐事件監聽器
+      _notifyDiningEventListeners(eventData);
+
+      debugPrint('RealtimeService: 已處理聚餐事件狀態變更通知');
+    } catch (e) {
+      debugPrint('RealtimeService: 檢查聚餐事件狀態時發生錯誤 - $e');
     }
   }
 
