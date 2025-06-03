@@ -494,11 +494,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                                   context,
                                   _dinnerTimeInfo!.weekdayText,
                                   iconPath,
+                                  '${_dinnerTimeInfo!.nextDinnerTime.hour}:${_dinnerTimeInfo!.nextDinnerTime.minute.toString().padLeft(2, '0')}',
                                   DateFormat(
-                                    'HH:mm',
-                                  ).format(_dinnerTimeInfo!.nextDinnerTime),
-                                  DateFormat(
-                                    'MM/dd',
+                                    'M 月 d 日',
                                   ).format(_dinnerTimeInfo!.nextDinnerDate),
                                 );
                               }(), // 立即調用此函數
@@ -660,7 +658,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
           Text(
             time,
             style: TextStyle(
-              fontSize: 18.sp,
+              fontSize: 20.sp,
               fontFamily: 'OtsutomeFont',
               color: const Color(0xFF23456B),
             ),
