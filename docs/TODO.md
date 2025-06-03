@@ -98,8 +98,8 @@
 - [ ] [前端] lib\screens\dinner\dinner_reservation_page.dart 要加入時間的取得是使用ntp 去取得而不是透過裝置的時間，並且使用台灣台北時間
 - [ ] [API] 大量用戶測試
 - [x] [前端] 音樂會暫停的問題，葉面完全窄入時暫停
-- [ ] [API] 聚餐出席的頁面日騎有誤
-- [ ] [前端] Realtime dinner info 不運作
+- [x] [API] 聚餐出席的頁面日騎有誤
+- [x] [前端] Realtime dinner info 不運作
 - [ ] [前端] 密語要儲存在 Supabase 
 - [ ] 設定 Cloud scheduler 定時任務
 - [x] 整理需求文件、API端點、SQL表格v、邏輯流程v(deepwiki)

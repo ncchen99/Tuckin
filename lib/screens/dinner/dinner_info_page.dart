@@ -340,9 +340,11 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     final newStatus = eventData['status'] as String?;
     final newReservationName = eventData['reservation_name'] as String?;
     final newReservationPhone = eventData['reservation_phone'] as String?;
+    final newRestaurantId = eventData['restaurant_id'] as String?;
 
     // 檢查是否需要更新狀態
     bool needsUpdate = false;
+    bool needsReloadData = false;
 
     if (newStatus != null && newStatus != _dinnerEventStatus) {
       needsUpdate = true;
@@ -360,6 +362,23 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
       debugPrint('訂位人電話變更：$_reservationPhone -> $newReservationPhone');
     }
 
+    // 檢查餐廳ID是否變更
+    if (newRestaurantId != null) {
+      // 獲取 UserStatusService 以檢查當前餐廳ID
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
+      );
+
+      final currentRestaurantId = userStatusService.dinnerRestaurantId;
+
+      if (currentRestaurantId != newRestaurantId) {
+        needsUpdate = true;
+        needsReloadData = true; // 餐廳變更時需要重新載入完整數據
+        debugPrint('餐廳ID變更：$currentRestaurantId -> $newRestaurantId');
+      }
+    }
+
     // 如果需要更新，則更新狀態並重新加載頁面數據
     if (needsUpdate) {
       // 獲取 UserStatusService 以更新 Provider 中的狀態
@@ -373,6 +392,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         eventStatus: newStatus,
         reservationName: newReservationName,
         reservationPhone: newReservationPhone,
+        dinnerRestaurantId: newRestaurantId,
       );
 
       // 更新本地狀態
@@ -381,6 +401,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         _reservationName = newReservationName ?? _reservationName;
         _reservationPhone = newReservationPhone ?? _reservationPhone;
       });
+
+      // 如果餐廳ID變更或需要重新載入數據，則重新載入完整頁面數據
+      if (needsReloadData) {
+        debugPrint('餐廳資訊變更，重新載入頁面數據');
+        _loadUserAndDinnerInfo();
+      }
 
       // 根據新狀態可能需要顯示相關對話框
       if (newStatus == 'pending_confirmation' && !_hasShownBookingDialog) {
