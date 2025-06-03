@@ -476,6 +476,7 @@ async def get_rating_form(
     """
     try:
         user_id = current_user.user.id
+        logger.info(f"評分表單請求 - 用戶ID: {user_id}, 聚餐事件ID: {request.dining_event_id}")
         
         # 獲取聚餐事件信息
         dining_event = supabase.table("dining_events") \
@@ -484,6 +485,7 @@ async def get_rating_form(
             .execute()
             
         if not dining_event.data:
+            logger.warning(f"找不到聚餐事件: {request.dining_event_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="找不到指定的聚餐事件"
@@ -491,22 +493,40 @@ async def get_rating_form(
             
         # 檢查聚餐事件狀態是否為 completed
         event_status = dining_event.data[0]["status"]
+        group_id = dining_event.data[0]["matching_group_id"]
+        logger.info(f"聚餐事件狀態: {event_status}, 群組ID: {group_id}")
+        
         if event_status != "completed":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="只有在聚餐事件完成後才能進行評分"
             )
-            
-        group_id = dining_event.data[0]["matching_group_id"]
         
         # 驗證用戶是否參與了該聚餐群組
+        logger.info(f"查詢用戶配對信息 - 用戶ID: {user_id}, 群組ID: {group_id}")
         user_group = supabase.table("user_matching_info") \
             .select("matching_group_id") \
             .eq("user_id", user_id) \
             .eq("matching_group_id", group_id) \
             .execute()
         
+        logger.info(f"用戶配對查詢結果: {user_group.data}")
+        
         if not user_group.data:
+            # 額外查詢：檢查該用戶是否有任何配對信息
+            all_user_groups = supabase.table("user_matching_info") \
+                .select("matching_group_id") \
+                .eq("user_id", user_id) \
+                .execute()
+            logger.warning(f"用戶 {user_id} 的所有配對信息: {all_user_groups.data}")
+            
+            # 檢查該群組的所有成員
+            group_members = supabase.table("matching_groups") \
+                .select("user_ids") \
+                .eq("id", group_id) \
+                .execute()
+            logger.warning(f"群組 {group_id} 的成員: {group_members.data}")
+            
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="您沒有參與此聚餐事件，無法提交評分"

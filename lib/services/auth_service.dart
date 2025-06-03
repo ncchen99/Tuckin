@@ -6,6 +6,7 @@ import 'supabase_service.dart';
 import 'api_service.dart';
 import 'error_handler.dart';
 import 'notification_service.dart';
+import 'user_status_service.dart';
 
 /// 認證服務，處理用戶登入、登出等認證相關功能
 class AuthService {
@@ -18,6 +19,7 @@ class AuthService {
   final SupabaseService _supabaseService = SupabaseService();
   final ApiService _apiService = ApiService();
   final ErrorHandler _errorHandler = ErrorHandler();
+  final UserStatusService _userStatusService = UserStatusService();
 
   // Google 登入實例
   GoogleSignIn? _googleSignIn;
@@ -138,6 +140,10 @@ class AuthService {
   // 登出
   Future<void> signOut() async {
     try {
+      // 重置所有聚餐相關資料
+      await _userStatusService.resetDiningData();
+      debugPrint('AuthService: 已重置聚餐相關資料');
+
       // 清除所有通知（包括排程通知）
       await NotificationService().clearAllNotificationsOnLogout();
 
