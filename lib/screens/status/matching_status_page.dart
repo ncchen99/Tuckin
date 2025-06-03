@@ -336,7 +336,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
             },
           ),
 
-          SizedBox(height: 25.h),
+          SizedBox(height: 20.h),
         ],
       ),
     );
