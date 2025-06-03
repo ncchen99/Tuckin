@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tuckin/services/api_service.dart';
 import 'package:tuckin/services/error_handler.dart';
+import 'package:tuckin/utils/dinner_time_utils.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'auth_service.dart'; // 需要AuthService來獲取token
@@ -29,7 +30,7 @@ class JoinMatchingResponse {
       groupId: json['group_id'],
       deadline:
           json['deadline'] != null
-              ? DateTime.parse(json['deadline']) // 將ISO 8601字串轉換為DateTime
+              ? DinnerTimeUtils.parseTimezoneAwareDateTime(json['deadline'])
               : null,
     );
   }

@@ -460,8 +460,11 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         String? diningEventId; // 新增: 保存聚餐事件ID
 
         if (diningEvent != null) {
-          // 從聚餐事件中獲取時間
-          dinnerTime = DateTime.parse(diningEvent['date']);
+          // 從聚餐事件中獲取時間 - 修正時區處理
+          final dateString = diningEvent['date'] as String;
+          dinnerTime = DinnerTimeUtils.parseTimezoneAwareDateTime(dateString);
+          debugPrint('原始時間字串: $dateString');
+          debugPrint('解析後的聚餐時間: $dinnerTime');
 
           // 從聚餐事件中獲取狀態和預訂信息
           dinnerEventStatus = diningEvent['status'];
@@ -496,10 +499,16 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             userStatusService.updateStatus(
               confirmedDinnerTime: dinnerTime,
               dinnerRestaurantId: diningEvent['restaurant_id'],
-              cancelDeadline: DateTime.parse(
-                diningEvent['status_change_time'] ??
-                    dinnerTime.toIso8601String(),
-              ),
+              cancelDeadline:
+                  (() {
+                    final statusChangeTimeString =
+                        diningEvent['status_change_time'] ??
+                        (dinnerTime?.toIso8601String() ??
+                            DateTime.now().toIso8601String());
+                    return DinnerTimeUtils.parseTimezoneAwareDateTime(
+                      statusChangeTimeString,
+                    );
+                  })(),
               // 新增：保存配對組ID、聚餐事件ID和餐廳詳細信息
               matchingGroupId: diningEvent['matching_group_id'],
               diningEventId: diningEventId, // 使用新變數

@@ -47,6 +47,23 @@ class DinnerTimeInfo {
 
 /// 聚餐時間計算工具類
 class DinnerTimeUtils {
+  /// 正確解析可能包含時區資訊的時間字串
+  /// 如果時間字串包含時區資訊，將其轉換為本地時間
+  /// 如果沒有時區資訊，假設是台灣時區(UTC+8)並轉換為本地時間
+  static DateTime parseTimezoneAwareDateTime(String dateTimeString) {
+    if (dateTimeString.contains('+') || dateTimeString.endsWith('Z')) {
+      // 如果包含時區資訊，先轉換為 UTC 再轉為本地時間
+      return DateTime.parse(dateTimeString).toLocal();
+    } else {
+      // 如果沒有時區資訊，假設是 UTC+8 (台灣時區)
+      final utcTime = DateTime.parse(dateTimeString);
+      return utcTime
+          .subtract(const Duration(hours: 8))
+          .toLocal()
+          .add(const Duration(hours: 8));
+    }
+  }
+
   /// 獲取當前ISO 8601週數
   static int getIsoWeekNumber(DateTime date) {
     int dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays + 1;
