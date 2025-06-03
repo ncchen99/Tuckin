@@ -336,7 +336,7 @@ class _MyAppState extends State<MyApp> {
   // 清除啟動時的通知
   Future<void> _clearNotificationsOnLaunch() async {
     try {
-      await NotificationService().clearAllNotifications();
+      await NotificationService().clearDisplayedNotifications();
     } catch (e) {
       debugPrint('清除啟動時通知錯誤: $e');
     }
@@ -746,8 +746,8 @@ class _LifecycleEventHandler extends WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // 應用恢復前台時清除通知
-      NotificationService().clearAllNotifications();
+      // 應用恢復前台時只清除已顯示的通知，保留排程通知
+      NotificationService().clearDisplayedNotifications();
     }
   }
 }

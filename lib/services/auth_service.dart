@@ -138,6 +138,9 @@ class AuthService {
   // 登出
   Future<void> signOut() async {
     try {
+      // 清除所有通知（包括排程通知）
+      await NotificationService().clearAllNotificationsOnLogout();
+
       // 登出 Google 賬號
       if (_googleSignIn != null) {
         await _googleSignIn!.disconnect();

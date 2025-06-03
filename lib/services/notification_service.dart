@@ -52,8 +52,8 @@ class NotificationService {
       // 初始化本地通知
       await _initNotifications();
 
-      // 清除所有現有通知
-      await clearAllNotifications();
+      // 只清除已顯示的通知，保留排程通知
+      await clearDisplayedNotifications();
 
       // 設置 token 刷新監聽
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
@@ -267,6 +267,82 @@ class NotificationService {
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
       debugPrint('清除通知錯誤: $e');
+    }
+  }
+
+  // 清除已顯示的通知（僅清除通知欄上的通知，保留排程通知）
+  Future<void> clearDisplayedNotifications() async {
+    try {
+      // 獲取所有活躍的通知
+      final List<ActiveNotification>? activeNotifications =
+          await _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >()
+              ?.getActiveNotifications();
+
+      if (activeNotifications != null && activeNotifications.isNotEmpty) {
+        // 逐一取消已顯示的通知
+        for (final notification in activeNotifications) {
+          await _localNotifications.cancel(notification.id ?? 0);
+        }
+        debugPrint('已清除 ${activeNotifications.length} 個已顯示的通知');
+      } else {
+        debugPrint('沒有找到已顯示的通知');
+      }
+    } catch (e) {
+      debugPrint('清除已顯示通知錯誤: $e');
+      // 如果無法獲取活躍通知，回退到清除所有通知
+      debugPrint('回退到清除所有通知方法');
+      await _clearAllNotificationsForced();
+    }
+  }
+
+  // 強制清除所有通知（包括排程通知）- 僅在必要時使用
+  Future<void> _clearAllNotificationsForced() async {
+    try {
+      await _localNotifications.cancelAll();
+      debugPrint('強制清除所有本地通知（包括排程通知）');
+    } catch (e) {
+      debugPrint('強制清除通知錯誤: $e');
+    }
+  }
+
+  // 在初始化時使用的清除方法（保持原有行為）
+  Future<void> clearAllNotificationsOnInit() async {
+    try {
+      await _localNotifications.cancelAll();
+      debugPrint('初始化時所有本地通知已清除');
+
+      // 清除 Firebase 的通知 (僅限 Android)
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+            alert: false,
+            badge: false,
+            sound: false,
+          );
+      debugPrint('Firebase 通知設置已更新');
+    } catch (e) {
+      debugPrint('清除通知錯誤: $e');
+    }
+  }
+
+  // 用戶登出時清除所有通知（包括排程通知）
+  Future<void> clearAllNotificationsOnLogout() async {
+    try {
+      await _localNotifications.cancelAll();
+      debugPrint('登出時所有本地通知已清除（包括排程通知）');
+
+      // 清除 Firebase 的通知 (僅限 Android)
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+            alert: false,
+            badge: false,
+            sound: false,
+          );
+      debugPrint('Firebase 通知設置已更新');
+    } catch (e) {
+      debugPrint('清除登出通知錯誤: $e');
     }
   }
 

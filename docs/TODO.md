@@ -101,6 +101,7 @@
 - [x] [API] 聚餐出席的頁面日騎有誤
 - [x] [前端] Realtime dinner info 不運作
 - [x] [前端] 密語要儲存在 Supabase 
+- [x] [API] 刪除聚餐資料產生等user rating遺失問題
 - [ ] 設定 Cloud scheduler 定時任務
 - [x] 整理需求文件、API端點、SQL表格v、邏輯流程v(deepwiki)
 - [x] 完成 QA 至 Github
