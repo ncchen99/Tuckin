@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS rating_sessions (
 -- 創建用戶評價資料表
 CREATE TABLE IF NOT EXISTS user_ratings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    dining_event_id UUID NOT NULL REFERENCES dining_events(id),
+    dining_event_id UUID NOT NULL,
     from_user_id UUID NOT NULL REFERENCES auth.users(id),
     to_user_id UUID NOT NULL REFERENCES auth.users(id),
     rating_type TEXT NOT NULL CHECK (rating_type IN ('like', 'dislike', 'no_show')),
