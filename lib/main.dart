@@ -116,6 +116,15 @@ Future<bool> _initializeServices(ErrorHandler errorHandler) async {
           bool retryNetworkConnected = await _testNetworkConnection();
           if (retryNetworkConnected) {
             debugPrint('網絡連接已恢復，繼續應用流程');
+
+            // 確保 Firebase 已初始化
+            try {
+              await Firebase.initializeApp();
+              debugPrint('Firebase 重新初始化成功');
+            } catch (e) {
+              debugPrint('Firebase 重新初始化錯誤（可能已經初始化）: $e');
+            }
+
             errorHandler.clearError();
             bool servicesInitialized = await _initializeServices(errorHandler);
             if (servicesInitialized) {
@@ -245,6 +254,15 @@ Future<void> _initializeApp() async {
     debugPrint('環境變數加載錯誤: $e');
   }
 
+  // 首先初始化 Firebase（必須在其他服務之前）
+  try {
+    await Firebase.initializeApp();
+    debugPrint('Firebase 初始化成功');
+  } catch (e) {
+    debugPrint('Firebase 初始化錯誤: $e');
+    debugPrintStack(label: 'Firebase 初始化錯誤堆疊');
+  }
+
   bool isNetworkConnected = false;
   try {
     debugPrint('正在測試網絡連接...');
@@ -268,14 +286,6 @@ Future<void> _initializeApp() async {
 
   if (isNetworkConnected) {
     await _initializeServices(errorHandler);
-  }
-
-  try {
-    await Firebase.initializeApp();
-    debugPrint('Firebase 初始化成功');
-  } catch (e) {
-    debugPrint('Firebase 初始化錯誤: $e');
-    debugPrintStack(label: 'Firebase 初始化錯誤堆疊');
   }
 
   // 重要：在決定初始路由之前不要構建主應用
@@ -516,7 +526,15 @@ class _MyAppState extends State<MyApp> {
         return;
       }
 
-      // 網絡恢復，初始化服務
+      // 網絡恢復，確保 Firebase 已初始化，然後初始化服務
+      debugPrint('確保 Firebase 已初始化...');
+      try {
+        await Firebase.initializeApp();
+        debugPrint('Firebase 重新初始化成功');
+      } catch (e) {
+        debugPrint('Firebase 重新初始化錯誤（可能已經初始化）: $e');
+      }
+
       debugPrint('開始初始化服務...');
       try {
         bool success = await _initializeServices(_errorHandler);
