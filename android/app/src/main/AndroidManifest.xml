@@ -65,8 +65,8 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- 添加通知權限（Android 13 及以上需要） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- 添加查詢所有包的權限（用於URL_LAUNCHER） -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- 移除QUERY_ALL_PACKAGES權限，改用更具體的queries宣告 -->
+    <!-- <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" /> -->
     <!-- 添加精確鬧鐘權限（Android 12+） -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
