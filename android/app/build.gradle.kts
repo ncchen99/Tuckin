@@ -56,6 +56,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 讓 debug 版本也使用 release 簽名（如果存在）
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            isDebuggable = true
+        }
         release {
             // 暫時使用debug簽名，您需要先產生release簽名金鑰
             signingConfig = if (keystorePropertiesFile.exists()) {
