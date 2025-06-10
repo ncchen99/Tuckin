@@ -49,6 +49,27 @@ app.*.map.json
 # Google services
 android/app/google-services.json
 
+/sign_app
+
+# Android Keystore (重要：這些檔案包含私鑰，絕對不能提交)
+*.jks
+*.keystore
+android/key.properties
+android/app/key.properties
+upload-keystore.jks
+release-keystore.jks
+tuckin-release-key.jks
+
+# PEPK 加密檔案 (包含私鑰，不能提交)
+encrypted-private-key.zip
+*.zip
+pepk.jar
+encryption_public_key.pem
+run-pepk.bat
+
+# PEPK 執行腳本 (包含密碼資訊，不能提交)
+run-pepk.bat
+
 node_modules/
 package-lock.json
 package.json

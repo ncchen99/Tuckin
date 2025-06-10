@@ -177,9 +177,9 @@ class DinnerTimeUtils {
     DateTime selectedDinnerDate;
 
     // 決定要顯示哪一週的聚餐
-    if (now.isAfter(currentWeekTarget) || timeUntilDinner.inHours < 61) {
+    if (now.isAfter(currentWeekTarget) || timeUntilDinner.inHours < 60) {
       // 已經過了本週聚餐或距離本週聚餐時間小於61小時 (即聚餐前兩天早上6點之後)
-      if (now.isAfter(nextWeekTarget) || timeUntilNextDinner.inHours < 61) {
+      if (now.isAfter(nextWeekTarget) || timeUntilNextDinner.inHours < 60) {
         // 如果下週聚餐也已經過了或時間也太接近，則顯示下下週聚餐
         selectedDinnerDate = afterNextWeekTarget;
         debugPrint('選擇下下週聚餐，因為本週和下週聚餐時間太近，使用下下週的日期計算相關時間');
@@ -207,7 +207,7 @@ class DinnerTimeUtils {
     // 參加階段開始：聚餐前60小時 (即聚餐前兩天+13小時，前兩天早上6點)
     // 參加階段結束：聚餐前37小時 (即聚餐前一天+13小時，前一天早上6點)
     DateTime joinPhaseStart = dinnerTime.subtract(const Duration(hours: 60));
-    DateTime joinPhaseEnd = dinnerTime.subtract(const Duration(hours: 36));
+    DateTime joinPhaseEnd = dinnerTime.subtract(const Duration(hours: 37));
 
     // 計算取消預約的截止時間 (與joinPhaseStart相同，即聚餐前兩天早上6點)
     // 這是一個重要時間點，用戶必須在此時間前取消預約，否則將計入缺席紀錄
