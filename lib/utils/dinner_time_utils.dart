@@ -205,9 +205,9 @@ class DinnerTimeUtils {
 
     // 根據選定的聚餐日期計算參加階段的開始時間和結束時間
     // 參加階段開始：聚餐前60小時 (即聚餐前兩天+13小時，前兩天早上6點)
-    // 參加階段結束：聚餐前37小時 (即聚餐前一天+13小時，前一天早上6點)
+    // 參加階段結束：聚餐前36小時 (即聚餐前一天+13小時，前一天早上6點)
     DateTime joinPhaseStart = dinnerTime.subtract(const Duration(hours: 60));
-    DateTime joinPhaseEnd = dinnerTime.subtract(const Duration(hours: 37));
+    DateTime joinPhaseEnd = dinnerTime.subtract(const Duration(hours: 36));
 
     // 計算取消預約的截止時間 (與joinPhaseStart相同，即聚餐前兩天早上6點)
     // 這是一個重要時間點，用戶必須在此時間前取消預約，否則將計入缺席紀錄
