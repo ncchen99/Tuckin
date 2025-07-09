@@ -8,5 +8,5 @@ requests==2.32.2
 python-multipart==0.0.18
 boto3==1.28.45
 gunicorn>=23.0.0
-Pillow==11.2.1
+pillow>=11.3.0
 pytz==2025.2
