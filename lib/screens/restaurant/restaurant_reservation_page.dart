@@ -28,6 +28,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
   bool _isLoading = true;
   bool _isPageMounted = false;
   final bool _isConfirming = false;
+  bool _isProcessingAction = false; // 新增：處理按鈕點擊時的loading狀態
 
   // 新增計時器相關變數
   Timer? _redirectTimer;
@@ -520,7 +521,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '餐廳狀態已變更為：$latestStatus，無法進行操作',
+                '訂位操作已逾時，正在返回聚餐資訊頁面',
                 style: const TextStyle(fontFamily: 'OtsutomeFont'),
               ),
             ),
@@ -560,9 +561,18 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
 
   Future<void> _handleReservationConfirm() async {
     try {
+      // 設置按鈕處理中狀態
+      setState(() {
+        _isProcessingAction = true;
+      });
+
       // 先檢查聚餐事件狀態
       bool isStatusValid = await _checkDiningEventStatus();
       if (!isStatusValid) {
+        // 重置狀態
+        setState(() {
+          _isProcessingAction = false;
+        });
         return; // 如果狀態不是confirming，直接返回
       }
 
@@ -581,11 +591,22 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
       // 創建DiningService實例
       final diningService = DiningService();
 
+      // 重置按鈕狀態，因為對話框有自己的狀態管理
+      setState(() {
+        _isProcessingAction = false;
+      });
+
       // 顯示輸入預訂資訊的對話框
       await _showReservationInfoDialog(diningEventId, diningService);
     } catch (e) {
       debugPrint('確認預訂時出錯: $e');
+
+      // 重置按鈕狀態
       if (mounted) {
+        setState(() {
+          _isProcessingAction = false;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -600,9 +621,18 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
 
   Future<void> _handleCannotReserve() async {
     try {
+      // 設置按鈕處理中狀態
+      setState(() {
+        _isProcessingAction = true;
+      });
+
       // 先檢查聚餐事件狀態
       bool isStatusValid = await _checkDiningEventStatus();
       if (!isStatusValid) {
+        // 重置狀態
+        setState(() {
+          _isProcessingAction = false;
+        });
         return; // 如果狀態不是confirming，直接返回
       }
 
@@ -627,6 +657,10 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
         confirmButtonText: '確定',
         barrierDismissible: true, // 正常狀態可點擊空白處關閉
         onCancel: () {
+          // 重置按鈕狀態
+          setState(() {
+            _isProcessingAction = false;
+          });
           Navigator.of(context).pop(false);
         },
         onConfirm: () async {
@@ -671,6 +705,11 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                 );
               }
 
+              // 重置按鈕狀態
+              setState(() {
+                _isProcessingAction = false;
+              });
+
               // 返回true表示更換成功
               Navigator.of(context).pop(true);
             } else {
@@ -681,10 +720,23 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
           }
         },
       );
+
+      // 檢查用戶是否點擊空白處關閉對話框
+      if (confirmChange == null) {
+        // 用戶點擊空白處關閉對話框，重置loading狀態
+        setState(() {
+          _isProcessingAction = false;
+        });
+      }
     } catch (e) {
       debugPrint('準備更換餐廳時出錯: $e');
 
+      // 重置按鈕狀態
       if (mounted) {
+        setState(() {
+          _isProcessingAction = false;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -1172,6 +1224,31 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                               final reservationPhone =
                                                   phoneController.text.trim();
 
+                                              // 檢查輸入是否完整
+                                              if (reservationName.isEmpty ||
+                                                  reservationPhone.isEmpty) {
+                                                // 重置處理狀態
+                                                setDialogState(() {
+                                                  isProcessing = false;
+                                                });
+
+                                                // 顯示錯誤提示
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      '請填寫完整的預訂資訊',
+                                                      style: TextStyle(
+                                                        fontFamily:
+                                                            'OtsutomeFont',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                                return;
+                                              }
+
                                               // 調用API確認餐廳預訂
                                               final response =
                                                   await diningService
@@ -1302,16 +1379,16 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
             ),
           ),
           child: SafeArea(
-            child: Column(
-              children: [
-                // 頂部導航欄 - 使用預設顯示TUCKIN
-                HeaderBar(title: '餐廳預訂'),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  // 頂部導航欄 - 移到滾動區域內
+                  HeaderBar(title: '餐廳預訂'),
 
-                // 主要內容
-                Expanded(
-                  child: SingleChildScrollView(
+                  // 主要內容
+                  Padding(
                     padding: EdgeInsets.symmetric(horizontal: 24.w),
-                    physics: const BouncingScrollPhysics(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1867,36 +1944,48 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
 
                         // 確認按鈕
                         Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // 左側藍色按鈕 - 這間無法
-                              ImageButton(
-                                text: '這間無法',
-                                imagePath: 'assets/images/ui/button/blue_l.png',
-                                width: 150.w,
-                                height: 70.h,
-                                onPressed: _handleCannotReserve,
-                              ),
-                              SizedBox(width: 20.w),
-                              // 右側橘色按鈕 - 已確認
-                              ImageButton(
-                                text: '已確認',
-                                imagePath: 'assets/images/ui/button/red_m.png',
-                                width: 150.w,
-                                height: 70.h,
-                                onPressed: _handleReservationConfirm,
-                              ),
-                            ],
-                          ),
+                          child:
+                              _isProcessingAction
+                                  ? Container(
+                                    margin: EdgeInsets.only(bottom: 15.h),
+                                    child: LoadingImage(
+                                      width: 60.w,
+                                      height: 60.h,
+                                      color: const Color(0xFFB33D1C),
+                                    ),
+                                  )
+                                  : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      // 左側藍色按鈕 - 這間無法
+                                      ImageButton(
+                                        text: '這間無法',
+                                        imagePath:
+                                            'assets/images/ui/button/blue_l.png',
+                                        width: 150.w,
+                                        height: 70.h,
+                                        onPressed: _handleCannotReserve,
+                                      ),
+                                      SizedBox(width: 20.w),
+                                      // 右側橘色按鈕 - 已確認
+                                      ImageButton(
+                                        text: '已確認',
+                                        imagePath:
+                                            'assets/images/ui/button/red_m.png',
+                                        width: 150.w,
+                                        height: 70.h,
+                                        onPressed: _handleReservationConfirm,
+                                      ),
+                                    ],
+                                  ),
                         ),
 
                         SizedBox(height: 30.h),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
