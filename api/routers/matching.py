@@ -589,34 +589,47 @@ async def _save_matching_groups_to_db(
     dinner_minute: int = None             # 新增參數：聚餐分鐘
 ) -> Tuple[int, int]:
     """
-    將配對結果保存到數據庫，更新用戶狀態，發送通知 (已重構)
+    將配對結果保存到數據庫，處理完所有後端邏輯後再更新用戶狀態並發送通知
+    
+    處理順序：
+    1. 創建所有分組記錄
+    2. 為所有群組推薦餐廳
+    3. 更新用戶狀態並發送通知
     """
     created_groups = 0
     total_matched_users = 0
+    group_processing_info = []  # 記錄成功處理的群組資訊
     
+    logger.info(f"開始處理 {len(result_groups)} 個配對群組")
+    
+    # 第一階段：創建所有分組記錄
+    logger.info("階段 1: 創建所有分組記錄")
     for group in result_groups:
-        # 檢查組別是否為校內專屬組
         user_ids = group["user_ids"]
         is_school_only = False
         
         # 獲取組內用戶的配對偏好
         if user_ids:
-            preference_response = supabase.table("user_matching_preferences") \
-                .select("user_id, prefer_school_only") \
-                .in_("user_id", user_ids) \
-                .execute()
-            
-            # 如果所有用戶都是校內專屬配對，則設置群組為校內專屬
-            if preference_response.data:
-                all_school_only = True
-                for pref in preference_response.data:
-                    if not pref.get("prefer_school_only", False):
-                        all_school_only = False
-                        break
+            try:
+                preference_response = supabase.table("user_matching_preferences") \
+                    .select("user_id, prefer_school_only") \
+                    .in_("user_id", user_ids) \
+                    .execute()
                 
-                is_school_only = all_school_only
+                # 如果所有用戶都是校內專屬配對，則設置群組為校內專屬
+                if preference_response.data:
+                    all_school_only = True
+                    for pref in preference_response.data:
+                        if not pref.get("prefer_school_only", False):
+                            all_school_only = False
+                            break
+                    
+                    is_school_only = all_school_only
+            except Exception as e:
+                logger.error(f"獲取用戶配對偏好失敗: {str(e)}")
+                # 繼續處理，使用預設值 False
         
-        # 創建分組記錄 (使用輔助函數)
+        # 創建分組記錄
         group_id = await create_matching_group(supabase, group, is_school_only)
         
         if not group_id:
@@ -624,21 +637,25 @@ async def _save_matching_groups_to_db(
             continue
             
         created_groups += 1
-        total_matched_users += len(group["user_ids"])
+        total_matched_users += len(user_ids)
         
-        # 更新用戶狀態和發送通知 (使用輔助函數)
-        for user_id in group["user_ids"]:
-            update_success = await update_user_status_to_restaurant(
-                supabase, user_id, group_id, confirm_deadline
-            )
-            if update_success:
-                await send_matching_notification(
-                    notification_service, user_id, group_id, confirm_deadline
-                )
-            else:
-                 logger.warning(f"更新用戶 {user_id} 加入組別 {group_id} 的狀態失敗")
+        # 記錄成功創建的群組資訊，供後續階段使用
+        group_processing_info.append({
+            "group_id": group_id,
+            "user_ids": user_ids,
+            "is_school_only": is_school_only
+        })
         
-        # 為群組推薦餐廳 (使用預先獲取的營業中餐廳列表)
+        logger.info(f"成功創建群組 {group_id}，包含用戶: {user_ids}")
+    
+    logger.info(f"階段 1 完成: 成功創建 {created_groups} 個群組")
+    
+    # 第二階段：為所有群組推薦餐廳
+    logger.info("階段 2: 為所有群組推薦餐廳")
+    for group_info in group_processing_info:
+        group_id = group_info["group_id"]
+        user_ids = group_info["user_ids"]
+        
         try:
             if open_restaurants is not None:
                 # 使用已過濾的營業中餐廳列表
@@ -649,16 +666,69 @@ async def _save_matching_groups_to_db(
                 )
                 
                 if recommended_restaurants:
-                    await save_recommended_restaurants(
+                    success = await save_recommended_restaurants(
                         supabase, 
                         group_id, 
                         recommended_restaurants
                     )
+                    if success:
+                        logger.info(f"成功為群組 {group_id} 推薦 {len(recommended_restaurants)} 家餐廳")
+                    else:
+                        logger.warning(f"為群組 {group_id} 保存推薦餐廳失敗")
+                else:
+                    logger.warning(f"無法為群組 {group_id} 選擇推薦餐廳")
             else:
                 # 如果沒有預先獲取的列表，使用原來的方法
-                await recommend_restaurants_for_group(supabase, group_id, user_ids)
+                success = await recommend_restaurants_for_group(supabase, group_id, user_ids)
+                if success:
+                    logger.info(f"成功為群組 {group_id} 推薦餐廳")
+                else:
+                    logger.warning(f"為群組 {group_id} 推薦餐廳失敗")
         except Exception as e:
             logger.error(f"為群組 {group_id} 推薦餐廳時出錯: {str(e)}")
+            # 餐廳推薦失敗不影響整體流程，繼續處理
+    
+    logger.info("階段 2 完成: 所有群組餐廳推薦處理完成")
+    
+    # 第三階段：更新用戶狀態並發送通知
+    logger.info("階段 3: 更新用戶狀態並發送通知")
+    successful_notifications = 0
+    failed_notifications = 0
+    
+    for group_info in group_processing_info:
+        group_id = group_info["group_id"]
+        user_ids = group_info["user_ids"]
+        
+        # 更新每個用戶的狀態並發送通知
+        for user_id in user_ids:
+            try:
+                # 更新用戶狀態
+                update_success = await update_user_status_to_restaurant(
+                    supabase, user_id, group_id, confirm_deadline
+                )
+                
+                if update_success:
+                    # 發送通知
+                    notification_success = await send_matching_notification(
+                        notification_service, user_id, group_id, confirm_deadline
+                    )
+                    
+                    if notification_success:
+                        successful_notifications += 1
+                        logger.info(f"成功更新用戶 {user_id} 狀態並發送通知")
+                    else:
+                        failed_notifications += 1
+                        logger.warning(f"用戶 {user_id} 狀態更新成功，但通知發送失敗")
+                else:
+                    failed_notifications += 1
+                    logger.warning(f"更新用戶 {user_id} 加入組別 {group_id} 的狀態失敗")
+                    
+            except Exception as e:
+                failed_notifications += 1
+                logger.error(f"處理用戶 {user_id} 狀態更新和通知時出錯: {str(e)}")
+    
+    logger.info(f"階段 3 完成: 成功處理 {successful_notifications} 個用戶通知，失敗 {failed_notifications} 個")
+    logger.info(f"配對處理總結: 創建 {created_groups} 個群組，處理 {total_matched_users} 個用戶")
     
     return created_groups, total_matched_users
 
