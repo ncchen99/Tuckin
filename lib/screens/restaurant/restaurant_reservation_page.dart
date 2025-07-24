@@ -791,6 +791,10 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
     // 使用外部變量來控制處理狀態
     bool isProcessing = false;
 
+    // 控制輸入框提示狀態
+    bool nameHasError = false;
+    bool phoneHasError = false;
+
     // 封裝顯示對話框的函數，當isProcessing變化時可以重新呼叫
     Future<void> showProcessingDialog() async {
       return showDialog<void>(
@@ -917,16 +921,30 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                       Expanded(
                                         child: TextField(
                                           controller: nameController,
+                                          onChanged: (value) {
+                                            if (nameHasError &&
+                                                value.trim().isNotEmpty) {
+                                              setDialogState(() {
+                                                nameHasError = false;
+                                              });
+                                            }
+                                          },
                                           style: TextStyle(
                                             fontFamily: 'OtsutomeFont',
                                             fontSize: 16.sp,
                                             height: 1.2,
                                           ),
                                           decoration: InputDecoration(
-                                            hintText: 'e.g. 陳先生',
+                                            hintText:
+                                                nameHasError
+                                                    ? '請填寫預訂人稱呼'
+                                                    : 'e.g. 陳先生',
                                             border: InputBorder.none,
                                             hintStyle: TextStyle(
-                                              color: Colors.grey,
+                                              color:
+                                                  nameHasError
+                                                      ? const Color(0xFFB33D1C)
+                                                      : Colors.grey,
                                               fontFamily: 'OtsutomeFont',
                                               fontSize: 14.sp,
                                               height: 1.2,
@@ -1030,6 +1048,14 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                       Expanded(
                                         child: TextField(
                                           controller: phoneController,
+                                          onChanged: (value) {
+                                            if (phoneHasError &&
+                                                value.trim().isNotEmpty) {
+                                              setDialogState(() {
+                                                phoneHasError = false;
+                                              });
+                                            }
+                                          },
                                           keyboardType: TextInputType.phone,
                                           inputFormatters: [
                                             FilteringTextInputFormatter
@@ -1041,10 +1067,16 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                             height: 1.2,
                                           ),
                                           decoration: InputDecoration(
-                                            hintText: 'e.g. 870',
+                                            hintText:
+                                                phoneHasError
+                                                    ? '請填寫電話末三碼'
+                                                    : 'e.g. 870',
                                             border: InputBorder.none,
                                             hintStyle: TextStyle(
-                                              color: Colors.grey,
+                                              color:
+                                                  phoneHasError
+                                                      ? const Color(0xFFB33D1C)
+                                                      : Colors.grey,
                                               fontFamily: 'OtsutomeFont',
                                               fontSize: 14.sp,
                                               height: 1.2,
@@ -1227,27 +1259,22 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                               // 檢查輸入是否完整
                                               if (reservationName.isEmpty ||
                                                   reservationPhone.isEmpty) {
-                                                // 重置處理狀態
+                                                // 重置處理狀態並設置錯誤狀態
                                                 setDialogState(() {
                                                   isProcessing = false;
+                                                  nameHasError =
+                                                      reservationName.isEmpty;
+                                                  phoneHasError =
+                                                      reservationPhone.isEmpty;
                                                 });
-
-                                                // 顯示錯誤提示
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      '請填寫完整的預訂資訊',
-                                                      style: TextStyle(
-                                                        fontFamily:
-                                                            'OtsutomeFont',
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
                                                 return;
                                               }
+
+                                              // 輸入完整，清除錯誤狀態
+                                              setDialogState(() {
+                                                nameHasError = false;
+                                                phoneHasError = false;
+                                              });
 
                                               // 調用API確認餐廳預訂
                                               final response =
