@@ -1198,34 +1198,39 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                     SizedBox(
                       width: 75.w,
                       height: 75.h,
-                      child: Stack(
-                        clipBehavior: Clip.none, // 允許陰影超出容器範圍
-                        children: [
-                          // 底部陰影
-                          Positioned(
-                            left: 0,
-                            top: 3.h,
-                            child: Image.asset(
-                              dinnerTime != null &&
-                                      dinnerTime.weekday == DateTime.monday
-                                  ? 'assets/images/icon/mon.png'
-                                  : 'assets/images/icon/thu.png',
-                              width: 75.w,
-                              height: 75.h,
-                              color: Colors.black.withOpacity(0.4),
-                              colorBlendMode: BlendMode.srcIn,
-                            ),
-                          ),
-                          // 主圖標
-                          Image.asset(
-                            dinnerTime != null &&
-                                    dinnerTime.weekday == DateTime.monday
-                                ? 'assets/images/icon/mon.png'
-                                : 'assets/images/icon/thu.png',
-                            width: 75.w,
-                            height: 75.h,
-                          ),
-                        ],
+                      child: FutureBuilder<DateTime>(
+                        future: userStatusService.getDinnerTime(),
+                        builder: (context, snapshot) {
+                          String iconPath =
+                              'assets/images/icon/thu.png'; // 預設圖標
+                          if (snapshot.hasData) {
+                            final dinnerTime = snapshot.data!;
+                            iconPath =
+                                dinnerTime.weekday == DateTime.monday
+                                    ? 'assets/images/icon/mon.png'
+                                    : 'assets/images/icon/thu.png';
+                          }
+
+                          return Stack(
+                            clipBehavior: Clip.none, // 允許陰影超出容器範圍
+                            children: [
+                              // 底部陰影
+                              Positioned(
+                                left: 0,
+                                top: 3.h,
+                                child: Image.asset(
+                                  iconPath,
+                                  width: 75.w,
+                                  height: 75.h,
+                                  color: Colors.black.withOpacity(0.4),
+                                  colorBlendMode: BlendMode.srcIn,
+                                ),
+                              ),
+                              // 主圖標
+                              Image.asset(iconPath, width: 75.w, height: 75.h),
+                            ],
+                          );
+                        },
                       ),
                     ),
 
@@ -1247,16 +1252,32 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                         ),
                         SizedBox(height: 4.h),
                         // 單行顯示日期和時間信息
-                        Text(
-                          dinnerTime != null
-                              ? '${dinnerTime.month}月${dinnerTime.day}日（${_getWeekdayShort(dinnerTime.weekday)}）${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}'
-                              : '-- 月 -- 日（-）--:--',
-                          style: TextStyle(
-                            fontSize: 18.sp,
-                            fontFamily: 'OtsutomeFont',
-                            color: const Color(0xFF23456B),
-                            fontWeight: FontWeight.bold,
-                          ),
+                        FutureBuilder<DateTime>(
+                          future: userStatusService.getDinnerTime(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData) {
+                              final dinnerTime = snapshot.data!;
+                              return Text(
+                                '${dinnerTime.month}月${dinnerTime.day}日（${_getWeekdayShort(dinnerTime.weekday)}）${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}',
+                                style: TextStyle(
+                                  fontSize: 18.sp,
+                                  fontFamily: 'OtsutomeFont',
+                                  color: const Color(0xFF23456B),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            } else {
+                              return Text(
+                                '-- 月 -- 日（-）--:--',
+                                style: TextStyle(
+                                  fontSize: 18.sp,
+                                  fontFamily: 'OtsutomeFont',
+                                  color: const Color(0xFF23456B),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            }
+                          },
                         ),
                       ],
                     ),
@@ -1537,13 +1558,32 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                         ),
                                       ),
                                       SizedBox(height: 2.h),
-                                      Text(
-                                        dinnerTimeFormatted,
-                                        style: TextStyle(
-                                          fontSize: 14.sp,
-                                          fontFamily: 'OtsutomeFont',
-                                          color: const Color(0xFF666666),
-                                        ),
+                                      // 使用 FutureBuilder 確保時間存在
+                                      FutureBuilder<DateTime>(
+                                        future:
+                                            userStatusService.getDinnerTime(),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasData) {
+                                            final dinnerTime = snapshot.data!;
+                                            return Text(
+                                              '${dinnerTime.month}月${dinnerTime.day}日 ${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}',
+                                              style: TextStyle(
+                                                fontSize: 14.sp,
+                                                fontFamily: 'OtsutomeFont',
+                                                color: const Color(0xFF666666),
+                                              ),
+                                            );
+                                          } else {
+                                            return Text(
+                                              '時間待定',
+                                              style: TextStyle(
+                                                fontSize: 14.sp,
+                                                fontFamily: 'OtsutomeFont',
+                                                color: const Color(0xFF666666),
+                                              ),
+                                            );
+                                          }
+                                        },
                                       ),
                                     ],
                                   ),

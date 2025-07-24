@@ -306,7 +306,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
 
       // 延遲一下導航到配對狀態頁面
       if (!mounted) return;
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(const Duration(milliseconds: 100));
       await _navigateToMatchingStatus();
     } catch (e) {
       debugPrint('預約時出錯: $e');
