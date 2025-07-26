@@ -309,10 +309,13 @@ class _LoginPageState extends State<LoginPage> {
                           padding: EdgeInsets.symmetric(vertical: 20.h),
                           child:
                               _isLoading
-                                  ? LoadingImage(
-                                    width: 60.w,
-                                    height: 60.h,
-                                    color: const Color(0xFFB33D1C),
+                                  ? Container(
+                                    margin: EdgeInsets.only(bottom: 23.h),
+                                    child: LoadingImage(
+                                      width: 60.w,
+                                      height: 60.h,
+                                      color: const Color(0xFFB33D1C),
+                                    ),
                                   )
                                   : GoogleSignInButton(
                                     onPressed: _handleGoogleSignIn,
