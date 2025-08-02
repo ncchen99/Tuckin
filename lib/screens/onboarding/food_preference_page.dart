@@ -25,21 +25,25 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
 
   // 食物類型列表 - 更新為目錄中提供的圖片
   final List<Map<String, dynamic>> _foodTypes = [
-    {'id': 1, 'name': '台灣料理', 'image': 'assets/images/dish/taiwanese.png'},
-    {'id': 2, 'name': '日式料理', 'image': 'assets/images/dish/japanese.png'},
-    {'id': 3, 'name': '日式咖哩', 'image': 'assets/images/dish/japanese_curry.png'},
-    {'id': 4, 'name': '韓式料理', 'image': 'assets/images/dish/korean.png'},
-    {'id': 5, 'name': '泰式料理', 'image': 'assets/images/dish/thai.png'},
-    {'id': 6, 'name': '義式料理', 'image': 'assets/images/dish/italian.png'},
-    {'id': 7, 'name': '美式餐廳', 'image': 'assets/images/dish/american.png'},
-    {'id': 8, 'name': '中式料理', 'image': 'assets/images/dish/chinese.png'},
-    {'id': 9, 'name': '港式飲茶', 'image': 'assets/images/dish/hongkong.png'},
-    {'id': 10, 'name': '印度料理', 'image': 'assets/images/dish/indian.png'},
-    {'id': 11, 'name': '墨西哥菜', 'image': 'assets/images/dish/mexican.png'},
-    {'id': 12, 'name': '越南料理', 'image': 'assets/images/dish/vietnamese.png'},
-    {'id': 14, 'name': '漢堡速食', 'image': 'assets/images/dish/burger.png'},
-    {'id': 15, 'name': '披薩料理', 'image': 'assets/images/dish/pizza.png'},
-    {'id': 17, 'name': '火鍋料理', 'image': 'assets/images/dish/hotpot.png'},
+    {'id': 1, 'name': '台灣料理', 'image': 'assets/images/dish/taiwanese.webp'},
+    {'id': 2, 'name': '日式料理', 'image': 'assets/images/dish/japanese.webp'},
+    {
+      'id': 3,
+      'name': '日式咖哩',
+      'image': 'assets/images/dish/japanese_curry.webp',
+    },
+    {'id': 4, 'name': '韓式料理', 'image': 'assets/images/dish/korean.webp'},
+    {'id': 5, 'name': '泰式料理', 'image': 'assets/images/dish/thai.webp'},
+    {'id': 6, 'name': '義式料理', 'image': 'assets/images/dish/italian.webp'},
+    {'id': 7, 'name': '美式餐廳', 'image': 'assets/images/dish/american.webp'},
+    {'id': 8, 'name': '中式料理', 'image': 'assets/images/dish/chinese.webp'},
+    {'id': 9, 'name': '港式飲茶', 'image': 'assets/images/dish/hongkong.webp'},
+    {'id': 10, 'name': '印度料理', 'image': 'assets/images/dish/indian.webp'},
+    {'id': 11, 'name': '墨西哥菜', 'image': 'assets/images/dish/mexican.webp'},
+    {'id': 12, 'name': '越南料理', 'image': 'assets/images/dish/vietnamese.webp'},
+    {'id': 14, 'name': '漢堡速食', 'image': 'assets/images/dish/burger.webp'},
+    {'id': 15, 'name': '披薩料理', 'image': 'assets/images/dish/pizza.webp'},
+    {'id': 17, 'name': '火鍋料理', 'image': 'assets/images/dish/hotpot.webp'},
   ];
 
   @override
@@ -239,7 +243,7 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
           body: Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/images/background/bg2.png'),
+                image: AssetImage('assets/images/background/bg2.jpg'),
                 fit: BoxFit.cover,
               ),
             ),

@@ -285,7 +285,7 @@ class _ProfilePageState extends State<ProfilePage> {
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/background/bg2.png'),
+            image: AssetImage('assets/images/background/bg2.jpg'),
             fit: BoxFit.cover,
           ),
         ),
@@ -368,7 +368,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       // 更改飲食偏好
                       _buildSettingItem(
-                        iconPath: 'assets/images/dish/american.png',
+                        iconPath: 'assets/images/dish/american.webp',
                         title: '更改飲食偏好',
                         onTap: () {
                           Navigator.push(

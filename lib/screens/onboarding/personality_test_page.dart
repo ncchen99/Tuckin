@@ -351,7 +351,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
         body: Container(
           decoration: const BoxDecoration(
             image: DecorationImage(
-              image: AssetImage('assets/images/background/bg2.png'),
+              image: AssetImage('assets/images/background/bg2.jpg'),
               fit: BoxFit.cover,
             ),
           ),

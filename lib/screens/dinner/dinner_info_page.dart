@@ -1090,7 +1090,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           body: Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/images/background/bg2.png'),
+                image: AssetImage('assets/images/background/bg2.jpg'),
                 fit: BoxFit.cover,
               ),
             ),
@@ -1737,7 +1737,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         body: Container(
           decoration: const BoxDecoration(
             image: DecorationImage(
-              image: AssetImage('assets/images/background/bg2.png'),
+              image: AssetImage('assets/images/background/bg2.jpg'),
               fit: BoxFit.cover,
             ),
           ),

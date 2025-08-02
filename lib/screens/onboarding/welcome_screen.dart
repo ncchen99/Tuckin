@@ -31,22 +31,22 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // 食物動畫相關變量
   final List<String> _dishPaths = [
-    'assets/images/dish/chinese.png',
-    'assets/images/dish/japanese.png',
-    'assets/images/dish/korean.png',
-    'assets/images/dish/taiwanese.png',
-    'assets/images/dish/italian.png',
-    'assets/images/dish/thai.png',
-    'assets/images/dish/indian.png',
-    'assets/images/dish/burger.png',
-    'assets/images/dish/pizza.png',
-    'assets/images/dish/japanese_curry.png',
-    'assets/images/dish/mexican.png',
-    'assets/images/dish/vietnamese.png',
-    'assets/images/dish/vegetarian.png',
-    'assets/images/dish/hongkong.png',
-    'assets/images/dish/barbecue.png',
-    'assets/images/dish/hotpot.png',
+    'assets/images/dish/chinese.webp',
+    'assets/images/dish/japanese.webp',
+    'assets/images/dish/korean.webp',
+    'assets/images/dish/taiwanese.webp',
+    'assets/images/dish/italian.webp',
+    'assets/images/dish/thai.webp',
+    'assets/images/dish/indian.webp',
+    'assets/images/dish/burger.webp',
+    'assets/images/dish/pizza.webp',
+    'assets/images/dish/japanese_curry.webp',
+    'assets/images/dish/mexican.webp',
+    'assets/images/dish/vietnamese.webp',
+    'assets/images/dish/vegetarian.webp',
+    'assets/images/dish/hongkong.webp',
+    'assets/images/dish/barbecue.webp',
+    'assets/images/dish/hotpot.webp',
   ];
   final List<Offset> _dishPositions = [];
   final List<double> _dishScales = [];
@@ -354,7 +354,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/background/bg2.png'),
+            image: AssetImage('assets/images/background/bg2.jpg'),
             fit: BoxFit.cover,
           ),
         ),
@@ -503,7 +503,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         decoration: const BoxDecoration(
           color: Colors.white,
           image: DecorationImage(
-            image: AssetImage('assets/images/background/bg3.png'),
+            image: AssetImage('assets/images/background/bg3.jpg'),
             fit: BoxFit.cover,
             opacity: 0.2, // 降低不透明度，使背景稍微淡化
           ),
