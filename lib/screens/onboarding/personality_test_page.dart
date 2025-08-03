@@ -29,7 +29,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   final List<Map<String, dynamic>> _questions = [
     {
       'id': 1,
-      'question': '當您接收資訊時，您更喜歡哪種方式？',
+      'question': '在日常生活中，您通常對哪種類型的資訊比較有感覺或印象深刻？',
       'options': [
         {'id': 'a', 'text': '以事實和數據為基礎的資訊', 'description': '例如：統計數字、報告、證據'},
         {'id': 'b', 'text': '以情感和個人經驗為基礎的資訊', 'description': '例如：故事、感覺、個人意見'},
@@ -37,7 +37,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
     },
     {
       'id': 2,
-      'question': '當您解釋某件事時，您更喜歡哪種方式？',
+      'question': '在日常與他人分享想法或說明事情時，您比較傾向用哪種方式表達？',
       'options': [
         {'id': 'a', 'text': '從頭到尾，逐步解釋', 'description': '例如：一步一步說明過程'},
         {
@@ -449,8 +449,10 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                                       // 副標題 - 問題1
                                       Padding(
                                         padding: EdgeInsets.only(
-                                          bottom: 20.h,
+                                          bottom: 25.h,
                                           top: 20.h,
+                                          left: 25.w,
+                                          right: 25.w,
                                         ),
                                         child: Text(
                                           _questions[0]['question'],
@@ -566,8 +568,10 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                                       // 副標題 - 問題2
                                       Padding(
                                         padding: EdgeInsets.only(
-                                          bottom: 20.h,
+                                          bottom: 25.h,
                                           top: 20.h,
+                                          left: 25.w,
+                                          right: 25.w,
                                         ),
                                         child: Text(
                                           _questions[1]['question'],

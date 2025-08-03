@@ -299,7 +299,7 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
 
                             // 提示文字
                             Padding(
-                              padding: EdgeInsets.only(bottom: 20.h),
+                              padding: EdgeInsets.only(top: 10.h, bottom: 25.h),
                               child: Text(
                                 '請選擇您喜愛的食物類型 (可複選)',
                                 style: TextStyle(
