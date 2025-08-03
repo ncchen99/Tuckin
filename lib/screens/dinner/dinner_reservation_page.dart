@@ -536,7 +536,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                                         : ImageButton(
                                           text: _buttonText,
                                           imagePath:
-                                              'assets/images/ui/button/red_m.webp',
+                                              'assets/images/ui/button/red_l.webp',
                                           width: 160.w,
                                           height: 70.h,
                                           onPressed: _handleButtonClick,

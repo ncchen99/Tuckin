@@ -216,7 +216,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '載入評分表單時出錯: $e',
+              '載入評分表單時出錯: ${e.toString().replaceFirst(RegExp(r'^.*Exception: '), '')}',
               style: const TextStyle(fontFamily: 'OtsutomeFont'),
             ),
           ),
