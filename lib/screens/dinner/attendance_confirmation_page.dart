@@ -464,7 +464,7 @@ class _AttendanceConfirmationPageState
                                       ImageButton(
                                         text: '無法出席',
                                         imagePath:
-                                            'assets/images/ui/button/blue_m.png',
+                                            'assets/images/ui/button/blue_m.webp',
                                         width: 150.w,
                                         height: 72.h,
                                         textStyle: TextStyle(
@@ -496,7 +496,7 @@ class _AttendanceConfirmationPageState
                                         ),
                                         countdownText: _formatRemainingHours(),
                                         imagePath:
-                                            'assets/images/ui/button/red_l.png',
+                                            'assets/images/ui/button/red_l.webp',
                                         width: 150.w,
                                         height: 70.h,
                                         countdownTextStyle: TextStyle(

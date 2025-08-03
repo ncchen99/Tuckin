@@ -450,7 +450,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 Padding(
                   padding: EdgeInsets.only(bottom: 85.h), // 調整底部間距為頁面指示器留出空間
                   child: ImageButton(
-                    imagePath: 'assets/images/ui/button/red_m.png',
+                    imagePath: 'assets/images/ui/button/red_m.webp',
                     text: pageIndex < _totalPages - 1 ? '下一步' : '開始使用',
                     width: 160.w, // 使用自適應寬度
                     height: 70.h, // 使用自適應高度

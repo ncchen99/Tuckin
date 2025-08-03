@@ -112,7 +112,7 @@ class ErrorScreen extends StatelessWidget {
                     ImageButton(
                       text: 'OK',
                       imagePath:
-                          'assets/images/ui/button/red_m.png', // 使用橘紅色中等大小按鈕
+                          'assets/images/ui/button/red_m.webp', // 使用橘紅色中等大小按鈕
                       width: 125.w, // 設置合適的寬度
                       height: 70.h, // 設置合適的高度
                       onPressed: () {

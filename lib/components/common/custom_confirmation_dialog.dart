@@ -144,7 +144,7 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                       children: [
                         ImageButton(
                           text: widget.cancelButtonText,
-                          imagePath: 'assets/images/ui/button/blue_m.png',
+                          imagePath: 'assets/images/ui/button/blue_m.webp',
                           width: 110.w,
                           height: 55.h,
                           onPressed: () {
@@ -163,7 +163,7 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                         SizedBox(width: 20.w),
                         ImageButton(
                           text: widget.confirmButtonText,
-                          imagePath: 'assets/images/ui/button/red_m.png',
+                          imagePath: 'assets/images/ui/button/red_m.webp',
                           width: 110.w,
                           height: 55.h,
                           onPressed: () async {

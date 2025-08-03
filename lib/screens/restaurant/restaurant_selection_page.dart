@@ -328,7 +328,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                 : ImageButton(
                                   text: '取消',
                                   imagePath:
-                                      'assets/images/ui/button/blue_m.png',
+                                      'assets/images/ui/button/blue_m.webp',
                                   width: 120.w,
                                   height: 60.h,
                                   textStyle: TextStyle(
@@ -603,7 +603,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                           : ImageButton(
                                             text: '送出選擇',
                                             imagePath:
-                                                'assets/images/ui/button/red_l.png',
+                                                'assets/images/ui/button/red_l.webp',
                                             width: 160.w,
                                             height: 70.h,
                                             onPressed: _handleSubmit,

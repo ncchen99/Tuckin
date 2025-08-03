@@ -73,7 +73,7 @@ class PrivacyPolicyDialog extends StatelessWidget {
               SizedBox(height: 20.h), // 使用自適應高度
               // 使用自定義的 ImageButton 代替 ElevatedButton
               ImageButton(
-                imagePath: 'assets/images/ui/button/blue_m.png',
+                imagePath: 'assets/images/ui/button/blue_m.webp',
                 text: '我同意',
                 width: 130.w, // 使用自適應寬度
                 height: 65.h, // 使用自適應高度

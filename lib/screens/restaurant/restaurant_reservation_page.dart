@@ -1159,7 +1159,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                         ImageButton(
                                           text: '不接受訂位',
                                           imagePath:
-                                              'assets/images/ui/button/blue_l.png',
+                                              'assets/images/ui/button/blue_l.webp',
                                           width: 120.w,
                                           height: 55.h,
                                           onPressed: () async {
@@ -1240,7 +1240,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                         ImageButton(
                                           text: '已訂位',
                                           imagePath:
-                                              'assets/images/ui/button/red_m.png',
+                                              'assets/images/ui/button/red_m.webp',
                                           width: 120.w,
                                           height: 55.h,
                                           onPressed: () async {
@@ -1988,7 +1988,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                       ImageButton(
                                         text: '這間無法',
                                         imagePath:
-                                            'assets/images/ui/button/blue_l.png',
+                                            'assets/images/ui/button/blue_l.webp',
                                         width: 150.w,
                                         height: 70.h,
                                         onPressed: _handleCannotReserve,
@@ -1998,7 +1998,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                       ImageButton(
                                         text: '已確認',
                                         imagePath:
-                                            'assets/images/ui/button/red_m.png',
+                                            'assets/images/ui/button/red_m.webp',
                                         width: 150.w,
                                         height: 70.h,
                                         onPressed: _handleReservationConfirm,

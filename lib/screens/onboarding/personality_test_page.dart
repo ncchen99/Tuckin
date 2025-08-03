@@ -550,7 +550,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                                         child: ImageButton(
                                           text: '下一步',
                                           imagePath:
-                                              'assets/images/ui/button/red_l.png',
+                                              'assets/images/ui/button/red_l.webp',
                                           width: 150.w,
                                           height: 70.h,
                                           onPressed: _handleNext,
@@ -676,7 +676,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                                                 : ImageButton(
                                                   text: '完成',
                                                   imagePath:
-                                                      'assets/images/ui/button/red_l.png',
+                                                      'assets/images/ui/button/red_l.webp',
                                                   width: 150.w,
                                                   height: 70.h,
                                                   onPressed: _handleComplete,

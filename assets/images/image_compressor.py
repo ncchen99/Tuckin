@@ -129,7 +129,7 @@ def compress_image(input_path, output_path, max_dimension=None, output_format=No
         logging.error(f"✗ 處理 {input_path} 時發生錯誤: {str(e)}")
         return False
 
-def process_directory(directory, max_dimension=None, output_format=None, quality=85, 
+def process_directory(directory, max_dimension=None, output_format=None, quality=90, 
                      recursive=False, overwrite=False, output_suffix="_compressed"):
     """
     處理目錄中的所有圖片

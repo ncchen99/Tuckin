@@ -39,7 +39,7 @@ class GoogleSignInButton extends StatelessWidget {
   Widget build(BuildContext context) {
     // 使用 ImageButton 的 isEnabled 參數實現完全禁用功能
     return ImageButton(
-      imagePath: 'assets/images/ui/button/red_l.png',
+      imagePath: 'assets/images/ui/button/red_l.webp',
       text: 'Google登入',
       width: width,
       height: height,

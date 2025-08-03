@@ -132,7 +132,7 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             ImageButton(
                               text: '開始',
-                              imagePath: 'assets/images/ui/button/red_l.png',
+                              imagePath: 'assets/images/ui/button/red_l.webp',
                               width: 160.w,
                               height: 70.h,
                               onPressed: () async {

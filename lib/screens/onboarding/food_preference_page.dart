@@ -462,7 +462,7 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
                                                       ? '完成'
                                                       : '下一步',
                                               imagePath:
-                                                  'assets/images/ui/button/red_l.png',
+                                                  'assets/images/ui/button/red_l.webp',
                                               width: 150.w,
                                               height: 70.h,
                                               onPressed: _handleNextStep,

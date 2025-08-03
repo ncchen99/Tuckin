@@ -247,7 +247,7 @@ class _ConfirmationTimeoutPageState extends State<ConfirmationTimeoutPage> {
                                   : ImageButton(
                                     text: '返回首頁',
                                     imagePath:
-                                        'assets/images/ui/button/blue_l.png',
+                                        'assets/images/ui/button/blue_l.webp',
                                     width: 160.w,
                                     height: 70.h,
                                     onPressed: () {
