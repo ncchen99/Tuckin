@@ -179,7 +179,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                       Positioned(
                         bottom: 10.h,
                         child: Image.asset(
-                          'assets/images/frame/bowl-back.png',
+                          'assets/images/frame/bowl-back.webp',
                           width: 160.w,
                           color: Colors.black.withOpacity(0.3),
                           colorBlendMode: BlendMode.srcIn,
@@ -189,7 +189,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                       Positioned(
                         bottom: 13.h,
                         child: Image.asset(
-                          'assets/images/frame/bowl-back.png',
+                          'assets/images/frame/bowl-back.webp',
                           width: 160.w,
                         ),
                       ),
@@ -208,7 +208,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                       Positioned(
                         bottom: 10.h,
                         child: Image.asset(
-                          'assets/images/frame/bowl-front.png',
+                          'assets/images/frame/bowl-front.webp',
                           width: 160.w,
                           color: Colors.black.withOpacity(0.3),
                           colorBlendMode: BlendMode.srcIn,
@@ -218,7 +218,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                       Positioned(
                         bottom: 13.h,
                         child: Image.asset(
-                          'assets/images/frame/bowl-front.png',
+                          'assets/images/frame/bowl-front.webp',
                           width: 160.w,
                         ),
                       ),
