@@ -29,6 +29,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   // 添加動畫控制器
   late AnimationController _animationController;
 
+  // 添加素材預載入狀態
+  bool _assetsPreloaded = false;
+
   // 食物動畫相關變量
   final List<String> _dishPaths = [
     'assets/images/dish/chinese.webp',
@@ -61,18 +64,18 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   // 黏土人物路徑
   final List<String> _figuresPaths = [
-    'assets/images/avatar/no_bg/female_1.png',
-    'assets/images/avatar/no_bg/male_1.png',
-    'assets/images/avatar/no_bg/female_2.png',
-    'assets/images/avatar/no_bg/male_2.png',
-    'assets/images/avatar/no_bg/female_3.png',
-    'assets/images/avatar/no_bg/male_3.png',
-    'assets/images/avatar/no_bg/female_4.png',
-    'assets/images/avatar/no_bg/male_4.png',
-    'assets/images/avatar/no_bg/female_5.png',
-    'assets/images/avatar/no_bg/male_5.png',
-    'assets/images/avatar/no_bg/female_6.png',
-    'assets/images/avatar/no_bg/male_6.png',
+    'assets/images/avatar/no_bg/female_1.webp',
+    'assets/images/avatar/no_bg/male_1.webp',
+    'assets/images/avatar/no_bg/female_2.webp',
+    'assets/images/avatar/no_bg/male_2.webp',
+    'assets/images/avatar/no_bg/female_3.webp',
+    'assets/images/avatar/no_bg/male_3.webp',
+    'assets/images/avatar/no_bg/female_4.webp',
+    'assets/images/avatar/no_bg/male_4.webp',
+    'assets/images/avatar/no_bg/female_5.webp',
+    'assets/images/avatar/no_bg/male_5.webp',
+    'assets/images/avatar/no_bg/female_6.webp',
+    'assets/images/avatar/no_bg/male_6.webp',
   ];
 
   // 黏土人物初始位置 (50個人物)
@@ -85,10 +88,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   List<double> _rowStartY = [];
   List<double> _rowHeights = [];
 
-  // 宣告動畫變數
-  late Animation<double> _figureAnimation;
-  late Animation<double> _logoAnimation;
-  late Animation<double> _zoomAnimation;
+  // 宣告動畫變數（暫時移除未使用的動畫變數）
 
   @override
   void initState() {
@@ -105,32 +105,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         });
         _videoController.play();
         _videoController.setLooping(false);
+
+        // 影片開始播放時預載入後續分頁的素材
+        _preloadAssets();
       });
 
     // 初始化動畫控制器
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500), // 縮短動畫時間
-    );
-
-    // 使用 CurvedAnimation 優化動畫曲線
-    _figureAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutBack,
-    );
-
-    _logoAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.2, 0.6, curve: Curves.easeOut),
-      ),
-    );
-
-    _zoomAnimation = Tween<double>(begin: 1.2, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
-      ),
     );
 
     // 初始化食物動畫數據
@@ -200,7 +183,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _rowHeights.clear();
 
     // 使用正規化座標系統，範圍從-1到1，中心點是(0,0)
-    final double canvasHalfNormalized = 1.0;
 
     // 定義5個橫排的格子數量 (已在類中定義)
     final int totalGrids = _rowGrids.reduce((a, b) => a + b); // 總格子數
@@ -293,6 +275,46 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     assert(_figureFinalPositions.length == actualFigureCount);
   }
 
+  // 預載入素材圖片
+  Future<void> _preloadAssets() async {
+    if (_assetsPreloaded) return;
+
+    try {
+      // 建立所有需要預載入的圖片列表
+      List<Future<void>> preloadTasks = [];
+
+      // 預載入所有人物頭像
+      for (String figurePath in _figuresPaths) {
+        preloadTasks.add(precacheImage(AssetImage(figurePath), context));
+      }
+
+      // 預載入所有食物圖片
+      for (String dishPath in _dishPaths) {
+        preloadTasks.add(precacheImage(AssetImage(dishPath), context));
+      }
+
+      // 預載入背景圖片
+      preloadTasks.addAll([
+        precacheImage(
+          const AssetImage('assets/images/background/bg3.jpg'),
+          context,
+        ),
+        precacheImage(
+          const AssetImage('assets/images/background/bg4.jpg'),
+          context,
+        ),
+      ]);
+
+      // 並行載入所有圖片
+      await Future.wait(preloadTasks);
+
+      _assetsPreloaded = true;
+    } catch (e) {
+      // 忽略預載入錯誤，避免影響主要功能
+      print('預載入素材時發生錯誤: $e');
+    }
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -320,16 +342,22 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       _currentPage = page;
     });
 
-    // 重置並開始動畫
+    // 重置動畫控制器
     if (_animationController.status == AnimationStatus.completed) {
       _animationController.reset();
     }
 
+    // 延遲開始動畫，確保頁面切換完成後再播放
     if (_currentPage > 0) {
-      // 確保動畫控制器開始運行
-      if (_animationController.status != AnimationStatus.forward) {
-        _animationController.forward();
-      }
+      // 延遲500毫秒後開始動畫，確保滑動動畫完成
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && _currentPage == page) {
+          // 確保頁面沒有再次改變
+          if (_animationController.status != AnimationStatus.forward) {
+            _animationController.forward();
+          }
+        }
+      });
     }
 
     // 如果是第一頁且視頻已經結束，重新播放一次

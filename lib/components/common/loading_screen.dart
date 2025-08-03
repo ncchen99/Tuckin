@@ -49,18 +49,18 @@ class LoadingScreen extends StatefulWidget {
 class _LoadingScreenState extends State<LoadingScreen>
     with SingleTickerProviderStateMixin {
   static const List<String> _defaultAvatars = [
-    'assets/images/avatar/no_bg/female_1.png',
-    'assets/images/avatar/no_bg/female_2.png',
-    'assets/images/avatar/no_bg/female_3.png',
-    'assets/images/avatar/no_bg/female_4.png',
-    'assets/images/avatar/no_bg/female_5.png',
-    'assets/images/avatar/no_bg/female_6.png',
-    'assets/images/avatar/no_bg/male_1.png',
-    'assets/images/avatar/no_bg/male_2.png',
-    'assets/images/avatar/no_bg/male_3.png',
-    'assets/images/avatar/no_bg/male_4.png',
-    'assets/images/avatar/no_bg/male_5.png',
-    'assets/images/avatar/no_bg/male_6.png',
+    'assets/images/avatar/no_bg/female_1.webp',
+    'assets/images/avatar/no_bg/female_2.webp',
+    'assets/images/avatar/no_bg/female_3.webp',
+    'assets/images/avatar/no_bg/female_4.webp',
+    'assets/images/avatar/no_bg/female_5.webp',
+    'assets/images/avatar/no_bg/female_6.webp',
+    'assets/images/avatar/no_bg/male_1.webp',
+    'assets/images/avatar/no_bg/male_2.webp',
+    'assets/images/avatar/no_bg/male_3.webp',
+    'assets/images/avatar/no_bg/male_4.webp',
+    'assets/images/avatar/no_bg/male_5.webp',
+    'assets/images/avatar/no_bg/male_6.webp',
   ];
 
   late final List<String> _avatars;
