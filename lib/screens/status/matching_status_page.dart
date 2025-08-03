@@ -504,8 +504,12 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                 fit: BoxFit.cover,
               ),
             ),
-            child: const Center(
-              child: CircularProgressIndicator(color: Color(0xFF23456B)),
+            child: Center(
+              child: LoadingImage(
+                width: 60.w,
+                height: 60.h,
+                color: const Color(0xFF23456B),
+              ),
             ),
           ),
         ),
@@ -572,7 +576,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                                             : ImageButton(
                                               text: '取消預約',
                                               imagePath:
-                                                  'assets/images/ui/button/red_l.webp',
+                                                  'assets/images/ui/button/blue_l.webp',
                                               width: 160.w,
                                               height: 70.h,
                                               onPressed: () {

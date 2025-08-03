@@ -513,7 +513,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   child: VideoPlayer(_videoController),
                 ),
               )
-              : const Center(child: CircularProgressIndicator()),
+              : Center(
+                child: LoadingImage(
+                  width: 60.w,
+                  height: 60.h,
+                  color: const Color(0xFF23456B),
+                ),
+              ),
     );
   }
 

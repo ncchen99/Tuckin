@@ -502,9 +502,11 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
           child: SafeArea(
             child:
                 _isLoading
-                    ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF23456B),
+                    ? Center(
+                      child: LoadingImage(
+                        width: 60.w,
+                        height: 60.h,
+                        color: const Color(0xFF23456B),
                       ),
                     )
                     : Column(

@@ -430,7 +430,28 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   @override
   Widget build(BuildContext context) {
     if (_dinnerTimeInfo == null) {
-      return const Center(child: CircularProgressIndicator());
+      return WillPopScope(
+        onWillPop: () async {
+          return false; // 禁用返回按鈕
+        },
+        child: Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/background/bg2.jpg'),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: Center(
+              child: LoadingImage(
+                width: 60.w,
+                height: 60.h,
+                color: const Color(0xFF23456B),
+              ),
+            ),
+          ),
+        ),
+      );
     }
     return WillPopScope(
       onWillPop: () async {
@@ -515,7 +536,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                                         : ImageButton(
                                           text: _buttonText,
                                           imagePath:
-                                              'assets/images/ui/button/red_l.webp',
+                                              'assets/images/ui/button/red_m.webp',
                                           width: 160.w,
                                           height: 70.h,
                                           onPressed: _handleButtonClick,
