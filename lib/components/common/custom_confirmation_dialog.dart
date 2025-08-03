@@ -180,7 +180,7 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        '操作失敗: ${e.toString()}',
+                                        '操作失敗: ${e.toString().replaceFirst(RegExp(r'^.*Exception: '), '')}',
                                         style: const TextStyle(
                                           fontFamily: 'OtsutomeFont',
                                         ),

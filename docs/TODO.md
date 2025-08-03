@@ -130,7 +130,7 @@
 - [ ] 小 bug：Supabase 的 realtime 功能在舊版 Android 無法正常運作，activity檢查回到畫面的刷新頁面也沒有作用
 - [x] 優化：圖片壓縮
 - [x] 更新資料庫圖檔路徑
-- [ ] exception 說明去除exception字樣
+- [x] exception 說明去除exception字樣
 - [x] 小 bug 修正：選擇餐廳頁面 下方圖片填滿(自動填滿剩餘空間spacer?)，需要檢查拔拔的手機
 - [x] 小 bug 修正：welcome 葉面 圖片預先載入 並且在見到該葉面才播放動畫
 - [ ] 更改個性測驗說明 

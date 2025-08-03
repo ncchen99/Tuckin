@@ -162,16 +162,6 @@ class _ProfilePageState extends State<ProfilePage> {
           }
         } catch (e) {
           debugPrint('登出錯誤: $e');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  '登出失敗: ${e.toString()}',
-                  style: const TextStyle(fontFamily: 'OtsutomeFont'),
-                ),
-              ),
-            );
-          }
           rethrow; // 讓對話框處理錯誤
         }
       },
@@ -202,14 +192,6 @@ class _ProfilePageState extends State<ProfilePage> {
               // 如果不能刪除，顯示提示消息並拋出異常
               if (mounted) {
                 Navigator.of(context).pop(); // 關閉對話框
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '您目前正在聚餐流程中，無法刪除帳號',
-                      style: const TextStyle(fontFamily: 'OtsutomeFont'),
-                    ),
-                  ),
-                );
               }
               throw Exception('您目前正在聚餐流程中，無法刪除帳號');
             }
@@ -241,16 +223,6 @@ class _ProfilePageState extends State<ProfilePage> {
           }
         } catch (e) {
           debugPrint('刪除帳號錯誤: $e');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  '刪除帳號失敗: ${e.toString()}',
-                  style: const TextStyle(fontFamily: 'OtsutomeFont'),
-                ),
-              ),
-            );
-          }
           rethrow; // 讓對話框處理錯誤
         }
       },
