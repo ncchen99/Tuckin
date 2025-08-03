@@ -1759,7 +1759,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                         0, 0, 0, 1, 0, // A影響
                       ]),
                       child: Image.asset(
-                        'assets/images/illustrate/p3.png',
+                        'assets/images/illustrate/p3.webp',
                         width: 220.w, // 增大尺寸
                         height: 220.h, // 增大尺寸
                         fit: BoxFit.contain,

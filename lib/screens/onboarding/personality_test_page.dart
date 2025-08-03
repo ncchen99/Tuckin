@@ -383,8 +383,8 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
                               ]),
                               child: Image.asset(
                                 _currentPage == 0
-                                    ? 'assets/images/illustrate/p1.png'
-                                    : 'assets/images/illustrate/p2.png',
+                                    ? 'assets/images/illustrate/p1.webp'
+                                    : 'assets/images/illustrate/p2.webp',
                                 width: 220.w, // 增大尺寸
                                 height: 220.h, // 增大尺寸
                                 fit: BoxFit.contain,
