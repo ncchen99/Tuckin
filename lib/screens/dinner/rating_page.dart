@@ -438,7 +438,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
               left: 2.w,
               top: 1.h,
               child: Image.asset(
-                'assets/images/icon/pointer.png',
+                'assets/images/icon/pointer.webp',
                 width: 38.w,
                 height: 38.h,
                 color: Colors.black.withOpacity(0.3),
@@ -447,7 +447,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
             ),
             // 主圖標
             Image.asset(
-              'assets/images/icon/pointer.png',
+              'assets/images/icon/pointer.webp',
               width: 38.w,
               height: 38.h,
             ),
@@ -763,7 +763,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                                                           left: 0.w,
                                                           top: 1.h,
                                                           child: Image.asset(
-                                                            'assets/images/icon/email.png',
+                                                            'assets/images/icon/email.webp',
                                                             width: 28.w,
                                                             height: 28.h,
                                                             color: Colors.black
@@ -776,7 +776,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                                                         ),
                                                         // 主圖標
                                                         Image.asset(
-                                                          'assets/images/icon/email.png',
+                                                          'assets/images/icon/email.webp',
                                                           width: 28.w,
                                                           height: 28.h,
                                                         ),

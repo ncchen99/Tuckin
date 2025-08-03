@@ -162,7 +162,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                     left: 0,
                                     top: 3.h,
                                     child: Image.asset(
-                                      'assets/images/icon/add.png',
+                                      'assets/images/icon/add.webp',
                                       width: 55.w,
                                       height: 55.h,
                                       color: Colors.black.withOpacity(0.4),
@@ -174,7 +174,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                     top: 0,
                                     left: 0,
                                     child: Image.asset(
-                                      'assets/images/icon/add.png',
+                                      'assets/images/icon/add.webp',
                                       width: 55.w,
                                       height: 55.h,
                                     ),
@@ -215,7 +215,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                       left: 0,
                                       top: 4.h,
                                       child: Image.asset(
-                                        'assets/images/icon/link.png',
+                                        'assets/images/icon/link.webp',
                                         width: 24.w,
                                         height: 24.h,
                                         color: Colors.black.withOpacity(0.4),
@@ -227,7 +227,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                       left: 0,
                                       top: 0,
                                       child: Image.asset(
-                                        'assets/images/icon/link.png',
+                                        'assets/images/icon/link.webp',
                                         width: 24.w,
                                         height: 24.h,
                                       ),

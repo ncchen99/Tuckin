@@ -203,7 +203,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                   left: 0,
                   top: adaptiveShadowOffset,
                   child: Image.asset(
-                    'assets/images/icon/notification.png',
+                    'assets/images/icon/notification.webp',
                     width: 70.w,
                     height: 70.h,
                     color: Colors.black.withOpacity(0.4),
@@ -212,7 +212,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                 ),
                 // 主圖像
                 Image.asset(
-                  'assets/images/icon/notification.png',
+                  'assets/images/icon/notification.webp',
                   width: 70.w,
                   height: 70.h,
                 ),
@@ -424,7 +424,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                   left: 0,
                   top: adaptiveShadowOffset,
                   child: Image.asset(
-                    'assets/images/icon/sorry.png',
+                    'assets/images/icon/sorry.webp',
                     width: 150.w,
                     height: 150.h,
                     color: Colors.black.withOpacity(0.4),
@@ -433,7 +433,7 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                 ),
                 // 主圖像
                 Image.asset(
-                  'assets/images/icon/sorry.png',
+                  'assets/images/icon/sorry.webp',
                   width: 150.w,
                   height: 150.h,
                 ),

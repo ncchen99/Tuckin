@@ -54,7 +54,7 @@ class InfoTipBox extends StatelessWidget {
                     left: 0, // 向右偏移
                     top: 1, // 向下偏移
                     child: Image.asset(
-                      'assets/images/icon/info.png',
+                      'assets/images/icon/info.webp',
                       width: 20.w,
                       height: 20.h,
                       color: Colors.black.withOpacity(0.4), // 稍微增加不透明度
@@ -65,7 +65,7 @@ class InfoTipBox extends StatelessWidget {
                     left: 0,
                     top: 0,
                     child: Image.asset(
-                      'assets/images/icon/info.png',
+                      'assets/images/icon/info.webp',
                       width: 20.w,
                       height: 20.h,
                     ),

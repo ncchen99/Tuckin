@@ -53,7 +53,7 @@ class _BackIconButtonState extends State<BackIconButton> {
                   height: widget.height,
                   decoration: const BoxDecoration(color: Colors.transparent),
                   child: Image.asset(
-                    'assets/images/icon/arrow_left.png',
+                    'assets/images/icon/arrow_left.webp',
                     width: widget.width,
                     height: widget.height,
                     fit: BoxFit.contain,
@@ -71,7 +71,7 @@ class _BackIconButtonState extends State<BackIconButton> {
                 child: Container(
                   decoration: const BoxDecoration(color: Colors.transparent),
                   child: Image.asset(
-                    'assets/images/icon/arrow_left.png',
+                    'assets/images/icon/arrow_left.webp',
                     width: widget.width,
                     height: widget.height,
                     fit: BoxFit.contain,

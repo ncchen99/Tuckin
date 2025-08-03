@@ -72,7 +72,7 @@ class _HeaderBarState extends State<HeaderBar> {
 
           // 右側：個人資料圖標
           _buildProfileButton(
-            'assets/images/icon/user_profile.png',
+            'assets/images/icon/user_profile.webp',
             () => _handleProfileTap(context),
             adaptiveShadowOffset,
           ),
@@ -103,7 +103,7 @@ class _HeaderBarState extends State<HeaderBar> {
                 top: shadowOffset,
                 left: 0,
                 child: Image.asset(
-                  'assets/images/icon/tuckin_t_brand.png',
+                  'assets/images/icon/tuckin_t_brand.webp',
                   height: 34.h,
                   fit: BoxFit.contain,
                   color: Colors.black.withValues(alpha: .4),
@@ -115,7 +115,7 @@ class _HeaderBarState extends State<HeaderBar> {
               top: _isBrandPressed ? shadowOffset : 0,
               left: 0,
               child: Image.asset(
-                'assets/images/icon/tuckin_t_brand.png',
+                'assets/images/icon/tuckin_t_brand.webp',
                 height: 34.h,
                 fit: BoxFit.contain,
               ),

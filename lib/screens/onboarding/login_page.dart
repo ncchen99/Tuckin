@@ -194,7 +194,7 @@ class _LoginPageState extends State<LoginPage> {
                                 left: 0,
                                 top: 3,
                                 child: Image.asset(
-                                  'assets/images/icon/tuckin_t_brand.png',
+                                  'assets/images/icon/tuckin_t_brand.webp',
                                   width: 220.w,
                                   height: 110.h,
                                   fit: BoxFit.contain,
@@ -204,7 +204,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               // 圖片主圖層
                               Image.asset(
-                                'assets/images/icon/tuckin_t_brand.png',
+                                'assets/images/icon/tuckin_t_brand.webp',
                                 width: 220.w,
                                 height: 110.h,
                                 fit: BoxFit.contain,

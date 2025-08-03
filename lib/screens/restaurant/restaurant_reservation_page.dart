@@ -651,7 +651,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
       // 使用自定義確認對話框
       bool? confirmChange = await showCustomConfirmationDialog(
         context: context,
-        iconPath: 'assets/images/icon/failed.png',
+        iconPath: 'assets/images/icon/failed.webp',
         content: '確定要更換另一家餐廳嗎？系統將從候選餐廳中選擇下一間！',
         cancelButtonText: '取消',
         confirmButtonText: '確定',
@@ -841,7 +841,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                   left: 0,
                                   top: 3.h,
                                   child: Image.asset(
-                                    'assets/images/icon/checking.png',
+                                    'assets/images/icon/checking.webp',
                                     width: 55.w,
                                     height: 55.h,
                                     color: Colors.black.withOpacity(0.4),
@@ -853,7 +853,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                   top: 0,
                                   left: 0,
                                   child: Image.asset(
-                                    'assets/images/icon/checking.png',
+                                    'assets/images/icon/checking.webp',
                                     width: 55.w,
                                     height: 55.h,
                                   ),
@@ -974,7 +974,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                               left: 0,
                                               top: 2,
                                               child: Image.asset(
-                                                'assets/images/icon/user_profile.png',
+                                                'assets/images/icon/user_profile.webp',
                                                 width: 25.w,
                                                 height: 25.h,
                                                 fit: BoxFit.contain,
@@ -989,7 +989,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                               left: 0,
                                               top: 0,
                                               child: Image.asset(
-                                                'assets/images/icon/user_profile.png',
+                                                'assets/images/icon/user_profile.webp',
                                                 width: 25.w,
                                                 height: 25.h,
                                                 fit: BoxFit.contain,
@@ -1106,7 +1106,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                               left: 0,
                                               top: 2,
                                               child: Image.asset(
-                                                'assets/images/icon/phone.png',
+                                                'assets/images/icon/phone.webp',
                                                 width: 25.w,
                                                 height: 25.h,
                                                 fit: BoxFit.contain,
@@ -1121,7 +1121,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                               left: 0,
                                               top: 0,
                                               child: Image.asset(
-                                                'assets/images/icon/phone.png',
+                                                'assets/images/icon/phone.webp',
                                                 width: 25.w,
                                                 height: 25.h,
                                                 fit: BoxFit.contain,
@@ -1590,7 +1590,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                     left: 0,
                                                     top: 2.h,
                                                     child: Image.asset(
-                                                      'assets/images/icon/clock.png',
+                                                      'assets/images/icon/clock.webp',
                                                       width: 35.w,
                                                       height: 35.h,
                                                       color: Colors.black
@@ -1601,7 +1601,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                   ),
                                                   // 主圖標
                                                   Image.asset(
-                                                    'assets/images/icon/clock.png',
+                                                    'assets/images/icon/clock.webp',
                                                     width: 35.w,
                                                     height: 35.h,
                                                   ),
@@ -1689,7 +1689,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                     left: 0,
                                                     top: 2.h,
                                                     child: Image.asset(
-                                                      'assets/images/icon/attendee.png',
+                                                      'assets/images/icon/attendee.webp',
                                                       width: 35.w,
                                                       height: 35.h,
                                                       color: Colors.black
@@ -1700,7 +1700,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                   ),
                                                   // 主圖標
                                                   Image.asset(
-                                                    'assets/images/icon/attendee.png',
+                                                    'assets/images/icon/attendee.webp',
                                                     width: 35.w,
                                                     height: 35.h,
                                                   ),
@@ -1804,7 +1804,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                       left: 0,
                                                       top: 2.h,
                                                       child: Image.asset(
-                                                        'assets/images/icon/phone.png',
+                                                        'assets/images/icon/phone.webp',
                                                         width: 35.w,
                                                         height: 35.h,
                                                         color: Colors.black
@@ -1815,7 +1815,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                     ),
                                                     // 主圖標
                                                     Image.asset(
-                                                      'assets/images/icon/phone.png',
+                                                      'assets/images/icon/phone.webp',
                                                       width: 35.w,
                                                       height: 35.h,
                                                     ),
@@ -1900,7 +1900,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                       left: 0,
                                                       top: 2.h,
                                                       child: Image.asset(
-                                                        'assets/images/icon/link.png',
+                                                        'assets/images/icon/link.webp',
                                                         width: 35.w,
                                                         height: 35.h,
                                                         color: Colors.black
@@ -1911,7 +1911,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                     ),
                                                     // 主圖標
                                                     Image.asset(
-                                                      'assets/images/icon/link.png',
+                                                      'assets/images/icon/link.webp',
                                                       width: 35.w,
                                                       height: 35.h,
                                                     ),

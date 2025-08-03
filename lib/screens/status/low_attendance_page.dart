@@ -197,7 +197,7 @@ class _LowAttendancePageState extends State<LowAttendancePage> {
                                   left: 0,
                                   top: adaptiveShadowOffset,
                                   child: Image.asset(
-                                    'assets/images/icon/low_rate.png',
+                                    'assets/images/icon/low_rate.webp',
                                     width: 150.w,
                                     height: 150.h,
                                     color: Colors.black.withOpacity(0.4),
@@ -206,7 +206,7 @@ class _LowAttendancePageState extends State<LowAttendancePage> {
                                 ),
                                 // 主圖像
                                 Image.asset(
-                                  'assets/images/icon/low_rate.png',
+                                  'assets/images/icon/low_rate.webp',
                                   width: 150.w,
                                   height: 150.h,
                                 ),

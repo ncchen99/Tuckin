@@ -34,7 +34,7 @@ class LoadingImage extends StatelessWidget {
             Positioned(
               bottom: 0, // 將陰影固定在底部
               child: Image.asset(
-                'assets/images/icon/loading.png',
+                'assets/images/icon/loading.webp',
                 width: imageSize,
                 height: imageSize,
                 fit: BoxFit.contain,
@@ -47,7 +47,7 @@ class LoadingImage extends StatelessWidget {
             Positioned(
               bottom: adaptiveShadowOffset, // 主圖層向上偏移
               child: Image.asset(
-                'assets/images/icon/loading.png',
+                'assets/images/icon/loading.webp',
                 width: imageSize,
                 height: imageSize,
                 fit: BoxFit.contain,

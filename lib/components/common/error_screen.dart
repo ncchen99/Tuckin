@@ -60,7 +60,7 @@ class ErrorScreen extends StatelessWidget {
                         Positioned(
                           top: 3,
                           child: Image.asset(
-                            'assets/images/icon/no_connection.png',
+                            'assets/images/icon/no_connection.webp',
                             width: 120, // 縮小圖標尺寸
                             height: 120,
                             color: Colors.black.withOpacity(0.4),
@@ -69,7 +69,7 @@ class ErrorScreen extends StatelessWidget {
                         ),
                         // 主圖層
                         Image.asset(
-                          'assets/images/icon/no_connection.png',
+                          'assets/images/icon/no_connection.webp',
                           width: 120, // 縮小圖標尺寸
                           height: 120,
                         ),

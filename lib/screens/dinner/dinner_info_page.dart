@@ -88,7 +88,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
     showCustomConfirmationDialog(
       context: context,
-      iconPath: 'assets/images/icon/reservation.png',
+      iconPath: 'assets/images/icon/reservation.webp',
       title: '',
       content: '你願意幫忙確認餐廳營業時間，\n並協助訂位嗎？',
       cancelButtonText: '不要',
@@ -811,7 +811,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                             left: 0.w,
                             top: 1.h,
                             child: Image.asset(
-                              'assets/images/icon/reservation.png',
+                              'assets/images/icon/reservation.webp',
                               width: 28.w,
                               height: 28.h,
                               color: Colors.black.withOpacity(0.3),
@@ -820,7 +820,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                           ),
                           // 主圖標
                           Image.asset(
-                            'assets/images/icon/reservation.png',
+                            'assets/images/icon/reservation.webp',
                             width: 28.w,
                             height: 28.h,
                           ),
@@ -876,7 +876,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                         left: 0.w,
                         top: 1.h,
                         child: Image.asset(
-                          'assets/images/icon/checking.png',
+                          'assets/images/icon/checking.webp',
                           width: 28.w,
                           height: 28.h,
                           color: Colors.black.withOpacity(0.3),
@@ -885,7 +885,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                       ),
                       // 主圖標
                       Image.asset(
-                        'assets/images/icon/checking.png',
+                        'assets/images/icon/checking.webp',
                         width: 28.w,
                         height: 28.h,
                       ),
@@ -954,7 +954,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                         left: 0.w,
                         top: 1.h,
                         child: Image.asset(
-                          'assets/images/icon/done.png',
+                          'assets/images/icon/done.webp',
                           width: 28.w,
                           height: 28.h,
                           color: Colors.black.withOpacity(0.3),
@@ -963,7 +963,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                       ),
                       // 主圖標
                       Image.asset(
-                        'assets/images/icon/done.png',
+                        'assets/images/icon/done.webp',
                         width: 28.w,
                         height: 28.h,
                       ),
@@ -1027,7 +1027,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                       left: 0.w,
                       top: 1.h,
                       child: Image.asset(
-                        'assets/images/icon/info.png',
+                        'assets/images/icon/info.webp',
                         width: 28.w,
                         height: 28.h,
                         color: Colors.black.withOpacity(0.3),
@@ -1036,7 +1036,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                     ),
                     // 主圖標
                     Image.asset(
-                      'assets/images/icon/info.png',
+                      'assets/images/icon/info.webp',
                       width: 28.w,
                       height: 28.h,
                     ),
@@ -1157,7 +1157,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                       shape: BoxShape.circle,
                       image: DecorationImage(
                         image: AssetImage(
-                          'assets/images/avatar/profile/female_7.png',
+                          'assets/images/avatar/profile/female_7.webp',
                         ),
                         fit: BoxFit.cover,
                       ),
@@ -1202,13 +1202,13 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                         future: userStatusService.getDinnerTime(),
                         builder: (context, snapshot) {
                           String iconPath =
-                              'assets/images/icon/thu.png'; // 預設圖標
+                              'assets/images/icon/thu.webp'; // 預設圖標
                           if (snapshot.hasData) {
                             final dinnerTime = snapshot.data!;
                             iconPath =
                                 dinnerTime.weekday == DateTime.monday
-                                    ? 'assets/images/icon/mon.png'
-                                    : 'assets/images/icon/thu.png';
+                                    ? 'assets/images/icon/mon.webp'
+                                    : 'assets/images/icon/thu.webp';
                           }
 
                           return Stack(
@@ -1520,7 +1520,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                           left: 0,
                                           top: 2.h,
                                           child: Image.asset(
-                                            'assets/images/icon/clock.png',
+                                            'assets/images/icon/clock.webp',
                                             width: 35.w,
                                             height: 35.h,
                                             color: Colors.black.withOpacity(
@@ -1531,7 +1531,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                         ),
                                         // 主圖標
                                         Image.asset(
-                                          'assets/images/icon/clock.png',
+                                          'assets/images/icon/clock.webp',
                                           width: 35.w,
                                           height: 35.h,
                                         ),
@@ -1665,7 +1665,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                             left: 0,
                                             top: 2.h,
                                             child: Image.asset(
-                                              'assets/images/icon/navigation.png',
+                                              'assets/images/icon/navigation.webp',
                                               width: 35.w,
                                               height: 35.h,
                                               color: Colors.black.withOpacity(
@@ -1676,7 +1676,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                           ),
                                           // 主圖標
                                           Image.asset(
-                                            'assets/images/icon/navigation.png',
+                                            'assets/images/icon/navigation.webp',
                                             width: 35.w,
                                             height: 35.h,
                                           ),

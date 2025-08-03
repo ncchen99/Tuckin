@@ -488,8 +488,8 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                                 String iconPath =
                                     _dinnerTimeInfo!.nextDinnerDate.weekday ==
                                             DateTime.monday
-                                        ? 'assets/images/icon/mon.png'
-                                        : 'assets/images/icon/thu.png';
+                                        ? 'assets/images/icon/mon.webp'
+                                        : 'assets/images/icon/thu.webp';
                                 return _buildDateCard(
                                   context,
                                   _dinnerTimeInfo!.weekdayText,

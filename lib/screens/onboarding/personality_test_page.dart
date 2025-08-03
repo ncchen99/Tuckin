@@ -149,7 +149,7 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
         // 如果是從profile頁面導航過來的，顯示確認對話框
         showCustomConfirmationDialog(
           context: context,
-          iconPath: 'assets/images/icon/save.png',
+          iconPath: 'assets/images/icon/save.webp',
           content: '您尚未儲存資料，\n是否要儲存後離開？',
           cancelButtonText: '不用',
           confirmButtonText: '儲存',

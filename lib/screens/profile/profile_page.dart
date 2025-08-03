@@ -146,7 +146,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     showCustomConfirmationDialog(
       context: context,
-      iconPath: 'assets/images/icon/logout.png',
+      iconPath: 'assets/images/icon/logout.webp',
       content: '確定要登出嗎？\n要用功能需要再登入喔',
       onConfirm: () async {
         try {
@@ -186,7 +186,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     showCustomConfirmationDialog(
       context: context,
-      iconPath: 'assets/images/icon/delete.png',
+      iconPath: 'assets/images/icon/delete.webp',
       content: '確定刪除帳號嗎？\n這一步不能後悔喔，所有資料都會被永久刪除',
       onConfirm: () async {
         try {
@@ -308,7 +308,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           Positioned(
                             top: 3.h,
                             child: Image.asset(
-                              'assets/images/icon/tuckin_t_brand.png',
+                              'assets/images/icon/tuckin_t_brand.webp',
                               height: 35.h,
                               fit: BoxFit.contain,
                               color: Colors.black.withValues(alpha: .4),
@@ -317,7 +317,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           // 主圖層
                           Image.asset(
-                            'assets/images/icon/tuckin_t_brand.png',
+                            'assets/images/icon/tuckin_t_brand.webp',
                             height: 35.h,
                             fit: BoxFit.contain,
                           ),
@@ -351,7 +351,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                       // 更改基本資料
                       _buildSettingItem(
-                        iconPath: 'assets/images/icon/user_profile.png',
+                        iconPath: 'assets/images/icon/user_profile.webp',
                         title: '更改基本資料',
                         onTap: () {
                           Navigator.push(
@@ -385,7 +385,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       // 重新進行個性測驗
                       _buildSettingItem(
-                        iconPath: 'assets/images/icon/brain.png',
+                        iconPath: 'assets/images/icon/brain.webp',
                         title: '重新進行測驗',
                         onTap: () {
                           Navigator.push(
@@ -402,7 +402,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       // 聚餐歷史記錄
                       _buildSettingItem(
-                        iconPath: 'assets/images/icon/history.png',
+                        iconPath: 'assets/images/icon/history.webp',
                         title: '聚餐歷史記錄',
                         onTap: () {
                           // 尚未建立
@@ -420,7 +420,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       // 隱私與條款
                       _buildSettingItem(
-                        iconPath: 'assets/images/icon/shield.png',
+                        iconPath: 'assets/images/icon/shield.webp',
                         title: '隱私與條款',
                         onTap: _showPrivacyPolicyDialog,
                       ),
@@ -428,7 +428,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       // 關於我們
                       _buildSettingItem(
-                        iconPath: 'assets/images/icon/tuckin_t_brand.png',
+                        iconPath: 'assets/images/icon/tuckin_t_brand.webp',
                         title: '關於我們',
                         onTap: _openAboutUsWebpage,
                       ),
@@ -436,7 +436,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       // 登出
                       _buildSettingItem(
-                        iconPath: 'assets/images/icon/logout.png',
+                        iconPath: 'assets/images/icon/logout.webp',
                         title: '登出',
                         onTap: _showLogoutConfirmDialog,
                       ),
@@ -444,7 +444,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                       // 刪除帳號
                       _buildSettingItem(
-                        iconPath: 'assets/images/icon/delete.png',
+                        iconPath: 'assets/images/icon/delete.webp',
                         title: '刪除帳號',
                         onTap: _showDeleteAccountConfirmDialog,
                       ),

@@ -378,7 +378,7 @@ class _AttendanceConfirmationPageState
                                   left: 0,
                                   top: adaptiveShadowOffset,
                                   child: Image.asset(
-                                    'assets/images/icon/match.png',
+                                    'assets/images/icon/match.webp',
                                     width: 150.w,
                                     height: 150.h,
                                     color: Colors.black.withOpacity(0.4),
@@ -387,7 +387,7 @@ class _AttendanceConfirmationPageState
                                 ),
                                 // 主圖像
                                 Image.asset(
-                                  'assets/images/icon/match.png',
+                                  'assets/images/icon/match.webp',
                                   width: 150.w,
                                   height: 150.h,
                                 ),

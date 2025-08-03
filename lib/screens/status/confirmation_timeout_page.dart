@@ -198,7 +198,7 @@ class _ConfirmationTimeoutPageState extends State<ConfirmationTimeoutPage> {
                                   left: 0,
                                   top: adaptiveShadowOffset,
                                   child: Image.asset(
-                                    'assets/images/icon/missing.png',
+                                    'assets/images/icon/missing.webp',
                                     width: 150.w,
                                     height: 150.h,
                                     color: Colors.black.withOpacity(0.4),
@@ -207,7 +207,7 @@ class _ConfirmationTimeoutPageState extends State<ConfirmationTimeoutPage> {
                                 ),
                                 // 主圖像
                                 Image.asset(
-                                  'assets/images/icon/missing.png',
+                                  'assets/images/icon/missing.webp',
                                   width: 150.w,
                                   height: 150.h,
                                 ),

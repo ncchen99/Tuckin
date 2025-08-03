@@ -390,7 +390,7 @@ class RecommendRestaurantCard extends StatelessWidget {
                       left: 0.w,
                       top: 3.h,
                       child: Image.asset(
-                        'assets/images/icon/add.png',
+                        'assets/images/icon/add.webp',
                         width: 40.w,
                         height: 40.h,
                         color: const Color.fromARGB(101, 0, 0, 0),
@@ -399,7 +399,7 @@ class RecommendRestaurantCard extends StatelessWidget {
                     ),
                     // Main image
                     Image.asset(
-                      'assets/images/icon/add.png',
+                      'assets/images/icon/add.webp',
                       width: 40.w,
                       height: 40.h,
                     ),
