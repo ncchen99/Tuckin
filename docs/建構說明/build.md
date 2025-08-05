@@ -34,6 +34,17 @@ flutter build appbundle --release
 ```
 🎉 **太棒了！您的Flutter應用程式已經成功打包！**
 
+### 手動簽名 AAB 文件
+
+```bash
+& "C:\Program Files\Android\Android Studio\jbr\bin\jarsigner.exe" -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore "android\app\tuckin-release-key.jks" -storepass "0c1d1214-329a-4ea4-b544-dd2508c64db1" "build\app\outputs\bundle\release\app-release.aab" tuckin
+```
+驗證簽名：
+```bash
+& "C:\Program Files\Android\Android Studio\jbr\bin\jarsigner.exe" -verify -verbose -certs "build\app\outputs\bundle\release\app-release.aab"
+```
+
+
 ### 📦 打包結果
 
 您的AAB檔案已經成功建置，位於：

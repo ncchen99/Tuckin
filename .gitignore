@@ -59,6 +59,7 @@ android/app/key.properties
 upload-keystore.jks
 release-keystore.jks
 tuckin-release-key.jks
+tuckin-development-key.jks.backup
 
 # PEPK 加密檔案 (包含私鑰，不能提交)
 encrypted-private-key.zip
