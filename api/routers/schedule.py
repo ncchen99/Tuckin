@@ -5,6 +5,9 @@ from typing import Dict, Any, List, Tuple
 import pytz
 
 from dependencies import get_supabase_service, verify_cron_api_key
+from routers.matching import process_batch_matching
+from routers.restaurant import process_finalize_votes
+from routers.dining import update_completed_dining_events, finalize_dining_events
 
 router = APIRouter()
 
@@ -221,4 +224,78 @@ async def generate_schedule(
             detail=f"產生排程時發生錯誤: {str(e)}",
         )
 
+
+@router.post("/execute", dependencies=[Depends(verify_cron_api_key)])
+async def execute_scheduled_tasks(
+    supabase: Client = Depends(get_supabase_service)
+) -> Dict[str, Any]:
+    """
+    執行當前時間應執行的任務：
+    - 從 schedule_table 取出 status=pending 且 scheduled_time 落在 [now-10min, now+10min]
+    - 依 task_type 呼叫對應的業務邏輯：
+      match -> process_batch_matching
+      restaurant_vote_end -> process_finalize_votes
+      event_end -> update_completed_dining_events
+      rating_end -> finalize_dining_events
+    - 成功則標記為 done，失敗則標記為 failed
+    """
+    try:
+        now_utc = datetime.now(timezone.utc)
+        window_start = (now_utc - timedelta(minutes=10)).isoformat()
+        window_end = (now_utc + timedelta(minutes=10)).isoformat()
+
+        pending = (
+            supabase.table("schedule_table")
+            .select("id, task_type, scheduled_time")
+            .eq("status", "pending")
+            .gte("scheduled_time", window_start)
+            .lte("scheduled_time", window_end)
+            .order("scheduled_time")
+            .execute()
+        )
+
+        tasks = pending.data or []
+        results: List[Dict[str, Any]] = []
+
+        for task in tasks:
+            task_id = task["id"]
+            task_type = task["task_type"]
+            ok = True
+            err_msg = None
+
+            try:
+                if task_type == "match":
+                    await process_batch_matching(supabase)
+                elif task_type == "restaurant_vote_end":
+                    await process_finalize_votes(supabase)
+                elif task_type == "event_end":
+                    await update_completed_dining_events(supabase)
+                elif task_type == "rating_end":
+                    await finalize_dining_events(supabase)
+                else:
+                    ok = False
+                    err_msg = f"未知的任務類型: {task_type}"
+            except Exception as ex:
+                ok = False
+                err_msg = str(ex)
+
+            supabase.table("schedule_table").update({
+                "status": "done" if ok else "failed",
+                "updated_at": now_utc.isoformat(),
+            }).eq("id", task_id).execute()
+
+            results.append({
+                "id": task_id,
+                "task_type": task_type,
+                "success": ok,
+                "error": err_msg,
+            })
+
+        return {"success": True, "executed": len(results), "results": results}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"執行任務時發生錯誤: {str(e)}",
+        )
 
