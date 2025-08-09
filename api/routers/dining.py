@@ -828,10 +828,10 @@ async def update_completed_dining_events(supabase: Client):
         # 獲取目前時間
         current_time = datetime.now(timezone.utc)
         
-        # 獲取所有已確認且時間已過的事件
+        # 獲取所有待確認/確認中/已確認且時間已過的事件
         events_to_complete = supabase.table("dining_events") \
             .select("id, matching_group_id") \
-            .eq("status", "confirmed") \
+            .in_("status", ["pending_confirmation", "confirming", "confirmed"]) \
             .lt("date", current_time.isoformat()) \
             .execute()
             
@@ -888,8 +888,8 @@ async def admin_update_completed_events(
     supabase: Client = Depends(get_supabase_service)
 ):
     """
-    管理員或排程任務API，用於將已過期的confirmed狀態事件更新為completed，
-    同時將相關用戶狀態從waiting_attendance更新為rating
+    管理員或排程任務API，用於將已過期的聚餐事件（狀態為 pending_confirmation、confirming、confirmed）更新為 completed，
+    同時將相關用戶狀態從 waiting_attendance 更新為 rating
     """
     # 添加到背景任務執行，避免阻塞API響應
     background_tasks.add_task(update_completed_dining_events, supabase)
