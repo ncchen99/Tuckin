@@ -49,6 +49,37 @@ def _to_utc_iso(dt_local: datetime) -> str:
     return dt_local.astimezone(timezone.utc).isoformat()
 
 
+def _compute_week_times(current_dt_local: datetime) -> Tuple[datetime, datetime, datetime, datetime, datetime]:
+    """
+    給定某個當地日期時間（台北），計算該「週」的四個任務時間與聚餐時間：
+    回傳順序：match_local, vote_local, event_end_local, rating_end_local, dinner_time_local
+    """
+    target_weekday = _target_dinner_weekday(current_dt_local)  # 1=Mon, 4=Thu
+    weekday = current_dt_local.isoweekday()
+    this_week_monday = current_dt_local - timedelta(days=weekday - 1)
+    dinner_day_local = this_week_monday + timedelta(days=target_weekday - 1)
+
+    # 聚餐 18:00
+    dinner_time_local = _localize(dinner_day_local.year, dinner_day_local.month, dinner_day_local.day, 18, 0)
+
+    # match = 聚餐日 - 2 天 的 06:00
+    match_day = dinner_time_local.date() - timedelta(days=2)
+    match_local = _localize(match_day.year, match_day.month, match_day.day, 6, 0)
+
+    # restaurant_vote_end = 聚餐日 - 1 天 的 06:00
+    vote_day = dinner_time_local.date() - timedelta(days=1)
+    vote_local = _localize(vote_day.year, vote_day.month, vote_day.day, 6, 0)
+
+    # event_end = 聚餐當日 22:00
+    event_end_local = _localize(dinner_time_local.year, dinner_time_local.month, dinner_time_local.day, 22, 0)
+
+    # rating_end = event_end 後 48 小時 → 次次日 22:00
+    rating_base = event_end_local + timedelta(hours=48)
+    rating_end_local = _localize(rating_base.year, rating_base.month, rating_base.day, 22, 0)
+
+    return match_local, vote_local, event_end_local, rating_end_local, dinner_time_local
+
+
 @router.post("/generate", dependencies=[Depends(verify_cron_api_key)])
 async def generate_schedule(
     supabase: Client = Depends(get_supabase_service)
@@ -102,44 +133,46 @@ async def generate_schedule(
                 "created": 0,
             }
 
-        # 從（最新已排程時間 + 1 天）的當地午夜開始，或今天起
-        start_local_date: ddate = (
+        # 計算起始與結束的週一（當地）
+        seed_local_date: ddate = (
             latest_time_utc.astimezone(TW_TZ).date() + timedelta(days=1)
             if latest_time_utc else now_local.date()
         )
+        seed_local_dt = TW_TZ.localize(datetime(seed_local_date.year, seed_local_date.month, seed_local_date.day, 0, 0))
+        seed_weekday = seed_local_dt.isoweekday()
+        first_week_monday_local = seed_local_dt - timedelta(days=seed_weekday - 1)
+
         end_local_date: ddate = generate_until_utc.astimezone(TW_TZ).date()
+        end_local_dt = TW_TZ.localize(datetime(end_local_date.year, end_local_date.month, end_local_date.day, 0, 0))
+        end_weekday = end_local_dt.isoweekday()
+        last_week_monday_local = end_local_dt - timedelta(days=end_weekday - 1)
+
+        # 若資料表為空，從下一個將到來的 match 起算，避免流程從中段開始
+        min_allowed_time_utc = now_utc
+        if not latest_time_utc:
+            probe_monday = first_week_monday_local
+            next_match_found = False
+            # 最多往後找 12 週，理論上很快就會找到
+            for _ in range(12):
+                match_local, vote_local, event_end_local, rating_end_local, dinner_local = _compute_week_times(probe_monday)
+                if match_local > now_local:
+                    min_allowed_time_utc = match_local.astimezone(timezone.utc)
+                    # 以 match 所在的週一為第一週
+                    first_week_monday_local = TW_TZ.localize(datetime(match_local.year, match_local.month, match_local.day, 0, 0))
+                    weekday_tmp = first_week_monday_local.isoweekday()
+                    first_week_monday_local = first_week_monday_local - timedelta(days=weekday_tmp - 1)
+                    next_match_found = True
+                    break
+                probe_monday = probe_monday + timedelta(days=7)
+            if not next_match_found:
+                # fallback：仍以當前時間為基準
+                min_allowed_time_utc = now_utc
 
         to_insert: List[Dict[str, Any]] = []
-        current = start_local_date
-        while current <= end_local_date:
-            # 依當地日期決定該週聚餐日
-            current_dt_local = TW_TZ.localize(datetime(current.year, current.month, current.day, 0, 0))
-            target_weekday = _target_dinner_weekday(current_dt_local)  # 1=Mon,4=Thu
+        week_monday = first_week_monday_local
+        while week_monday <= last_week_monday_local:
+            match_local, vote_local, event_end_local, rating_end_local, _ = _compute_week_times(week_monday)
 
-            # 找到該週的週一
-            weekday = current_dt_local.isoweekday()
-            this_week_monday = current_dt_local - timedelta(days=weekday - 1)
-            dinner_day_local = this_week_monday + timedelta(days=target_weekday - 1)
-
-            # 聚餐時間 18:00（台北）
-            dinner_time_local = _localize(dinner_day_local.year, dinner_day_local.month, dinner_day_local.day, 18, 0)
-
-            # match = 聚餐日 - 2 天 的 06:00
-            match_day = dinner_time_local.date() - timedelta(days=2)
-            match_local = _localize(match_day.year, match_day.month, match_day.day, 6, 0)
-
-            # restaurant_vote_end = match 後 24 小時 → 聚餐日 - 1 天 的 06:00
-            vote_day = dinner_time_local.date() - timedelta(days=1)
-            vote_local = _localize(vote_day.year, vote_day.month, vote_day.day, 6, 0)
-
-            # event_end = 聚餐當日 22:00
-            event_end_local = _localize(dinner_time_local.year, dinner_time_local.month, dinner_time_local.day, 22, 0)
-
-            # rating_end = event_end 後 48 小時 → 次次日 22:00
-            rating_base = event_end_local + timedelta(hours=48)
-            rating_end_local = _localize(rating_base.year, rating_base.month, rating_base.day, 22, 0)
-
-            # 加入四個任務（僅加入在當前 now_utc 之後的）
             for task_type, dt_local in [
                 ("match", match_local),
                 ("restaurant_vote_end", vote_local),
@@ -147,14 +180,22 @@ async def generate_schedule(
                 ("rating_end", rating_end_local),
             ]:
                 dt_utc = dt_local.astimezone(timezone.utc)
-                if dt_utc > now_utc:
+                if dt_utc > now_utc and dt_utc >= min_allowed_time_utc and dt_utc <= generate_until_utc:
                     to_insert.append({
                         "task_type": task_type,
                         "scheduled_time": dt_utc.isoformat(),
                         "status": "pending",
                     })
 
-            current += timedelta(days=1)
+            week_monday = week_monday + timedelta(days=7)
+
+        # 批次內去重，避免同一個 (task_type, scheduled_time) 在一次 upsert 中重複
+        if to_insert:
+            unique_map = {}
+            for item in to_insert:
+                key = (item["task_type"], item["scheduled_time"]) 
+                unique_map[key] = item
+            to_insert = list(unique_map.values())
 
         created = 0
         if to_insert:
@@ -170,8 +211,8 @@ async def generate_schedule(
             "success": True,
             "message": "排程生成完成",
             "created": created,
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
+            "start_date": first_week_monday_local.date().isoformat(),
+            "end_date": last_week_monday_local.date().isoformat(),
         }
 
     except Exception as e:
