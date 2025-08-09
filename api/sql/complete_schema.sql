@@ -337,6 +337,36 @@ CREATE INDEX IF NOT EXISTS idx_user_ratings_from_user_id ON user_ratings(from_us
 CREATE INDEX IF NOT EXISTS idx_user_ratings_to_user_id ON user_ratings(to_user_id);
 CREATE INDEX IF NOT EXISTS idx_user_ratings_dining_event_id ON user_ratings(dining_event_id);
 
+-- === 排程任務表：schedule_table ===
+-- 用於儲存系統層級的時間驅動任務（由 GCP Scheduler 觸發 API 來批次執行）
+CREATE TABLE IF NOT EXISTS schedule_table (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    task_type TEXT NOT NULL CHECK (task_type IN (
+        'match',                -- 每週一次大配對
+        'restaurant_vote_end',  -- 餐廳投票結束
+        'event_end',            -- 活動結束（將 confirmed → completed）
+        'rating_end'            -- 評分結束（轉存歷史與清理資料）
+    )),
+    scheduled_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','done','failed')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT schedule_task_unique UNIQUE (task_type, scheduled_time)
+);
+
+-- 索引優化常見查詢
+CREATE INDEX IF NOT EXISTS idx_schedule_table_scheduled_time ON schedule_table(scheduled_time);
+CREATE INDEX IF NOT EXISTS idx_schedule_table_status ON schedule_table(status);
+CREATE INDEX IF NOT EXISTS idx_schedule_table_task_type ON schedule_table(task_type);
+
+-- 為排程表啟用 RLS
+ALTER TABLE schedule_table ENABLE ROW LEVEL SECURITY;
+
+-- 為排程表設置 RLS 策略
+CREATE POLICY service_all_schedule ON schedule_table
+FOR ALL TO authenticated
+USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+
 -- 設置 RLS 權限
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE food_preferences ENABLE ROW LEVEL SECURITY;
