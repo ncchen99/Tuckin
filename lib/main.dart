@@ -781,6 +781,8 @@ class _LifecycleEventHandler extends WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       // 應用恢復前台時只清除已顯示的通知，保留排程通知
       NotificationService().clearDisplayedNotifications();
+      // 應用恢復前台時嘗試刷新 NTP（非阻塞）
+      // TimeService().refresh();
     }
   }
 }
