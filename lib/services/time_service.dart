@@ -19,6 +19,12 @@ class TimeService {
   /// 是否成功獲得 NTP 校時
   bool _synced = false;
 
+  /// NTP 是否同步成功（Release 模式）
+  bool get isSynced => _synced;
+
+  /// 當前校時偏移量（ntpNow - deviceNow）
+  Duration get offset => _offset;
+
   /// 初始化校時流程。Release 模式會抓 NTP；Debug/Profile 則跳過。
   Future<void> initialize({
     Duration timeout = const Duration(seconds: 3),

@@ -274,9 +274,15 @@ Future<void> _initializeApp() async {
 
   bool isNetworkConnected = false;
   try {
-    debugPrint('正在測試網絡連接...');
-    isNetworkConnected = await _testNetworkConnection();
-    debugPrint('網絡連接測試結果: ${isNetworkConnected ? '成功' : '失敗'}');
+    // 若 NTP 已成功同步，視為網路可用，跳過額外的網絡測試以加速啟動
+    if (TimeService().isSynced) {
+      isNetworkConnected = true;
+      debugPrint('TimeService 已同步（NTP 成功），略過網絡測試');
+    } else {
+      debugPrint('正在測試網絡連接...');
+      isNetworkConnected = await _testNetworkConnection();
+      debugPrint('網絡連接測試結果: ${isNetworkConnected ? '成功' : '失敗'}');
+    }
     if (!isNetworkConnected) {
       debugPrint('網絡連接測試失敗，顯示錯誤訊息');
       errorHandler.showError(
