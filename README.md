@@ -94,25 +94,10 @@ Tuckin 鼓勵真實且安全的聚餐環境。透過學校 Gmail 認證，我們
 - 大部分程式碼由 **Claude 3.7 Sonnet** 撰寫。
 - 素材設計由 **recraft.ai** 生成。
 
+<div align="center">
+
 ## ☕ 支持 Tuckin
 
-<br>
-
-<div style="background-color: #e1e4e8; padding: 20px; border-radius: 16px; text-align: center; border: 2px solid #D2441D; color: #D2441D;">
-
 <a href="https://www.buymeacoffee.com/ncchen" target="_blank">
-  <img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" 
-       alt="Buy Me A Coffee" 
-       style="height: 41px; width: 174px; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
+<img src="docs/images/bmc_banner.png" alt="Buy Me A Coffee" width="625">
 </a>
-
-<br>
-
-**感謝每一位支持 Tuckin 的朋友！**
-
-**你們的贊助不僅是對我們的鼓勵，更是讓這個專案能夠持續發展的重要動力。**
-
-**謝謝你們！🥹**
-
-
-</div>
