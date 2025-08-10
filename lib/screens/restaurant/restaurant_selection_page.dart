@@ -28,6 +28,10 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   bool _isSubmittingLink = false;
   bool _isValidLink = false;
 
+  // 初始載入時的重試設定
+  final int _maxLoadRetries = 2; // 額外重試次數（不含第一次）
+  final Duration _retryDelay = const Duration(seconds: 2);
+
   // 範例餐廳資料
   List<Map<String, dynamic>> _restaurantList = [];
 
@@ -37,7 +41,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadDataWithRetry();
   }
 
   @override
@@ -47,42 +51,67 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     super.dispose();
   }
 
-  // 載入資料
-  Future<void> _loadData() async {
+  // 僅負責向後端抓取餐廳清單，不處理UI loading狀態
+  Future<List<Map<String, dynamic>>> _fetchRestaurants() async {
+    try {
+      final userMatchingInfo = await _matchingService.getCurrentMatchingInfo();
+
+      if (userMatchingInfo != null &&
+          userMatchingInfo.containsKey('matching_group_id')) {
+        final List<Map<String, dynamic>> votedRestaurants =
+            await _restaurantService.getTopVotedRestaurants(
+              userMatchingInfo['matching_group_id'],
+            );
+        return votedRestaurants;
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('抓取餐廳清單出錯: $e');
+      return [];
+    }
+  }
+
+  // 進入頁面時的載入流程：若一開始拿不到資料，間隔重試幾次
+  Future<void> _loadDataWithRetry() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // 獲取用戶當前的匹配群組
-      final userMatchingInfo = await _matchingService.getCurrentMatchingInfo();
+      for (
+        int attemptIndex = 0;
+        attemptIndex <= _maxLoadRetries;
+        attemptIndex++
+      ) {
+        final List<Map<String, dynamic>> restaurants =
+            await _fetchRestaurants();
+        if (!mounted) return;
 
-      // 載入投票餐廳
-      List<Map<String, dynamic>> votedRestaurants = [];
-      if (userMatchingInfo != null &&
-          userMatchingInfo.containsKey('matching_group_id')) {
-        votedRestaurants = await _restaurantService.getTopVotedRestaurants(
-          userMatchingInfo['matching_group_id'],
-        );
+        if (restaurants.isNotEmpty) {
+          setState(() {
+            _restaurantList = restaurants;
+          });
+          break; // 提前結束重試
+        }
+
+        // 資料仍為空且尚可重試，延遲再試
+        if (attemptIndex < _maxLoadRetries) {
+          await Future.delayed(_retryDelay);
+          if (!mounted) return;
+        }
       }
-
-      setState(() {
-        _restaurantList = votedRestaurants;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('載入餐廳資料出錯: $e');
-      setState(() {
-        _isLoading = false;
-      });
-
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('載入餐廳資料失敗: $e')));
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
+
+  // 已改為 _loadDataWithRetry
 
   // 處理餐廳卡片點擊
   void _handleRestaurantTap(dynamic restaurantId) {
@@ -480,10 +509,7 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     }
   }
 
-  // 處理用戶頭像點擊
-  void _handleProfileTap() {
-    _navigationService.navigateToProfile(context);
-  }
+  // （移除未使用的頭像點擊處理器）
 
   @override
   Widget build(BuildContext context) {

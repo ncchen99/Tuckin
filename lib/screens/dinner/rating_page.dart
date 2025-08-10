@@ -635,10 +635,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
     );
   }
 
-  // 處理用戶頭像點擊
-  void _handleProfileTap() {
-    _navigationService.navigateToProfile(context);
-  }
+  // （移除未使用的頭像點擊處理器）
 
   @override
   Widget build(BuildContext context) {
@@ -669,15 +666,14 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                     child: Column(
                       // 改為Column佈局以便使用Expanded
                       children: [
-                        // HeaderBar
-                        HeaderBar(title: '聚餐評分', showBackButton: false),
-
                         // 內容區域使用Expanded包裹，確保可以滾動
                         Expanded(
                           child: SingleChildScrollView(
                             physics: const BouncingScrollPhysics(),
                             child: Column(
                               children: [
+                                // HeaderBar 跟隨內容一起滾動
+                                HeaderBar(title: '聚餐評分', showBackButton: false),
                                 // 主要內容區域
                                 Padding(
                                   padding: EdgeInsets.symmetric(

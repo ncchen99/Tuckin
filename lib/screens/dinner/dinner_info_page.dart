@@ -25,13 +25,13 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   final RealtimeService _realtimeService = RealtimeService();
   final Random _random = Random();
   bool _isLoading = true;
-  bool _isPageMounted = false; // 追蹤頁面是否完全掛載
-  String _userStatus = ''; // 用戶當前狀態
+  String _userStatus = ''; // 用戶當前狀態（Provider 為主，本地作為回退）
   bool _hasShownBookingDialog = false; // 追蹤是否已顯示過訂位對話框
 
-  // 聚餐相關資訊
-  final Map<String, dynamic> _dinnerInfo = {};
-  DateTime? _dinnerTime;
+  // Provider 監聽
+  UserStatusService? _userStatusService; // 供監聽狀態變更
+  String? _lastUserStatus; // 記錄上一次狀態
+  // 移除未使用：聚餐時間僅透過 Provider 提供
   String? _restaurantName;
   String? _restaurantAddress;
   String? _restaurantImageUrl;
@@ -49,18 +49,34 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   void initState() {
     super.initState();
     _loadUserAndDinnerInfo();
-    // 使用延遲來確保頁面完全渲染後才設置為掛載狀態
+    // 建立 Provider 監聽，偵測用戶狀態變更
+    _userStatusService = Provider.of<UserStatusService>(context, listen: false);
+    _lastUserStatus = _userStatusService!.userStatus;
+    _userStatusService!.addListener(_onUserStatusChanged);
+    // 在頁面掛載完成後檢查餐廳確認狀態
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        setState(() {
-          _isPageMounted = true;
-        });
         debugPrint('DinnerInfoPage 完全渲染');
-
-        // 在頁面掛載完成後檢查餐廳確認狀態
         _checkPendingConfirmation();
       }
     });
+  }
+
+  // 當 Provider 的用戶狀態變更時呼叫
+  void _onUserStatusChanged() {
+    if (!mounted || _userStatusService == null) return;
+    final String? newStatus = _userStatusService!.userStatus;
+    if (newStatus != _lastUserStatus) {
+      debugPrint('DinnerInfoPage: 用戶狀態變更 -> $_lastUserStatus → $newStatus');
+      _lastUserStatus = newStatus;
+      // 當進入顯示聚餐資訊的狀態時重新拉資料
+      if (newStatus == 'waiting_attendance' || newStatus == 'waiting_dinner') {
+        _loadUserAndDinnerInfo();
+      }
+      setState(() {
+        _userStatus = newStatus ?? _userStatus;
+      });
+    }
   }
 
   // 檢查是否需要顯示幫忙訂位對話框
@@ -304,7 +320,8 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     if (_diningEventId != null) {
       _realtimeService.removeDiningEventListener('dinner_info_page');
     }
-    _isPageMounted = false;
+    // 解除 Provider 監聽
+    _userStatusService?.removeListener(_onUserStatusChanged);
     super.dispose();
   }
 
@@ -633,7 +650,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         // 更新狀態
         setState(() {
           _userStatus = status;
-          _dinnerTime = dinnerTime;
+          // 移除本地 _dinnerTime，聚餐時間統一由 Provider 提供
           _restaurantName = restaurantName;
           _restaurantAddress = restaurantAddress;
           _restaurantImageUrl = restaurantImageUrl;
@@ -685,9 +702,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     }
   }
 
-  // 獲取狀態相關的提示文字
-  String _getStatusText() {
-    switch (_userStatus) {
+  // 根據傳入的用戶狀態獲取標題文字（改為參數化，避免依賴本地快照）
+  String _getStatusTextFor(String? userStatus) {
+    switch (userStatus) {
       case 'waiting_other_users':
         return '正在等待其他用戶確認...';
       case 'waiting_attendance':
@@ -698,42 +715,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     }
   }
 
-  // 打開地圖的共用函數
-  Future<void> _openMap(String? mapUrl) async {
-    try {
-      if (mapUrl != null) {
-        final Uri url = Uri.parse(mapUrl);
-        debugPrint('嘗試打開地圖URL: $url');
-        if (await launchUrl(url, mode: LaunchMode.externalApplication)) {
-          debugPrint('地圖已成功打開');
-        } else {
-          debugPrint('無法打開URL: $url');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  '無法開啟地圖',
-                  style: TextStyle(fontFamily: 'OtsutomeFont'),
-                ),
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('打開地圖時出錯: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '打開地圖時出錯: $e',
-              style: TextStyle(fontFamily: 'OtsutomeFont'),
-            ),
-          ),
-        );
-      }
-    }
-  }
+  // 已移除：未使用的開地圖共用函數，改在點擊處理中直接處理
 
   // 在 _DinnerInfoPageState 類中添加此輔助方法，用於獲取星期的簡短表示
   String _getWeekdayShort(int weekday) {
@@ -1079,7 +1061,11 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     // 獲取 UserStatusService 以便在 UI 中使用
     final userStatusService = Provider.of<UserStatusService>(context);
 
-    // 根據狀態決定顯示內容
+    // 從 Provider 取得最新用戶狀態，若暫無則回退到本地快照
+    final String? currentUserStatus =
+        userStatusService.userStatus ?? _userStatus;
+
+    // 根據狀態決定顯示內容（改為使用 currentUserStatus，確保 Provider 更新可即時反映）
     Widget content;
 
     if (_isLoading) {
@@ -1107,21 +1093,10 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
       );
     }
 
-    // 從 UserStatusService 獲取聚餐時間，如果已有值則使用，否則使用頁面加載時獲取的值
-    final dinnerTime = userStatusService.confirmedDinnerTime ?? _dinnerTime;
-
-    // 格式化聚餐時間
-    final dinnerTimeFormatted =
-        dinnerTime != null
-            ? '${dinnerTime.month}月${dinnerTime.day}日 ${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}'
-            : '時間待定';
-
-    // 取消截止時間
-    final cancelDeadline = userStatusService.cancelDeadline;
-    final canCancelReservation = userStatusService.canCancelReservation;
+    // 從 UserStatusService 獲取聚餐時間（僅供後續 FutureBuilder 回退參考，若未使用則不建立本地變數）
 
     // 構建等待其他用戶確認的UI
-    if (_userStatus == 'waiting_other_users') {
+    if (currentUserStatus == 'waiting_other_users') {
       content = Column(
         children: [
           SizedBox(height: 80.h),
@@ -1777,7 +1752,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 Column(
                   children: [
                     // 頂部導航欄
-                    HeaderBar(title: _getStatusText()),
+                    HeaderBar(title: _getStatusTextFor(currentUserStatus)),
 
                     // 主要內容
                     Expanded(
