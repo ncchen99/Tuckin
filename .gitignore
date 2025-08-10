@@ -79,3 +79,5 @@ package.json
 api/.env
 google-services.json
 firebase-credentials.json
+
+.github/
