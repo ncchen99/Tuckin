@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tuckin/services/supabase_service.dart';
-import 'package:tuckin/services/api_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/auth_service.dart';
 
@@ -17,7 +16,7 @@ class RealtimeService with WidgetsBindingObserver {
   // 服務相關依賴
   final SupabaseService _supabaseService = SupabaseService();
   final DatabaseService _databaseService = DatabaseService();
-  final ApiService _apiService = ApiService();
+  // 移除未使用的 ApiService 依賴
   final AuthService _authService = AuthService();
 
   // 實時通道
@@ -33,7 +32,7 @@ class RealtimeService with WidgetsBindingObserver {
   // 訂閱狀態
   bool _isSubscribed = false;
   bool _isDiningEventsSubscribed = false;
-  bool _isInitialized = false;
+  // 移除未使用的初始化旗標
 
   // 保存上一個用戶狀態
   String? _lastUserStatus;
@@ -63,7 +62,6 @@ class RealtimeService with WidgetsBindingObserver {
       // 訂閱用戶狀態
       await subscribeToUserStatus();
 
-      _isInitialized = true;
       debugPrint('RealtimeService: 初始化成功');
     } catch (e) {
       debugPrint('RealtimeService: 初始化錯誤 - $e');
@@ -207,7 +205,6 @@ class RealtimeService with WidgetsBindingObserver {
         _lastUserStatus = await _databaseService.getUserStatus(_userId!);
         debugPrint('RealtimeService: 重試初始化 - 獲取初始用戶狀態: $_lastUserStatus');
         await subscribeToUserStatus();
-        _isInitialized = true;
       }
     } catch (e) {
       debugPrint('RealtimeService: 重試初始化失敗 - $e');
@@ -387,11 +384,11 @@ class RealtimeService with WidgetsBindingObserver {
 
         case 'waiting_other_users':
           // 等待其他用戶階段，應該在等待其他用戶頁面
-          _navigateIfNotCurrent(navigator, '/dinner_info');
+          _navigateIfNotCurrent(navigator, '/dinner_info_waiting');
           break;
 
         case 'waiting_attendance':
-          // 等待出席階段，應該在晚餐資訊頁面
+          // 等待出席階段/聚餐資訊頁
           _navigateIfNotCurrent(navigator, '/dinner_info');
           break;
 

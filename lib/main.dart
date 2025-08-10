@@ -39,6 +39,7 @@ import 'screens/dinner/attendance_confirmation_page.dart';
 import 'screens/restaurant/restaurant_selection_page.dart';
 import 'screens/restaurant/restaurant_reservation_page.dart';
 import 'screens/dinner/dinner_info_page.dart';
+import 'screens/dinner/dinner_info_waiting_page.dart';
 import 'screens/dinner/rating_page.dart';
 // 導入個人資料頁面
 import 'screens/profile/profile_page.dart';
@@ -730,6 +731,7 @@ class _MyAppState extends State<MyApp> {
             '/restaurant_reservation':
                 (context) => const RestaurantReservationPage(),
             '/dinner_info': (context) => const DinnerInfoPage(),
+            '/dinner_info_waiting': (context) => const DinnerInfoWaitingPage(),
             '/dinner_rating': (context) => const RatingPage(),
 
             // 個人資料與設定頁面
@@ -749,17 +751,7 @@ class _MyAppState extends State<MyApp> {
           onGenerateRoute: (settings) {
             debugPrint('正在產生路由: ${settings.name}');
 
-            final uri = Uri.parse(settings.name ?? '/');
-
-            if (uri.pathSegments.length >= 2) {
-              if (uri.pathSegments[0] == 'dinner_info') {
-                final id = uri.pathSegments[1];
-                // 返回帶有ID參數的晚餐資訊頁面
-                // return MaterialPageRoute(
-                //   builder: (context) => DinnerInfoPage(dinnerId: id),
-                // );
-              }
-            }
+            // 保留參數化路由佔位，當前未使用
 
             return MaterialPageRoute(
               builder:

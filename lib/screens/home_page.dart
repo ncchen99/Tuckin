@@ -67,8 +67,14 @@ class _HomePageState extends State<HomePage> {
                       fit: BoxFit.cover,
                     ),
                   ),
-                  child: const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF23456B)),
+                  child: Center(
+                    child: Center(
+                      child: LoadingImage(
+                        width: 60.w,
+                        height: 60.h,
+                        color: const Color(0xFF23456B),
+                      ),
+                    ),
                   ),
                 )
                 : Container(

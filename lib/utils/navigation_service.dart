@@ -120,7 +120,9 @@ class NavigationService {
       case 'waiting_restaurant':
         return '/restaurant_selection';
       case 'waiting_other_users':
+        return '/dinner_info_waiting';
       case 'waiting_attendance':
+      case 'waiting_dinner':
         return '/dinner_info';
       case 'confirmation_timeout':
         return '/confirmation_timeout';
@@ -364,9 +366,19 @@ class NavigationService {
     Navigator.of(context).pushReplacementNamed('/dinner_info');
   }
 
+  /// 導航到晚餐資訊（等待其他用戶）頁面
+  void navigateToDinnerInfoWaiting(BuildContext context) {
+    Navigator.of(context).pushReplacementNamed('/dinner_info_waiting');
+  }
+
+  /// 導航到晚餐資訊（出席/聚餐資訊）頁面
+  void navigateToDinnerInfoAttendance(BuildContext context) {
+    Navigator.of(context).pushReplacementNamed('/dinner_info');
+  }
+
   /// 導航到晚餐評分頁面
   void navigateToDinnerRating(BuildContext context) {
-    Navigator.of(context).pushReplacementNamed('/dinner_info');
+    Navigator.of(context).pushReplacementNamed('/dinner_rating');
   }
 
   /// 導航到餐廳預訂頁面

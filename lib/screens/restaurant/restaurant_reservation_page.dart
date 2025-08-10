@@ -27,8 +27,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
   final DatabaseService _databaseService = DatabaseService();
   final NavigationService _navigationService = NavigationService();
   bool _isLoading = true;
-  bool _isPageMounted = false;
-  final bool _isConfirming = false;
+  // 已移除：_isPageMounted 狀態未被讀取使用
   bool _isProcessingAction = false; // 新增：處理按鈕點擊時的loading狀態
 
   // 新增計時器相關變數
@@ -36,8 +35,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
   static const int _redirectTimeInSeconds = 596; // 9分56秒 = 596秒
   static const String _entryTimeKey = "restaurant_reservation_entry_time";
 
-  // 餐廳相關資訊
-  final Map<String, dynamic> _restaurantInfo = {};
+  // 餐廳相關資訊（移除未使用的 map 聚合）
   String? _restaurantName;
   String? _restaurantAddress;
   String? _restaurantImageUrl;
@@ -45,7 +43,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
   String? _restaurantMapUrl;
   String? _restaurantPhone;
   String? _restaurantWebsite;
-  String? _restaurantReservationNote;
+  // 已移除：訂位備註欄位未在 UI 使用
 
   @override
   void initState() {
@@ -56,19 +54,14 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
 
     // 在Provider中設置用戶正在幫忙訂位的狀態
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final userStatusService = Provider.of<UserStatusService>(
-          context,
-          listen: false,
-        );
-        userStatusService.setHelpingWithReservation(true);
-        debugPrint('已設置用戶正在幫忙訂位狀態');
-
-        setState(() {
-          _isPageMounted = true;
-        });
-        debugPrint('RestaurantReservationPage 完全渲染');
-      }
+      if (!mounted) return;
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
+      );
+      userStatusService.setHelpingWithReservation(true);
+      debugPrint('已設置用戶正在幫忙訂位狀態');
+      debugPrint('RestaurantReservationPage 完全渲染');
     });
   }
 
@@ -90,7 +83,6 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
           debugPrint('dispose時清除入口時間記錄出錯: $e');
         });
 
-    _isPageMounted = false;
     debugPrint('RestaurantReservationPage dispose完成');
     super.dispose();
   }
@@ -223,7 +215,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
       // 使用Future.microtask確保在當前渲染幀完成後再執行導航
       Future.microtask(() {
         if (mounted) {
-          _navigationService.navigateToDinnerInfo(context);
+          _navigationService.navigateToDinnerInfoAttendance(context);
         } else {
           debugPrint('導航前Widget已卸載，取消導航');
         }
@@ -260,7 +252,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
         final phone = restaurantInfo['phone'] ?? '未提供';
         final website =
             restaurantInfo['website'] ?? 'https://example.com/restaurant';
-        final reservationNote = restaurantInfo['reservation_note'] ?? '請提前預訂。';
+        // 移除未使用的 reservationNote
 
         // 構建地圖URL
         String? mapUrl;
@@ -282,7 +274,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
           _restaurantMapUrl = mapUrl;
           _restaurantPhone = phone;
           _restaurantWebsite = website;
-          _restaurantReservationNote = reservationNote;
+          // 移除未使用的 reservationNote
           _isLoading = false;
         });
 
@@ -330,8 +322,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                       : null;
               _restaurantPhone = restaurant['phone'] ?? "未提供";
               _restaurantWebsite = restaurant['website'] ?? "未提供";
-              _restaurantReservationNote =
-                  restaurant['reservation_note'] ?? "請提前預訂。";
+              // 移除未使用的 reservationNote
               _isLoading = false;
             });
 
@@ -351,7 +342,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
               _restaurantMapUrl = "https://maps.google.com/";
               _restaurantPhone = "未提供";
               _restaurantWebsite = "https://example.com/restaurant";
-              _restaurantReservationNote = "載入中...";
+              // 移除未使用的 reservationNote
               _isLoading = false;
             });
           }
@@ -1171,13 +1162,12 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                               });
 
                                               // 使用空字符串作為訂位資訊
-                                              final response =
-                                                  await diningService
-                                                      .confirmRestaurant(
-                                                        eventId,
-                                                        reservationName: "",
-                                                        reservationPhone: "",
-                                                      );
+                                              await diningService
+                                                  .confirmRestaurant(
+                                                    eventId,
+                                                    reservationName: "",
+                                                    reservationPhone: "",
+                                                  );
 
                                               // 更新UserStatusService中的資訊
                                               if (mounted) {
@@ -1214,7 +1204,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
 
                                                 // 導航到下一個頁面
                                                 _navigationService
-                                                    .navigateToDinnerInfo(
+                                                    .navigateToDinnerInfoAttendance(
                                                       context,
                                                     );
                                               }
@@ -1278,15 +1268,14 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                               });
 
                                               // 調用API確認餐廳預訂
-                                              final response =
-                                                  await diningService
-                                                      .confirmRestaurant(
-                                                        eventId,
-                                                        reservationName:
-                                                            reservationName,
-                                                        reservationPhone:
-                                                            reservationPhone,
-                                                      );
+                                              await diningService
+                                                  .confirmRestaurant(
+                                                    eventId,
+                                                    reservationName:
+                                                        reservationName,
+                                                    reservationPhone:
+                                                        reservationPhone,
+                                                  );
 
                                               // 更新UserStatusService中的資訊
                                               if (mounted) {
@@ -1329,7 +1318,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
 
                                                 // 導航到下一個頁面
                                                 _navigationService
-                                                    .navigateToDinnerInfo(
+                                                    .navigateToDinnerInfoAttendance(
                                                       context,
                                                     );
                                               }

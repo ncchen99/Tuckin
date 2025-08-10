@@ -471,8 +471,8 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
         final isVotingComplete = response['is_voting_complete'] == true;
 
         if (isVotingComplete) {
-          // 投票已完成，導航到餐廳資訊頁面
-          _navigationService.navigateToDinnerInfo(context);
+          // 投票已完成，導航到等待其他用戶頁面
+          _navigationService.navigateToDinnerInfoWaiting(context);
         } else {
           // 投票未完成，更新用戶狀態為等待其他用戶
           await _databaseService.updateUserStatus(

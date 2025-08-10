@@ -71,8 +71,8 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
               _navigationService.navigateToDinnerReservation(context);
             } else if (status == 'waiting_restaurant') {
               _navigationService.navigateToRestaurantSelection(context);
-            } else if (status == 'waiting_dinner') {
-              _navigationService.navigateToDinnerInfo(context);
+            } else if (status == 'waiting_attendance') {
+              _navigationService.navigateToDinnerInfoAttendance(context);
             } else if (status == 'rating') {
               _navigationService.navigateToDinnerRating(context);
             } else {
@@ -231,7 +231,6 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
                 ).getDinnerTime(),
             builder: (context, snapshot) {
               if (snapshot.hasData) {
-                final dinnerTime = snapshot.data!;
                 final dinnerTimeInfo =
                     DinnerTimeUtils.calculateDinnerTimeInfo();
                 return Text(

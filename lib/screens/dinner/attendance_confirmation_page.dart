@@ -179,9 +179,10 @@ class _AttendanceConfirmationPageState
       _navigationService.navigateToUserStatusPage(context);
     } else if (status == 'waiting_restaurant') {
       _navigationService.navigateToRestaurantSelection(context);
-    } else if (status == 'waiting_other_users' ||
-        status == 'waiting_attendance') {
-      _navigationService.navigateToDinnerInfo(context);
+    } else if (status == 'waiting_other_users') {
+      _navigationService.navigateToDinnerInfoWaiting(context);
+    } else if (status == 'waiting_attendance' || status == 'waiting_dinner') {
+      _navigationService.navigateToDinnerInfoAttendance(context);
     } else if (status == 'rating') {
       _navigationService.navigateToDinnerRating(context);
     } else {
