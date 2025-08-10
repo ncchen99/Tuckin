@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:tuckin/services/time_service.dart';
 
 /// 頁面階段狀態
 enum DinnerPageStage {
@@ -98,7 +99,7 @@ class DinnerTimeUtils {
 
   /// 計算下次聚餐時間信息
   static DinnerTimeInfo calculateDinnerTimeInfo({String? userStatus}) {
-    final now = DateTime.now();
+    final now = TimeService().now();
     final currentDay = now.weekday;
 
     // 計算當前是第幾週（使用 ISO 8601 標準）

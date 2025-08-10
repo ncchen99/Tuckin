@@ -51,6 +51,7 @@ dependencies:
   provider: ^6.1.4
   timezone: ^0.9.4
   flutter_timezone: ^4.1.0
+  ntp: ^2.0.0
 
 dev_dependencies:
   flutter_test:

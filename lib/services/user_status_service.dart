@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'package:tuckin/services/time_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:tuckin/utils/dinner_time_utils.dart';
@@ -89,7 +90,7 @@ class UserStatusService with ChangeNotifier {
   // 判斷是否可以取消預約
   bool get canCancelReservation {
     if (_cancelDeadline == null) return false;
-    return DateTime.now().isBefore(_cancelDeadline!);
+    return TimeService().now().isBefore(_cancelDeadline!);
   }
 
   // 判斷幫忙訂位時間是否有效
@@ -102,7 +103,7 @@ class UserStatusService with ChangeNotifier {
     final validUntil = _helpingReservationStartTime!.add(
       Duration(seconds: helpingReservationValiditySeconds),
     );
-    return DateTime.now().isBefore(validUntil);
+    return TimeService().now().isBefore(validUntil);
   }
 
   // 從 SharedPreferences 載入資料
@@ -186,7 +187,7 @@ class UserStatusService with ChangeNotifier {
           final validUntil = _helpingReservationStartTime!.add(
             Duration(seconds: helpingReservationValiditySeconds),
           );
-          isValid = DateTime.now().isBefore(validUntil);
+          isValid = TimeService().now().isBefore(validUntil);
         }
 
         if (!isValid) {
@@ -385,7 +386,7 @@ class UserStatusService with ChangeNotifier {
 
     // 當設置為true且updateStartTime為true時，更新開始時間
     if (value && updateStartTime) {
-      _helpingReservationStartTime = DateTime.now();
+      _helpingReservationStartTime = TimeService().now();
       debugPrint(
         '設置用戶正在幫忙訂位，並更新開始時間為: ${_helpingReservationStartTime!.toIso8601String()}',
       );
@@ -405,7 +406,7 @@ class UserStatusService with ChangeNotifier {
   // 更新幫忙訂位開始時間
   void updateHelpingReservationStartTime() {
     if (_isHelpingWithReservation) {
-      _helpingReservationStartTime = DateTime.now();
+      _helpingReservationStartTime = TimeService().now();
       debugPrint(
         '更新幫忙訂位開始時間: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_helpingReservationStartTime!)}',
       );
@@ -496,7 +497,7 @@ class UserStatusService with ChangeNotifier {
 
       // 當設置為true時，同時設置開始時間
       if (isHelpingWithReservation && helpingReservationStartTime == null) {
-        _helpingReservationStartTime = DateTime.now();
+        _helpingReservationStartTime = TimeService().now();
         debugPrint(
           '在updateStatus中設置幫忙訂位開始時間: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(_helpingReservationStartTime!)}',
         );

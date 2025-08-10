@@ -23,6 +23,7 @@ import 'package:tuckin/services/user_status_service.dart'; // 導入 UserStatusS
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:tuckin/services/time_service.dart';
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -261,6 +262,14 @@ Future<void> _initializeApp() async {
   } catch (e) {
     debugPrint('Firebase 初始化錯誤: $e');
     debugPrintStack(label: 'Firebase 初始化錯誤堆疊');
+  }
+
+  // 初始化時間服務（Release 版抓取 NTP，Debug/Profile 直接用裝置時間）
+  try {
+    await TimeService().initialize();
+    debugPrint('TimeService 初始化完成');
+  } catch (e) {
+    debugPrint('TimeService 初始化錯誤: $e');
   }
 
   bool isNetworkConnected = false;

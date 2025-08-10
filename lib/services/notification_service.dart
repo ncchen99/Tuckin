@@ -6,6 +6,7 @@ import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/supabase_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:tuckin/services/time_service.dart';
 
 /// 通知服務，處理推送通知相關邏輯
 class NotificationService {
@@ -163,7 +164,7 @@ class NotificationService {
             .from('user_device_tokens')
             .update({
               'token': token,
-              'updated_at': DateTime.now().toIso8601String(),
+              'updated_at': TimeService().now().toIso8601String(),
             })
             .eq('id', existingTokenId);
       } else {
@@ -171,7 +172,7 @@ class NotificationService {
         await _supabaseService.client.from('user_device_tokens').insert({
           'user_id': currentUser.id,
           'token': token,
-          'updated_at': DateTime.now().toIso8601String(),
+          'updated_at': TimeService().now().toIso8601String(),
         });
       }
 
@@ -429,7 +430,7 @@ class NotificationService {
         debugPrint('精確排程通知失敗: $e，嘗試使用備用通知機制');
 
         // 只有在精確通知失敗時，才使用備用通知機制
-        if (scheduledDate.isAfter(DateTime.now())) {
+        if (scheduledDate.isAfter(TimeService().now())) {
           _scheduleBackupNotification(
             id: id, // 使用相同ID，因為主通知沒有成功
             title: title,
@@ -468,8 +469,8 @@ class NotificationService {
     required NotificationDetails platformChannelSpecifics,
     String? payload,
   }) {
-    if (scheduledDate.isAfter(DateTime.now())) {
-      final difference = scheduledDate.difference(DateTime.now());
+    if (scheduledDate.isAfter(TimeService().now())) {
+      final difference = scheduledDate.difference(TimeService().now());
       debugPrint('設置備用延遲通知，將在 ${difference.inMinutes} 分鐘後顯示（非精確排程）');
 
       // 使用延遲而非精確排程
@@ -579,7 +580,7 @@ class NotificationService {
         debugPrint('精確排程預約提醒通知失敗: $e，嘗試使用備用通知機制');
 
         // 只有在精確通知失敗時，才使用備用通知機制
-        if (scheduledTime.isAfter(DateTime.now())) {
+        if (scheduledTime.isAfter(TimeService().now())) {
           _scheduleBackupNotification(
             id: id, // 使用相同ID，因為主通知沒有成功
             title: title,

@@ -6,6 +6,7 @@ import 'package:tuckin/utils/index.dart'; // 包含 NavigationService
 import 'dart:async';
 import 'package:tuckin/services/user_status_service.dart'; // <-- 引入 UserStatusService
 import 'package:provider/provider.dart'; // <-- 引入 Provider
+import 'package:tuckin/services/time_service.dart';
 
 class AttendanceConfirmationPage extends StatefulWidget {
   const AttendanceConfirmationPage({super.key});
@@ -89,8 +90,8 @@ class _AttendanceConfirmationPageState
 
         // 若confirmDeadline仍為null（沒有從路由參數獲取到），設置一個默認值
         if (_confirmDeadline == null) {
-          // 設定默認值（現在時間加上7小時）
-          final DateTime now = DateTime.now();
+          // 設定默認值（校正後現在時間加上7小時）
+          final DateTime now = TimeService().now();
           setState(() {
             _confirmDeadline = now.add(const Duration(hours: 7));
           });
@@ -108,7 +109,7 @@ class _AttendanceConfirmationPageState
           debugPrint(
             '警告：無法從 UserStatusService 獲取 confirmedDinnerTime，使用當前時間+1天',
           );
-          final DateTime now = DateTime.now();
+          final DateTime now = TimeService().now();
           _dinnerTime = now.add(const Duration(days: 1));
         } else {
           _dinnerTime = dinnerTime;
@@ -145,7 +146,7 @@ class _AttendanceConfirmationPageState
   void _updateRemainingTime() {
     if (_confirmDeadline == null || !mounted) return;
 
-    final now = DateTime.now();
+    final now = TimeService().now();
     if (now.isBefore(_confirmDeadline!)) {
       setState(() {
         _remainingTime = _confirmDeadline!.difference(now);

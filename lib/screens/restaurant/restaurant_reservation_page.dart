@@ -11,6 +11,7 @@ import 'package:tuckin/services/user_status_service.dart';
 import 'package:tuckin/services/dining_service.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'package:tuckin/services/time_service.dart';
 
 class RestaurantReservationPage extends StatefulWidget {
   const RestaurantReservationPage({super.key});
@@ -108,8 +109,8 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
       // 獲取 SharedPreferences 實例
       final prefs = await SharedPreferences.getInstance();
 
-      // 保存進入頁面的時間戳
-      final currentTime = DateTime.now().millisecondsSinceEpoch;
+      // 保存進入頁面的時間戳（校正後）
+      final currentTime = TimeService().epochMilliseconds();
       await prefs.setInt(_entryTimeKey, currentTime);
       debugPrint('已保存頁面進入時間戳: $currentTime');
 
@@ -136,7 +137,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
       final entryTime = prefs.getInt(_entryTimeKey);
 
       if (entryTime != null) {
-        final currentTime = DateTime.now().millisecondsSinceEpoch;
+        final currentTime = TimeService().epochMilliseconds();
         final timeElapsed = currentTime - entryTime;
         final timeElapsedInSeconds = timeElapsed ~/ 1000;
 

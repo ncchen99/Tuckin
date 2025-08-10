@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:tuckin/services/dining_service.dart';
 import 'package:tuckin/services/realtime_service.dart';
 import 'dart:math';
+import 'package:tuckin/services/time_service.dart';
 
 class DinnerInfoPage extends StatefulWidget {
   const DinnerInfoPage({super.key});
@@ -562,7 +563,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           // 若無聚餐事件，使用 UserStatusService 中的數據或預設值
           dinnerTime =
               userStatusService.confirmedDinnerTime ??
-              DateTime.now().add(const Duration(days: 1));
+              TimeService().now().add(const Duration(days: 1));
 
           // 嘗試從 UserStatusService 獲取餐廳信息，如果有的話
           final cachedRestaurantInfo = userStatusService.restaurantInfo;

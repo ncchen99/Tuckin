@@ -103,10 +103,10 @@
 - [x] [前端] Realtime dinner info 不運作
 - [x] [前端] 密語要儲存在 Supabase 
 - [x] [API] 刪除聚餐資料產生等user rating遺失問題
-- [ ] [API] 定時 API 們加入時間檢查，並設置 api route 開關此功能
+- [x] [API] 定時 API 們加入時間檢查，並設置 api route 開關此功能
 - [ ] [前端] lib\screens\dinner\dinner_reservation_page.dart 要加入時間的取得是使用ntp 去取得而不是透過裝置的時間，並且使用台灣台北時間
 - [ ] [前端] 開發版關閉 ntp 時間取得
-- [ ] 設定 Cloud scheduler 定時任務
+- [x] 設定 Cloud scheduler 定時任務
 - [x] 整理需求文件、API端點、SQL表格v、邏輯流程v(deepwiki)
 - [x] 完成 QA 至 Github
 - [x] 完成上架所需文件，意式圖、文案、隱私政策、使用者協議

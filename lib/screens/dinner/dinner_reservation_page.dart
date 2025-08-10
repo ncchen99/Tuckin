@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:tuckin/services/user_status_service.dart';
 import 'package:provider/provider.dart';
+import 'package:tuckin/services/time_service.dart';
 
 class DinnerReservationPage extends StatefulWidget {
   const DinnerReservationPage({super.key});
@@ -82,7 +83,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
 
   // 安排下一次整點更新
   void _scheduleHourlyUpdate() {
-    final now = DateTime.now();
+    final now = TimeService().now();
     // 計算到下一個整點的時間
     final nextHour = DateTime(now.year, now.month, now.day, now.hour + 1);
     final durationUntilNextHour = nextHour.difference(now);
@@ -340,7 +341,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
       DateTime reminderTime = _dinnerTimeInfo!.cancelDeadline.subtract(
         const Duration(hours: 12),
       );
-      final DateTime now = DateTime.now();
+      final DateTime now = TimeService().now();
 
       // 如果提醒時間已經過去，則使用當前時間和取消截止時間的中間點
       if (reminderTime.isBefore(now)) {
@@ -377,8 +378,10 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
 
       // 在生產環境中：如果已經在測試時間內，使用3分鐘後的時間作為測試
       final DateTime actualReminderTime =
-          reminderTime.isBefore(DateTime.now().add(const Duration(minutes: 3)))
-              ? DateTime.now().add(const Duration(minutes: 3))
+          reminderTime.isBefore(
+                TimeService().now().add(const Duration(minutes: 3)),
+              )
+              ? TimeService().now().add(const Duration(minutes: 3))
               : reminderTime;
 
       if (actualReminderTime != reminderTime) {
@@ -545,7 +548,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                                                   DinnerPageStage.nextWeek ||
                                               _dinnerTimeInfo!.nextDinnerDate
                                                   .isAfter(
-                                                    DateTime.now(),
+                                                    TimeService().now(),
                                                   ), // 如果是nextWeek階段且已過下週日期，則禁用
                                         ),
                               ),
@@ -554,7 +557,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                               if (_dinnerTimeInfo!.currentStage ==
                                       DinnerPageStage.nextWeek &&
                                   !_dinnerTimeInfo!.nextDinnerDate.isAfter(
-                                    DateTime.now(),
+                                    TimeService().now(),
                                   ))
                                 Padding(
                                   padding: EdgeInsets.only(top: 15.h),
