@@ -116,13 +116,16 @@ class _ProfilePageState extends State<ProfilePage> {
             _buildIconWithShadow(iconPath, size: iconSize),
             SizedBox(width: 16.w),
             Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18.sp,
-                  fontFamily: 'OtsutomeFont',
-                  color: const Color(0xFF23456B),
-                  height: 1.7,
+              child: Padding(
+                padding: EdgeInsets.only(top: 4.h),
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontFamily: 'OtsutomeFont',
+                    color: const Color(0xFF23456B),
+                    height: 1.5,
+                  ),
                 ),
               ),
             ),
@@ -229,19 +232,20 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // 顯示隱私政策對話框
-  void _showPrivacyPolicyDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return const PrivacyPolicyDialog();
-      },
-    );
-  }
-
   // 打開關於我們的網頁
   void _openAboutUsWebpage() async {
     final Uri url = Uri.parse('https://github.com/ncchen99/Tuckin');
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('無法開啟網頁')));
+      }
+    }
+  }
+
+  void _openSupportWebpage() async {
+    final Uri url = Uri.parse('https://buymeacoffee.com/ncchen');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -390,19 +394,19 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       SizedBox(height: 15.h),
 
-                      // 隱私與條款
+                      // 關於我們
                       _buildSettingItem(
-                        iconPath: 'assets/images/icon/shield.webp',
-                        title: '隱私與條款',
-                        onTap: _showPrivacyPolicyDialog,
+                        iconPath: 'assets/images/icon/info.webp',
+                        title: '關於我們',
+                        onTap: _openAboutUsWebpage,
                       ),
                       SizedBox(height: 15.h),
 
-                      // 關於我們
+                      // 支持塔金
                       _buildSettingItem(
-                        iconPath: 'assets/images/icon/tuckin_t_brand.webp',
-                        title: '關於我們',
-                        onTap: _openAboutUsWebpage,
+                        iconPath: 'assets/images/icon/coffee_cup.webp',
+                        title: '支持塔金',
+                        onTap: _openSupportWebpage,
                       ),
                       SizedBox(height: 35.h),
 

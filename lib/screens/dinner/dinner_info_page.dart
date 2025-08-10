@@ -1042,7 +1042,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     final userStatusService = Provider.of<UserStatusService>(context);
 
     // 從 Provider 取得最新用戶狀態，若暫無則回退到本地快照
-    final String? currentUserStatus =
+    final String currentUserStatus =
         userStatusService.userStatus ?? _userStatus;
 
     // 根據狀態決定顯示內容（改為使用 currentUserStatus，確保 Provider 更新可即時反映）
