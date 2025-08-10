@@ -95,4 +95,5 @@ Tuckin 鼓勵真實且安全的聚餐環境。透過學校 Gmail 認證，我們
 <a href="https://www.buymeacoffee.com/ncchen" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 
 > 感謝每一位支持 Tuckin 的朋友! 你們的贊助不僅是對我們的鼓勵，更是讓這個專案能夠持續發展的重要動力。
+> 
 > **謝謝你們🥹**
