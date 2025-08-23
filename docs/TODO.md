@@ -106,6 +106,8 @@
 - [x] [API] 定時 API 們加入時間檢查，並設置 api route 開關此功能
 - [x] [前端] lib\screens\dinner\dinner_reservation_page.dart 要加入時間的取得是使用ntp 去取得而不是透過裝置的時間，並且使用台灣台北時間
 - [x] [前端] 開發版關閉 ntp 時間取得
+- [ ] [前端] 餐廳預約頁面的高度需要填滿視窗高度
+- [ ] [前端] [API] 現在時間的計算在真正來到聚餐時間的時候會計算到下一周，需要修正
 - [x] 設定 Cloud scheduler 定時任務
 - [x] 整理需求文件、API端點、SQL表格v、邏輯流程v(deepwiki)
 - [x] 完成 QA 至 Github
