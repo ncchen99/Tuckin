@@ -102,7 +102,7 @@ class _ProfilePageState extends State<ProfilePage> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12.r),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 15.h),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.8),
           borderRadius: BorderRadius.circular(12.r),
@@ -120,14 +120,14 @@ class _ProfilePageState extends State<ProfilePage> {
             SizedBox(width: 16.w),
             Expanded(
               child: Padding(
-                padding: EdgeInsets.only(top: 4.h),
+                padding: EdgeInsets.only(top: 5.h),
                 child: Text(
                   title,
                   style: TextStyle(
                     fontSize: 18.sp,
                     fontFamily: 'OtsutomeFont',
                     color: const Color(0xFF23456B),
-                    height: 1.5,
+                    height: 1,
                   ),
                 ),
               ),
