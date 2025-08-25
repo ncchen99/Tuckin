@@ -141,22 +141,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
       // 設定按鈕文字和說明文字
       _updateTextsBasedOnStage();
 
-      // 使用 Provider 將聚餐時間和取消截止日期儲存到 UserStatusService 中
+      // 已移除：將時間更新到 UserStatusService，改由 UserStatusService 集中控管
       if (mounted) {
-        final userStatusService = Provider.of<UserStatusService>(
-          context,
-          listen: false,
-        );
-        userStatusService.updateStatus(
-          confirmedDinnerTime: _dinnerTimeInfo!.nextDinnerTime,
-          cancelDeadline: _dinnerTimeInfo!.cancelDeadline,
-        );
-        debugPrint(
-          '儲存聚餐時間到 UserStatusService: ${_dinnerTimeInfo!.nextDinnerTime}',
-        );
-        debugPrint(
-          '儲存取消截止時間到 UserStatusService: ${_dinnerTimeInfo!.cancelDeadline}',
-        );
+        setState(() {});
       }
 
       // 強制刷新UI
@@ -281,18 +268,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         throw Exception('用戶未登入');
       }
 
-      // 在處理任何操作前，獲取 UserStatusService 實例
-      // 使用 Provider 獲取 UserStatusService 實例
-      final userStatusService = Provider.of<UserStatusService>(
-        context,
-        listen: false,
-      );
-
-      // 只更新聚餐時間，不覆蓋其他值
-      userStatusService.updateStatus(
-        confirmedDinnerTime: _dinnerTimeInfo!.nextDinnerTime,
-      );
-      debugPrint('確認聚餐時間: ${_dinnerTimeInfo!.nextDinnerTime}');
+      // 已移除：由元件更新聚餐時間，統一改由 UserStatusService 控管
 
       // 無論是哪種階段，都使用相同的預約邏輯
       // 儲存用戶的配對偏好

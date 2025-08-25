@@ -616,31 +616,4 @@ class UserStatusService with ChangeNotifier {
       return false;
     }
   }
-
-  // 新增：確保聚餐時間存在的方法
-  Future<DateTime> ensureDinnerTimeExists() async {
-    // 如果聚餐時間已存在，直接返回
-    if (_confirmedDinnerTime != null) {
-      return _confirmedDinnerTime!;
-    }
-
-    debugPrint('聚餐時間不存在，開始計算並儲存...');
-
-    // 使用 DinnerTimeUtils 計算聚餐時間
-    final dinnerTimeInfo = DinnerTimeUtils.calculateDinnerTimeInfo();
-
-    // 更新聚餐時間和取消截止時間
-    updateStatus(
-      confirmedDinnerTime: dinnerTimeInfo.nextDinnerTime,
-      cancelDeadline: dinnerTimeInfo.cancelDeadline,
-    );
-
-    debugPrint('已計算並儲存聚餐時間: ${dinnerTimeInfo.nextDinnerTime}');
-    return dinnerTimeInfo.nextDinnerTime;
-  }
-
-  // 新增：獲取聚餐時間的便捷方法（如果不存在會自動計算）
-  Future<DateTime> getDinnerTime() async {
-    return await ensureDinnerTimeExists();
-  }
 }

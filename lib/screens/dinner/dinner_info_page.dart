@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:tuckin/services/dining_service.dart';
 import 'package:tuckin/services/realtime_service.dart';
 import 'dart:math';
-import 'package:tuckin/services/time_service.dart';
+// import 'package:tuckin/services/time_service.dart';
 
 class DinnerInfoPage extends StatefulWidget {
   const DinnerInfoPage({super.key});
@@ -499,8 +499,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         userStatusService.setUserStatus(status);
         debugPrint('已將用戶狀態 $status 記錄到Provider');
 
-        // 從 Provider 中獲取聚餐時間或從 dining_events 中獲取
-        DateTime? dinnerTime;
+        // 聚餐時間顯示統一由 UserStatusService 提供，不再使用伺服器時間
         String? restaurantName;
         String? restaurantAddress;
         String? restaurantImageUrl;
@@ -514,12 +513,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         String? diningEventDescription; // 新增: 保存聚餐事件描述
 
         if (diningEvent != null) {
-          // 從聚餐事件中獲取時間 - 修正時區處理
-          final dateString = diningEvent['date'] as String;
-          dinnerTime = DinnerTimeUtils.parseTimezoneAwareDateTime(dateString);
-          debugPrint('原始時間字串: $dateString');
-          debugPrint('解析後的聚餐時間: $dinnerTime');
-
           // 從聚餐事件中獲取狀態和預訂信息
           dinnerEventStatus = diningEvent['status'];
           reservationName = diningEvent['reservation_name'];
@@ -550,20 +543,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                   "https://maps.google.com/?q=${Uri.encodeComponent(restaurantName)}+${Uri.encodeComponent(restaurantAddress)}";
             }
 
-            // 更新 UserStatusService 中的數據
+            // 更新 UserStatusService 中的數據（移除時間欄位更新）
             userStatusService.updateStatus(
-              confirmedDinnerTime: dinnerTime,
               dinnerRestaurantId: diningEvent['restaurant_id'],
-              cancelDeadline:
-                  (() {
-                    final statusChangeTimeString =
-                        diningEvent['status_change_time'] ??
-                        (dinnerTime?.toIso8601String() ??
-                            DateTime.now().toIso8601String());
-                    return DinnerTimeUtils.parseTimezoneAwareDateTime(
-                      statusChangeTimeString,
-                    );
-                  })(),
               // 新增：保存配對組ID、聚餐事件ID和餐廳詳細信息
               matchingGroupId: diningEvent['matching_group_id'],
               diningEventId: diningEventId, // 使用新變數
@@ -577,11 +559,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             debugPrint('已更新UserStatusService中的餐廳信息: ${restaurant['name']}');
           }
         } else {
-          // 若無聚餐事件，使用 UserStatusService 中的數據或預設值
-          dinnerTime =
-              userStatusService.confirmedDinnerTime ??
-              TimeService().now().add(const Duration(days: 1));
-
           // 嘗試從 UserStatusService 獲取餐廳信息，如果有的話
           final cachedRestaurantInfo = userStatusService.restaurantInfo;
           dinnerEventStatus = userStatusService.eventStatus;
