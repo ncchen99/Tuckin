@@ -76,58 +76,36 @@ class UserStatusService with ChangeNotifier {
   int? get attendees => _attendees; // 用餐人數的getter
 
   // 格式化日期時間為可讀字符串
-  String get formattedDinnerTime {
-    if (_confirmedDinnerTime == null) return '未確定';
-    return DateFormat('yyyy-MM-dd HH:mm').format(_confirmedDinnerTime!);
-  }
+  String get formattedDinnerTime =>
+      DinnerTimeUtils.formatDinnerTime(_confirmedDinnerTime);
 
   // 格式化取消截止時間為可讀字符串
-  String get formattedCancelDeadline {
-    if (_cancelDeadline == null) return '未確定';
-    return DateFormat('yyyy-MM-dd HH:mm').format(_cancelDeadline!);
-  }
+  String get formattedCancelDeadline =>
+      DinnerTimeUtils.formatCancelDeadline(_cancelDeadline);
 
   // 獲取星期幾的中文簡稱
-  String get weekdayText {
-    if (_confirmedDinnerTime == null) return '星期待定';
-    final weekdayNames = ['', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
-    return weekdayNames[_confirmedDinnerTime!.weekday];
-  }
+  String get weekdayText =>
+      DinnerTimeUtils.getWeekdayText(_confirmedDinnerTime);
 
   // 獲取星期幾的短簡稱（一、二、三...）
-  String get weekdayShort {
-    if (_confirmedDinnerTime == null) return '-';
-    final weekdayNames = ['', '一', '二', '三', '四', '五', '六', '日'];
-    return weekdayNames[_confirmedDinnerTime!.weekday];
-  }
+  String get weekdayShort =>
+      DinnerTimeUtils.getWeekdayShort(_confirmedDinnerTime);
 
   // 獲取格式化的聚餐日期（M月d日）
-  String get formattedDinnerDate {
-    if (_confirmedDinnerTime == null) return '--月--日';
-    return DateFormat('M 月 d 日').format(_confirmedDinnerTime!);
-  }
+  String get formattedDinnerDate =>
+      DinnerTimeUtils.formatDinnerDate(_confirmedDinnerTime);
 
   // 獲取格式化的聚餐時間（HH:mm）
-  String get formattedDinnerTimeOnly {
-    if (_confirmedDinnerTime == null) return '--:--';
-    return '${_confirmedDinnerTime!.hour}:${_confirmedDinnerTime!.minute.toString().padLeft(2, '0')}';
-  }
+  String get formattedDinnerTimeOnly =>
+      DinnerTimeUtils.formatDinnerTimeOnly(_confirmedDinnerTime);
 
   // 獲取聚餐日期的完整描述（M月d日（weekday）HH:mm）
-  String get fullDinnerTimeDescription {
-    if (_confirmedDinnerTime == null) return '-- 月 -- 日（-）--:--';
-    return '${_confirmedDinnerTime!.month}月${_confirmedDinnerTime!.day}日（$weekdayShort）${formattedDinnerTimeOnly}';
-  }
+  String get fullDinnerTimeDescription =>
+      DinnerTimeUtils.getFullDinnerTimeDescription(_confirmedDinnerTime);
 
   // 獲取取消截止時間的完整描述（M月d日(weekday) HH:mm 前可以取消預約）
-  String get cancelDeadlineDescription {
-    if (_cancelDeadline == null) return '計算中...';
-    final weekdayNames = ['', '一', '二', '三', '四', '五', '六', '日'];
-    final weekdayText = weekdayNames[_cancelDeadline!.weekday];
-    final cancelTime =
-        '${_cancelDeadline!.hour}:${_cancelDeadline!.minute.toString().padLeft(2, '0')}';
-    return '${_cancelDeadline!.month}月${_cancelDeadline!.day}日($weekdayText) $cancelTime 前可以取消預約';
-  }
+  String get cancelDeadlineDescription =>
+      DinnerTimeUtils.getCancelDeadlineDescription(_cancelDeadline);
 
   // 判斷是否可以取消預約
   bool get canCancelReservation {

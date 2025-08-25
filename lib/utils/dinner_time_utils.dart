@@ -120,8 +120,8 @@ class DinnerTimeUtils {
     // 本週日的日期
     DateTime thisWeekSunday = now.subtract(Duration(days: 7 - daysToSunday));
 
-    // 本週的目標聚餐日
-    DateTime thisWeekTarget = thisWeekSunday.add(Duration(days: targetWeekday));
+    // 本週的目標聚餐日（計算用，但實際選擇邏輯在後面）
+    // DateTime thisWeekTarget = thisWeekSunday.add(Duration(days: targetWeekday));
 
     // 計算下一週的週數
     final int nextWeekNumber = weekNumber + 1;
@@ -304,5 +304,63 @@ class DinnerTimeUtils {
     }
 
     return '$weekdayText 6:00 前可以取消預約';
+  }
+
+  // ================== 時間格式化方法 ==================
+
+  /// 獲取星期幾的中文全稱
+  static String getWeekdayText(DateTime? dateTime) {
+    if (dateTime == null) return '星期待定';
+    final weekdayNames = ['', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+    return weekdayNames[dateTime.weekday];
+  }
+
+  /// 獲取星期幾的中文簡稱
+  static String getWeekdayShort(DateTime? dateTime) {
+    if (dateTime == null) return '-';
+    final weekdayNames = ['', '一', '二', '三', '四', '五', '六', '日'];
+    return weekdayNames[dateTime.weekday];
+  }
+
+  /// 格式化聚餐時間為可讀字符串
+  static String formatDinnerTime(DateTime? dateTime) {
+    if (dateTime == null) return '未確定';
+    return DateFormat('yyyy-MM-dd HH:mm').format(dateTime);
+  }
+
+  /// 格式化取消截止時間為可讀字符串
+  static String formatCancelDeadline(DateTime? dateTime) {
+    if (dateTime == null) return '未確定';
+    return DateFormat('yyyy-MM-dd HH:mm').format(dateTime);
+  }
+
+  /// 獲取格式化的聚餐日期（M月d日）
+  static String formatDinnerDate(DateTime? dateTime) {
+    if (dateTime == null) return '--月--日';
+    return DateFormat('M 月 d 日').format(dateTime);
+  }
+
+  /// 獲取格式化的聚餐時間（HH:mm）
+  static String formatDinnerTimeOnly(DateTime? dateTime) {
+    if (dateTime == null) return '--:--';
+    return '${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// 獲取聚餐日期的完整描述（M月d日（weekday）HH:mm）
+  static String getFullDinnerTimeDescription(DateTime? dateTime) {
+    if (dateTime == null) return '-- 月 -- 日（-）--:--';
+    final weekdayShort = getWeekdayShort(dateTime);
+    final timeOnly = formatDinnerTimeOnly(dateTime);
+    return '${dateTime.month}月${dateTime.day}日（$weekdayShort）$timeOnly';
+  }
+
+  /// 獲取取消截止時間的完整描述（M月d日(weekday) HH:mm 前可以取消預約）
+  static String getCancelDeadlineDescription(DateTime? cancelDeadline) {
+    if (cancelDeadline == null) return '計算中...';
+    final weekdayNames = ['', '一', '二', '三', '四', '五', '六', '日'];
+    final weekdayText = weekdayNames[cancelDeadline.weekday];
+    final cancelTime =
+        '${cancelDeadline.hour}:${cancelDeadline.minute.toString().padLeft(2, '0')}';
+    return '${cancelDeadline.month}月${cancelDeadline.day}日($weekdayText) $cancelTime 前可以取消預約';
   }
 }
