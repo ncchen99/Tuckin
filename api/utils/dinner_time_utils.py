@@ -135,13 +135,12 @@ class DinnerTimeUtils:
         # 將時間設置為臺灣時區
         dinner_date_time = TW_TIMEZONE.localize(dinner_date_time)
 
-        # 計算距離聚餐時間的小時數
-        time_until_dinner = dinner_date_time - now
-        time_until_dinner_hours = time_until_dinner.total_seconds() / 3600
+        # 切換門檻：當週聚餐時間 + 4 小時
+        switch_to_next_threshold = dinner_date_time + timedelta(hours=4)
 
-        # 修改判斷邏輯：判斷當前時間是否已過本週聚餐時間或距離聚餐時間小於61小時
-        if now > dinner_date_time or time_until_dinner_hours < 61:
-            # 如果已經過了本週聚餐時間或時間太近，顯示下週聚餐
+        # 修改判斷邏輯：只有在當週聚餐時間過後 4 小時，才會切換到下週聚餐日期
+        if now > switch_to_next_threshold:
+            # 如果已經過了本週聚餐時間+4小時，顯示下週聚餐
             dinner_date_time = TW_TIMEZONE.localize(datetime(
                 next_week_target.year,
                 next_week_target.month,
@@ -151,12 +150,11 @@ class DinnerTimeUtils:
             ))
             selected_dinner_date = next_week_target
             
-            # 計算距離下週聚餐時間的小時數
-            time_until_next_dinner = dinner_date_time - now
-            time_until_next_dinner_hours = time_until_next_dinner.total_seconds() / 3600
+            # 計算下週聚餐的切換門檻
+            next_switch_threshold = dinner_date_time + timedelta(hours=4)
             
-            # 如果下週聚餐時間也已過或時間太近
-            if now > dinner_date_time or time_until_next_dinner_hours < 61:
+            # 如果下週聚餐時間+4小時也已過
+            if now > next_switch_threshold:
                 dinner_date_time = TW_TIMEZONE.localize(datetime(
                     after_next_week_target.year,
                     after_next_week_target.month,
@@ -165,13 +163,13 @@ class DinnerTimeUtils:
                     0,
                 ))
                 selected_dinner_date = after_next_week_target
-                print('選擇下下週聚餐，因為下週聚餐時間也過近')
+                print('選擇下下週聚餐，因為下週聚餐時間+4小時也已過')
             else:
-                print('選擇下週聚餐，因為本週聚餐時間過近')
+                print('選擇下週聚餐，因為本週聚餐時間+4小時已過')
         else:
-            # 顯示本週聚餐
+            # 其餘時間（包含聚餐前與聚餐後 4 小時內）→ 顯示本週聚餐
             selected_dinner_date = current_week_target
-            print('選擇本週聚餐')
+            print('選擇本週聚餐，尚未超過當週聚餐+4小時')
 
         # 根據選定的聚餐日期計算餐廳選擇時段的開始時間和結束時間
         # 餐廳選擇時段開始：聚餐前60小時
@@ -214,6 +212,7 @@ class DinnerTimeUtils:
         print(f'當前階段: {current_stage}')
         print(f'選擇的聚餐日期: {selected_dinner_date.strftime("%Y-%m-%d")} ({weekday_text})')
         print(f'聚餐時間: {dinner_date_time.strftime("%Y-%m-%d %H:%M")}')
+        print(f'切換門檻(聚餐+4h): {switch_to_next_threshold.strftime("%Y-%m-%d %H:%M")}')
         print(f'餐廳選擇時段開始: {restaurant_selection_start.strftime("%Y-%m-%d %H:%M")}')
         print(f'餐廳選擇時段結束: {restaurant_selection_end.strftime("%Y-%m-%d %H:%M")}')
         print(f'取消預約截止時間: {cancel_deadline.strftime("%Y-%m-%d %H:%M")}')
