@@ -18,7 +18,8 @@ class DinnerReservationPage extends StatefulWidget {
   State<DinnerReservationPage> createState() => _DinnerReservationPageState();
 }
 
-class _DinnerReservationPageState extends State<DinnerReservationPage> {
+class _DinnerReservationPageState extends State<DinnerReservationPage>
+    with WidgetsBindingObserver {
   // 是否僅限成大學生參與
   bool _onlyNckuStudents = true;
   // 控制提示框顯示
@@ -44,6 +45,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkIfNewUser();
     // 初始化時由 UserStatusService 統一更新聚餐時間
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -57,6 +59,19 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
     _loadUserPreferences();
     _checkUserEmail();
     _scheduleHourlyUpdate(); // 啟動整點更新計時器
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      if (!mounted) return;
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
+      );
+      userStatusService.updateDinnerTimeByUserStatus();
+    }
   }
 
   // 檢查用戶email是否為校內email
@@ -649,6 +664,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _hourlyTimer?.cancel();
     super.dispose();
   }
