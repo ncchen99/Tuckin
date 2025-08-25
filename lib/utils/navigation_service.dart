@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 集中管理應用程式的導航邏輯
 ///
@@ -40,6 +41,19 @@ class NavigationService {
               currentUser.id,
             );
             _currentUserStatus = userStatus;
+
+            // 將用戶狀態持久化，供 UserStatusService 啟動時讀取
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('user_status', _currentUserStatus);
+              debugPrint(
+                'NavigationService: 已將 user_status 寫入 SharedPreferences: $_currentUserStatus',
+              );
+            } catch (persistError) {
+              debugPrint(
+                'NavigationService: 持久化 user_status 失敗: $persistError',
+              );
+            }
 
             debugPrint('NavigationService: 用戶狀態為 $_currentUserStatus');
 

@@ -4,6 +4,7 @@ import 'package:tuckin/services/time_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:tuckin/utils/dinner_time_utils.dart';
+import 'dart:async';
 
 class UserStatusService with ChangeNotifier {
   DateTime? _confirmedDinnerTime;
@@ -56,6 +57,10 @@ class UserStatusService with ChangeNotifier {
     _loadFromPrefs();
     debugPrint('UserStatusService 已創建，並開始從持久化存儲載入數據');
   }
+
+  // 初始化完成通知器（確保在使用者狀態載入後再進行時間計算）
+  final Completer<void> _initCompleter = Completer<void>();
+  bool get isInitialized => _initCompleter.isCompleted;
 
   // Getter 方法
   DateTime? get confirmedDinnerTime => _confirmedDinnerTime;
@@ -269,8 +274,14 @@ class UserStatusService with ChangeNotifier {
       }
 
       notifyListeners();
+      if (!_initCompleter.isCompleted) {
+        _initCompleter.complete();
+      }
     } catch (e) {
       debugPrint('載入 UserStatusService 資料時出錯: $e');
+      if (!_initCompleter.isCompleted) {
+        _initCompleter.complete();
+      }
     }
   }
 
@@ -553,6 +564,59 @@ class UserStatusService with ChangeNotifier {
     if (changed) {
       _saveToPrefs();
       notifyListeners();
+    }
+  }
+
+  /// 根據使用者狀態更新聚餐時間與取消截止時間
+  /// - 當狀態為 `booking`、`waiting_matching`、`initial` 時，使用 calculateDinnerTimeInfo
+  /// - 其他狀態使用 calculateDinnerTimeInfoForFlow
+  Future<void> updateDinnerTimeByUserStatus() async {
+    try {
+      // 等待初始化完成（避免 _userStatus 尚未載入）
+      if (!isInitialized) {
+        try {
+          await _initCompleter.future;
+        } catch (_) {}
+      }
+
+      String? status = _userStatus;
+
+      // 若仍為空，嘗試從 SharedPreferences 讀取先前寫入的 user_status
+      if (status == null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final persisted = prefs.getString(_userStatusKey);
+          if (persisted != null && persisted.isNotEmpty) {
+            status = persisted;
+            setUserStatus(persisted);
+            debugPrint('從持久化讀取 user_status 並同步：$persisted');
+          }
+        } catch (e) {
+          debugPrint('讀取持久化 user_status 失敗: $e');
+        }
+      }
+
+      final DinnerTimeInfo info =
+          (status == 'booking' ||
+                  status == 'waiting_matching' ||
+                  status == 'initial')
+              ? DinnerTimeUtils.calculateDinnerTimeInfo(userStatus: status)
+              : DinnerTimeUtils.calculateDinnerTimeInfoForFlow();
+
+      debugPrint('更新聚餐時間（依狀態：$status）');
+      debugPrint(
+        '新聚餐時間: ${DateFormat('yyyy-MM-dd HH:mm').format(info.nextDinnerTime)}',
+      );
+      debugPrint(
+        '新取消截止時間: ${DateFormat('yyyy-MM-dd HH:mm').format(info.cancelDeadline)}',
+      );
+
+      updateStatus(
+        confirmedDinnerTime: info.nextDinnerTime,
+        cancelDeadline: info.cancelDeadline,
+      );
+    } catch (e) {
+      debugPrint('更新聚餐時間時發生錯誤: $e');
     }
   }
 

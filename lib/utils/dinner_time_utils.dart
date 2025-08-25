@@ -313,24 +313,24 @@ class DinnerTimeUtils {
       0,
     );
 
-    // 切換門檻：當週聚餐時間 + 52 小時
+    // 切換門檻：當週聚餐時間 + 4 小時
     final DateTime switchToNextThreshold = currentDinnerTime.add(
-      const Duration(hours: 52),
+      const Duration(hours: 4),
     );
 
     DateTime selectedDinnerDate;
     DateTime selectedDinnerTime;
 
     if (now.isAfter(switchToNextThreshold)) {
-      // 超過當週聚餐時間 + 52 小時 → 顯示下週
+      // 超過當週聚餐時間 + 4 小時 → 顯示下週
       selectedDinnerDate = nextWeekTarget;
       selectedDinnerTime = nextDinnerTime;
-      debugPrint('流程模式：已超過當週聚餐+52小時，顯示下週聚餐');
+      debugPrint('流程模式：已超過當週聚餐+4小時，顯示下週聚餐');
     } else {
-      // 其餘時間（包含聚餐前與聚餐後 52 小時內）→ 顯示本週
+      // 其餘時間（包含聚餐前與聚餐後 4 小時內）→ 顯示本週
       selectedDinnerDate = currentWeekTarget;
       selectedDinnerTime = currentDinnerTime;
-      debugPrint('流程模式：尚未超過當週聚餐+52小時，顯示本週聚餐');
+      debugPrint('流程模式：尚未超過當週聚餐+4小時，顯示本週聚餐');
     }
 
     // 仍沿用既有欄位計算，方便前端共用顯示
@@ -362,7 +362,7 @@ class DinnerTimeUtils {
       '流程模式 - 聚餐時間: ${DateFormat('yyyy-MM-dd HH:mm').format(selectedDinnerTime)}',
     );
     debugPrint(
-      '流程模式 - 切換門檻(聚餐+52h): ${DateFormat('yyyy-MM-dd HH:mm').format(switchToNextThreshold)}',
+      '流程模式 - 切換門檻(聚餐+4h): ${DateFormat('yyyy-MM-dd HH:mm').format(switchToNextThreshold)}',
     );
 
     return DinnerTimeInfo(

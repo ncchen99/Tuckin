@@ -3,7 +3,6 @@ import 'package:tuckin/components/components.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/matching_service.dart';
 import 'package:tuckin/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -19,8 +18,7 @@ class DinnerReservationPage extends StatefulWidget {
   State<DinnerReservationPage> createState() => _DinnerReservationPageState();
 }
 
-class _DinnerReservationPageState extends State<DinnerReservationPage>
-    with WidgetsBindingObserver {
+class _DinnerReservationPageState extends State<DinnerReservationPage> {
   // 是否僅限成大學生參與
   bool _onlyNckuStudents = true;
   // 控制提示框顯示
@@ -35,78 +33,30 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   final NavigationService _navigationService = NavigationService();
-  final MatchingService _matchingService = MatchingService();
   String _username = ''; // 用戶名稱
-  // 添加一個計時器來處理整點更新
-  Timer? _hourlyTimer;
-
-  // 使用DinnerTimeInfo存儲聚餐時間信息
-  DinnerTimeInfo? _dinnerTimeInfo;
+  // 已移除本地時間計算與整點更新計時器，改由 UserStatusService 統一處理
 
   // 按鈕文字
-  late String _buttonText;
-  // 說明文字
-  late String _descriptionText;
-
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final NotificationService _notificationService = NotificationService();
+  String _buttonText = '預約';
+  // 整點更新計時器
+  Timer? _hourlyTimer;
 
   @override
   void initState() {
     super.initState();
     _checkIfNewUser();
-    // 確保 Provider 中的數據加載完成後再計算日期
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _calculateDates();
-      }
+    // 初始化時由 UserStatusService 統一更新聚餐時間
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
+      );
+      userStatusService.updateDinnerTimeByUserStatus();
     });
     _loadUserPreferences();
     _checkUserEmail();
-    _scheduleHourlyUpdate(); // 啟動計時器調度
-    WidgetsBinding.instance.addObserver(this); // 註冊 observer
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) {
-      // 應用程式回到前景時，重新計算日期和階段
-      debugPrint('應用程式回到前景：重新計算日期和階段...');
-      setState(() {
-        _calculateDates();
-      });
-      // 重新安排計時器
-      _scheduleHourlyUpdate();
-    }
-  }
-
-  // 安排下一次整點更新
-  void _scheduleHourlyUpdate() {
-    final now = TimeService().now();
-    // 計算到下一個整點的時間
-    final nextHour = DateTime(now.year, now.month, now.day, now.hour + 1);
-    final durationUntilNextHour = nextHour.difference(now);
-
-    // 取消任何現有的計時器
-    _hourlyTimer?.cancel();
-
-    // 設定一個新的計時器，在下一個整點觸發
-    _hourlyTimer = Timer(durationUntilNextHour, () {
-      // 確保 widget 仍然存在
-      if (mounted) {
-        debugPrint('整點觸發：重新計算日期和階段...');
-        // 重新計算日期和階段，並更新 UI
-        setState(() {
-          _calculateDates();
-        });
-        // 再次安排下一次更新
-        _scheduleHourlyUpdate();
-      }
-    });
-    debugPrint(
-      '已安排下次整點更新於: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(nextHour)} (延遲: ${durationUntilNextHour.inMinutes} 分鐘)',
-    );
+    _scheduleHourlyUpdate(); // 啟動整點更新計時器
   }
 
   // 檢查用戶email是否為校內email
@@ -123,56 +73,29 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
     }
   }
 
-  // 使用DinnerTimeUtils計算日期並決定當前階段
-  void _calculateDates() async {
-    try {
-      // 獲取當前用戶的狀態
-      String? userStatus;
-      final currentUser = await _authService.getCurrentUser();
-      if (currentUser != null) {
-        userStatus = await _databaseService.getUserStatus(currentUser.id);
-      }
+  // 安排下一次整點更新，並在整點時由 UserStatusService 更新聚餐時間
+  void _scheduleHourlyUpdate() {
+    final now = TimeService().now();
+    final nextHour = DateTime(now.year, now.month, now.day, now.hour + 1);
+    final durationUntilNextHour = nextHour.difference(now);
 
-      // 使用DinnerTimeUtils計算聚餐時間信息
-      _dinnerTimeInfo = DinnerTimeUtils.calculateDinnerTimeInfo(
-        userStatus: userStatus,
+    _hourlyTimer?.cancel();
+    _hourlyTimer = Timer(durationUntilNextHour, () async {
+      if (!mounted) return;
+      debugPrint('整點觸發：由 UserStatusService 更新聚餐時間');
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
       );
-
-      // 設定按鈕文字和說明文字
-      _updateTextsBasedOnStage();
-
-      // 已移除：將時間更新到 UserStatusService，改由 UserStatusService 集中控管
-      if (mounted) {
-        setState(() {});
-      }
-
-      // 強制刷新UI
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (error) {
-      debugPrint('計算日期錯誤: $error');
-    }
+      userStatusService.updateDinnerTimeByUserStatus();
+      _scheduleHourlyUpdate();
+    });
+    debugPrint(
+      '已安排下次整點更新於: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(nextHour)} (延遲: ${durationUntilNextHour.inMinutes} 分鐘)',
+    );
   }
 
-  // 更新按鈕文字和說明文字
-  void _updateTextsBasedOnStage() {
-    switch (_dinnerTimeInfo!.currentStage) {
-      case DinnerPageStage.reserve:
-        _buttonText = '預約';
-        // 使用 UserStatusService 獲取星期文字
-        final userStatusService = Provider.of<UserStatusService>(
-          context,
-          listen: false,
-        );
-        _descriptionText = '下次活動在${userStatusService.weekdayText}舉行，歡迎預約參加';
-        break;
-      case DinnerPageStage.nextWeek:
-        _buttonText = '預約';
-        _descriptionText = '本週聚餐預約已結束，您可以預約下週聚餐';
-        break;
-    }
-  }
+  // 說明文字改由 Consumer 動態取得，不再在本地狀態中維護
 
   // 從資料庫加載用戶的配對偏好
   Future<void> _loadUserPreferences() async {
@@ -229,16 +152,6 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
     } catch (error) {
       debugPrint('檢查新用戶狀態錯誤: $error');
     }
-  }
-
-  // 處理通知按鈕點擊
-  void _handleNotificationTap() {
-    Navigator.pushNamed(context, '/notifications');
-  }
-
-  // 處理用戶頭像點擊
-  void _handleUserProfileTap() {
-    _navigationService.navigateToProfile(context);
   }
 
   // 導航到匹配狀態頁面
@@ -312,14 +225,18 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   // 排程聚餐提醒通知
   Future<void> _scheduleDinnerReminder() async {
     try {
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
+      );
       // 確保取消截止時間存在
-      if (_dinnerTimeInfo?.cancelDeadline == null) {
+      if (userStatusService.cancelDeadline == null) {
         debugPrint('無法設置提醒通知：取消截止時間未定義');
         return;
       }
 
       // 計算提醒時間（取消截止時間前12小時）
-      DateTime reminderTime = _dinnerTimeInfo!.cancelDeadline.subtract(
+      DateTime reminderTime = userStatusService.cancelDeadline!.subtract(
         const Duration(hours: 12),
       );
       final DateTime now = TimeService().now();
@@ -329,14 +246,14 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
         debugPrint('原提醒時間已過，計算新的提醒時間');
 
         // 確保取消截止時間還未到
-        if (_dinnerTimeInfo!.cancelDeadline.isBefore(now)) {
+        if (userStatusService.cancelDeadline!.isBefore(now)) {
           debugPrint('取消截止時間也已過，不設置通知');
           return;
         }
 
         // 計算當前時間到取消截止時間的中間點
         final int totalMinutes =
-            _dinnerTimeInfo!.cancelDeadline.difference(now).inMinutes;
+            userStatusService.cancelDeadline!.difference(now).inMinutes;
         final int halfwayMinutes = totalMinutes ~/ 2;
 
         // 如果剩餘時間太短（少於10分鐘），則設為5分鐘後
@@ -355,7 +272,9 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
 
       // 設置通知ID，使用聚餐時間的哈希碼確保唯一性和可重複性（用於取消）
       final int notificationId =
-          _dinnerTimeInfo!.nextDinnerTime.millisecondsSinceEpoch.hashCode;
+          (userStatusService.confirmedDinnerTime ?? TimeService().now())
+              .millisecondsSinceEpoch
+              .hashCode;
 
       // 在生產環境中：如果已經在測試時間內，使用3分鐘後的時間作為測試
       final DateTime actualReminderTime =
@@ -413,30 +332,6 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
 
   @override
   Widget build(BuildContext context) {
-    if (_dinnerTimeInfo == null) {
-      return WillPopScope(
-        onWillPop: () async {
-          return false; // 禁用返回按鈕
-        },
-        child: Scaffold(
-          body: Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/background/bg2.jpg'),
-                fit: BoxFit.cover,
-              ),
-            ),
-            child: Center(
-              child: LoadingImage(
-                width: 60.w,
-                height: 60.h,
-                color: const Color(0xFF23456B),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
     return WillPopScope(
       onWillPop: () async {
         return false; // 禁用返回按鈕
@@ -476,14 +371,20 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                                 ),
                               ),
                               SizedBox(height: 10.h),
-                              // 說明文字
-                              Text(
-                                _descriptionText,
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontFamily: 'OtsutomeFont',
-                                  color: const Color(0xFF23456B),
-                                ),
+                              // 說明文字（由 UserStatusService 動態提供）
+                              Consumer<UserStatusService>(
+                                builder: (context, userStatusService, _) {
+                                  final description =
+                                      '下次活動在${userStatusService.weekdayText}舉行，歡迎預約參加';
+                                  return Text(
+                                    description,
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                    ),
+                                  );
+                                },
                               ),
                               SizedBox(height: 25.h),
 
@@ -517,51 +418,68 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                               SizedBox(height: 60.h),
 
                               // 按鈕（預約或參加）
-                              Center(
-                                child:
-                                    _isProcessing
-                                        ? LoadingImage(
-                                          width: 60.w,
-                                          height: 60.h,
-                                          color: const Color(0xFFB33D1C),
-                                        )
-                                        : ImageButton(
-                                          text: _buttonText,
-                                          imagePath:
-                                              'assets/images/ui/button/red_l.webp',
-                                          width: 160.w,
-                                          height: 70.h,
-                                          onPressed: _handleButtonClick,
-                                          isEnabled:
-                                              _dinnerTimeInfo!.currentStage !=
-                                                  DinnerPageStage.nextWeek ||
-                                              _dinnerTimeInfo!.nextDinnerDate
-                                                  .isAfter(
-                                                    TimeService().now(),
-                                                  ), // 如果是nextWeek階段且已過下週日期，則禁用
-                                        ),
+                              Consumer<UserStatusService>(
+                                builder: (context, userStatusService, _) {
+                                  final String? status =
+                                      userStatusService.userStatus;
+                                  final bool isNextWeekStage =
+                                      status != 'booking';
+                                  final bool isFuture =
+                                      (userStatusService.confirmedDinnerTime
+                                          ?.isAfter(TimeService().now())) ??
+                                      true;
+                                  return Center(
+                                    child:
+                                        _isProcessing
+                                            ? LoadingImage(
+                                              width: 60.w,
+                                              height: 60.h,
+                                              color: const Color(0xFFB33D1C),
+                                            )
+                                            : ImageButton(
+                                              text: _buttonText,
+                                              imagePath:
+                                                  'assets/images/ui/button/red_l.webp',
+                                              width: 160.w,
+                                              height: 70.h,
+                                              onPressed: _handleButtonClick,
+                                              isEnabled:
+                                                  !isNextWeekStage || isFuture,
+                                            ),
+                                  );
+                                },
                               ),
 
                               // 顯示預約狀態提示（如果不能預約）
-                              if (_dinnerTimeInfo!.currentStage ==
-                                      DinnerPageStage.nextWeek &&
-                                  !_dinnerTimeInfo!.nextDinnerDate.isAfter(
-                                    TimeService().now(),
-                                  ))
-                                Padding(
-                                  padding: EdgeInsets.only(top: 15.h),
-                                  child: Center(
-                                    child: Text(
-                                      '當前聚餐活動預約已截止',
-                                      style: TextStyle(
-                                        fontSize: 14.sp,
-                                        fontFamily: 'OtsutomeFont',
-                                        color: const Color(0xFFB33D1C),
-                                        fontWeight: FontWeight.bold,
+                              Consumer<UserStatusService>(
+                                builder: (context, userStatusService, _) {
+                                  final String? status =
+                                      userStatusService.userStatus;
+                                  final bool isNextWeekStage =
+                                      status != 'booking';
+                                  final bool isFuture =
+                                      (userStatusService.confirmedDinnerTime
+                                          ?.isAfter(TimeService().now())) ??
+                                      false;
+                                  final bool showClosedTip =
+                                      isNextWeekStage && !isFuture;
+                                  if (!showClosedTip) return const SizedBox();
+                                  return Padding(
+                                    padding: EdgeInsets.only(top: 15.h),
+                                    child: Center(
+                                      child: Text(
+                                        '當前聚餐活動預約已截止',
+                                        style: TextStyle(
+                                          fontSize: 14.sp,
+                                          fontFamily: 'OtsutomeFont',
+                                          color: const Color(0xFFB33D1C),
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
+                                  );
+                                },
+                              ),
 
                               SizedBox(height: 30.h),
                             ],
@@ -731,8 +649,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
 
   @override
   void dispose() {
-    _hourlyTimer?.cancel(); // 在 widget 銷毀時取消計時器
-    WidgetsBinding.instance.removeObserver(this); // 移除 observer
+    _hourlyTimer?.cancel();
     super.dispose();
   }
 }
