@@ -105,44 +105,44 @@ class DinnerInfoWaitingPage extends StatelessWidget {
                                   SizedBox(
                                     width: 75.w,
                                     height: 75.h,
-                                    child: FutureBuilder<DateTime>(
-                                      future: userStatusService.getDinnerTime(),
-                                      builder: (context, snapshot) {
-                                        String iconPath =
-                                            'assets/images/icon/thu.webp';
-                                        if (snapshot.hasData) {
-                                          final dinnerTime = snapshot.data!;
-                                          iconPath =
-                                              dinnerTime.weekday ==
-                                                      DateTime.monday
-                                                  ? 'assets/images/icon/mon.webp'
-                                                  : 'assets/images/icon/thu.webp';
-                                        }
-                                        return Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            Positioned(
-                                              left: 0,
-                                              top: 3.h,
-                                              child: Image.asset(
-                                                iconPath,
-                                                width: 75.w,
-                                                height: 75.h,
-                                                color: Colors.black.withOpacity(
-                                                  0.4,
-                                                ),
-                                                colorBlendMode: BlendMode.srcIn,
-                                              ),
-                                            ),
-                                            Image.asset(
+                                    child: () {
+                                      String iconPath =
+                                          'assets/images/icon/thu.webp';
+                                      if (userStatusService
+                                              .confirmedDinnerTime !=
+                                          null) {
+                                        iconPath =
+                                            userStatusService
+                                                        .confirmedDinnerTime!
+                                                        .weekday ==
+                                                    DateTime.monday
+                                                ? 'assets/images/icon/mon.webp'
+                                                : 'assets/images/icon/thu.webp';
+                                      }
+                                      return Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          Positioned(
+                                            left: 0,
+                                            top: 3.h,
+                                            child: Image.asset(
                                               iconPath,
                                               width: 75.w,
                                               height: 75.h,
+                                              color: Colors.black.withOpacity(
+                                                0.4,
+                                              ),
+                                              colorBlendMode: BlendMode.srcIn,
                                             ),
-                                          ],
-                                        );
-                                      },
-                                    ),
+                                          ),
+                                          Image.asset(
+                                            iconPath,
+                                            width: 75.w,
+                                            height: 75.h,
+                                          ),
+                                        ],
+                                      );
+                                    }(),
                                   ),
                                   SizedBox(width: 10.w),
                                   Column(
@@ -159,35 +159,15 @@ class DinnerInfoWaitingPage extends StatelessWidget {
                                         ),
                                       ),
                                       SizedBox(height: 4.h),
-                                      FutureBuilder<DateTime>(
-                                        future:
-                                            userStatusService.getDinnerTime(),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.hasData) {
-                                            final dinnerTime = snapshot.data!;
-                                            final weekday = _weekdayShort(
-                                              dinnerTime.weekday,
-                                            );
-                                            return Text(
-                                              '${dinnerTime.month}月${dinnerTime.day}日（$weekday）${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}',
-                                              style: TextStyle(
-                                                fontSize: 18.sp,
-                                                fontFamily: 'OtsutomeFont',
-                                                color: const Color(0xFF23456B),
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            );
-                                          }
-                                          return Text(
-                                            '-- 月 -- 日（-）--:--',
-                                            style: TextStyle(
-                                              fontSize: 18.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          );
-                                        },
+                                      Text(
+                                        userStatusService
+                                            .fullDinnerTimeDescription,
+                                        style: TextStyle(
+                                          fontSize: 18.sp,
+                                          fontFamily: 'OtsutomeFont',
+                                          color: const Color(0xFF23456B),
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -208,26 +188,5 @@ class DinnerInfoWaitingPage extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _weekdayShort(int weekday) {
-    switch (weekday) {
-      case DateTime.monday:
-        return '一';
-      case DateTime.tuesday:
-        return '二';
-      case DateTime.wednesday:
-        return '三';
-      case DateTime.thursday:
-        return '四';
-      case DateTime.friday:
-        return '五';
-      case DateTime.saturday:
-        return '六';
-      case DateTime.sunday:
-        return '日';
-      default:
-        return '';
-    }
   }
 }

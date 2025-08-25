@@ -173,7 +173,12 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
     switch (_dinnerTimeInfo!.currentStage) {
       case DinnerPageStage.reserve:
         _buttonText = '預約';
-        _descriptionText = '下次活動在${_dinnerTimeInfo!.weekdayText}舉行，歡迎預約參加';
+        // 使用 UserStatusService 獲取星期文字
+        final userStatusService = Provider.of<UserStatusService>(
+          context,
+          listen: false,
+        );
+        _descriptionText = '下次活動在${userStatusService.weekdayText}舉行，歡迎預約參加';
         break;
       case DinnerPageStage.nextWeek:
         _buttonText = '預約';
@@ -506,24 +511,32 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
                               ),
                               SizedBox(height: 25.h),
 
-                              // 日期卡片（單周星期一或雙周星期四）
-                              () {
-                                // 使用 IIFE (Immediately Invoked Function Expression) 來計算 iconPath
-                                String iconPath =
-                                    _dinnerTimeInfo!.nextDinnerDate.weekday ==
-                                            DateTime.monday
-                                        ? 'assets/images/icon/mon.webp'
-                                        : 'assets/images/icon/thu.webp';
-                                return _buildDateCard(
-                                  context,
-                                  _dinnerTimeInfo!.weekdayText,
-                                  iconPath,
-                                  '${_dinnerTimeInfo!.nextDinnerTime.hour}:${_dinnerTimeInfo!.nextDinnerTime.minute.toString().padLeft(2, '0')}',
-                                  DateFormat(
-                                    'M 月 d 日',
-                                  ).format(_dinnerTimeInfo!.nextDinnerDate),
-                                );
-                              }(), // 立即調用此函數
+                              // 日期卡片（使用 Consumer 來監聽 UserStatusService）
+                              Consumer<UserStatusService>(
+                                builder: (context, userStatusService, child) {
+                                  // 根據聚餐時間判斷圖標
+                                  String iconPath =
+                                      'assets/images/icon/thu.webp';
+                                  if (userStatusService.confirmedDinnerTime !=
+                                      null) {
+                                    iconPath =
+                                        userStatusService
+                                                    .confirmedDinnerTime!
+                                                    .weekday ==
+                                                DateTime.monday
+                                            ? 'assets/images/icon/mon.webp'
+                                            : 'assets/images/icon/thu.webp';
+                                  }
+
+                                  return _buildDateCard(
+                                    context,
+                                    userStatusService.weekdayText,
+                                    iconPath,
+                                    userStatusService.formattedDinnerTimeOnly,
+                                    userStatusService.formattedDinnerDate,
+                                  );
+                                },
+                              ),
 
                               SizedBox(height: 60.h),
 

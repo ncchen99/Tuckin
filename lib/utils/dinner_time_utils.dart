@@ -179,7 +179,7 @@ class DinnerTimeUtils {
 
     // 決定要顯示哪一週的聚餐
     if (now.isAfter(currentWeekTarget) || timeUntilDinner.inHours < 60) {
-      // 已經過了本週聚餐或距離本週聚餐時間小於61小時 (即聚餐前兩天早上6點之後)
+      // 已經過了本週聚餐或距離本週聚餐時間小於60小時 (即聚餐前兩天早上6點之後)
       if (now.isAfter(nextWeekTarget) || timeUntilNextDinner.inHours < 60) {
         // 如果下週聚餐也已經過了或時間也太接近，則顯示下下週聚餐
         selectedDinnerDate = afterNextWeekTarget;

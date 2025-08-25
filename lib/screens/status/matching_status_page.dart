@@ -6,7 +6,7 @@ import 'package:tuckin/utils/index.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tuckin/services/notification_service.dart';
-import 'package:intl/intl.dart';
+
 import 'package:provider/provider.dart';
 import 'package:tuckin/services/user_status_service.dart';
 
@@ -222,105 +222,51 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
 
           SizedBox(height: 20.h),
 
-          // 星期幾文字（參考dinner_reservation_page）
-          FutureBuilder<DateTime>(
-            future:
-                Provider.of<UserStatusService>(
-                  context,
-                  listen: false,
-                ).getDinnerTime(),
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                final dinnerTimeInfo =
-                    DinnerTimeUtils.calculateDinnerTimeInfo();
-                return Text(
-                  dinnerTimeInfo.weekdayText,
-                  style: TextStyle(
-                    fontSize: 22.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF23456B),
-                    fontWeight: FontWeight.bold,
-                  ),
-                );
-              } else {
-                return Text(
-                  '星期待定',
-                  style: TextStyle(
-                    fontSize: 22.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF23456B),
-                    fontWeight: FontWeight.bold,
-                  ),
-                );
-              }
+          // 星期幾文字（使用 UserStatusService）
+          Consumer<UserStatusService>(
+            builder: (context, userStatusService, child) {
+              return Text(
+                userStatusService.weekdayText,
+                style: TextStyle(
+                  fontSize: 22.sp,
+                  fontFamily: 'OtsutomeFont',
+                  color: const Color(0xFF23456B),
+                  fontWeight: FontWeight.bold,
+                ),
+              );
             },
           ),
 
           SizedBox(height: 8.h),
 
-          // 聚餐日期顯示（參考dinner_reservation_page格式）
-          FutureBuilder<DateTime>(
-            future:
-                Provider.of<UserStatusService>(
-                  context,
-                  listen: false,
-                ).getDinnerTime(),
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                final dinnerTime = snapshot.data!;
-                return Text(
-                  DateFormat('M 月 d 日').format(dinnerTime),
-                  style: TextStyle(
-                    fontSize: 20.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF23456B),
-                    fontWeight: FontWeight.bold,
-                  ),
-                );
-              } else {
-                return Text(
-                  '--月--日',
-                  style: TextStyle(
-                    fontSize: 20.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF23456B),
-                    fontWeight: FontWeight.bold,
-                  ),
-                );
-              }
+          // 聚餐日期顯示（使用 UserStatusService）
+          Consumer<UserStatusService>(
+            builder: (context, userStatusService, child) {
+              return Text(
+                userStatusService.formattedDinnerDate,
+                style: TextStyle(
+                  fontSize: 20.sp,
+                  fontFamily: 'OtsutomeFont',
+                  color: const Color(0xFF23456B),
+                  fontWeight: FontWeight.bold,
+                ),
+              );
             },
           ),
 
           SizedBox(height: 8.h),
 
-          // 聚餐時間顯示（改為24小時制格式）
-          FutureBuilder<DateTime>(
-            future:
-                Provider.of<UserStatusService>(
-                  context,
-                  listen: false,
-                ).getDinnerTime(),
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                final dinnerTime = snapshot.data!;
-                return Text(
-                  '${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}',
-                  style: TextStyle(
-                    fontSize: 20.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF23456B),
-                  ),
-                );
-              } else {
-                return Text(
-                  '--:--',
-                  style: TextStyle(
-                    fontSize: 20.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF23456B),
-                  ),
-                );
-              }
+          // 聚餐時間顯示（使用 UserStatusService）
+          Consumer<UserStatusService>(
+            builder: (context, userStatusService, child) {
+              return Text(
+                userStatusService.formattedDinnerTimeOnly,
+                style: TextStyle(
+                  fontSize: 20.sp,
+                  fontFamily: 'OtsutomeFont',
+                  color: const Color(0xFF23456B),
+                ),
+              );
             },
           ),
 
@@ -335,46 +281,19 @@ class _MatchingStatusPageState extends State<MatchingStatusPage> {
 
           SizedBox(height: 20.h),
 
-          // 取消截止時間資訊（加入確切時間）
-          FutureBuilder<DateTime>(
-            future:
-                Provider.of<UserStatusService>(
-                  context,
-                  listen: false,
-                ).getDinnerTime(),
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                // 獲取取消截止時間
-                final dinnerTimeInfo =
-                    DinnerTimeUtils.calculateDinnerTimeInfo();
-                final cancelDeadline = dinnerTimeInfo.cancelDeadline;
-                final weekdayNames = ['', '一', '二', '三', '四', '五', '六', '日'];
-                final weekdayText = weekdayNames[cancelDeadline.weekday];
-                final cancelTime =
-                    '${cancelDeadline.hour}:${cancelDeadline.minute.toString().padLeft(2, '0')}';
-
-                return Text(
-                  '${cancelDeadline.month}月${cancelDeadline.day}日($weekdayText) $cancelTime 前可以取消預約',
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF666666),
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                );
-              } else {
-                return Text(
-                  '計算中...',
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF666666),
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                );
-              }
+          // 取消截止時間資訊（使用 UserStatusService）
+          Consumer<UserStatusService>(
+            builder: (context, userStatusService, child) {
+              return Text(
+                userStatusService.cancelDeadlineDescription,
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontFamily: 'OtsutomeFont',
+                  color: const Color(0xFF666666),
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              );
             },
           ),
 
