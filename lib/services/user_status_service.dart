@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:tuckin/services/time_service.dart';
+import 'package:tuckin/services/auth_service.dart';
+import 'package:tuckin/services/database_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:tuckin/utils/dinner_time_utils.dart';
@@ -572,28 +574,28 @@ class UserStatusService with ChangeNotifier {
   /// - 其他狀態使用 calculateDinnerTimeInfoForFlow
   Future<void> updateDinnerTimeByUserStatus() async {
     try {
-      // 等待初始化完成（避免 _userStatus 尚未載入）
-      if (!isInitialized) {
-        try {
-          await _initCompleter.future;
-        } catch (_) {}
-      }
+      // 從 database 獲取當前用戶狀態
+      String? status;
+      try {
+        final authService = AuthService();
+        final databaseService = DatabaseService();
 
-      String? status = _userStatus;
+        final currentUser = await authService.getCurrentUser();
+        if (currentUser != null) {
+          status = await databaseService.getUserStatus(currentUser.id);
+          debugPrint('從 database 獲取用戶狀態：$status');
 
-      // 若仍為空，嘗試從 SharedPreferences 讀取先前寫入的 user_status
-      if (status == null) {
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          final persisted = prefs.getString(_userStatusKey);
-          if (persisted != null && persisted.isNotEmpty) {
-            status = persisted;
-            setUserStatus(persisted);
-            debugPrint('從持久化讀取 user_status 並同步：$persisted');
+          // 同步更新本地狀態
+          if (status != _userStatus) {
+            setUserStatus(status);
           }
-        } catch (e) {
-          debugPrint('讀取持久化 user_status 失敗: $e');
+        } else {
+          debugPrint('無法獲取當前用戶，使用預設狀態');
+          status = 'initial';
         }
+      } catch (e) {
+        debugPrint('從 database 獲取用戶狀態失敗: $e，使用預設狀態');
+        status = 'initial';
       }
 
       final DinnerTimeInfo info =

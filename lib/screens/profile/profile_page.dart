@@ -31,6 +31,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadUserProfile() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
@@ -39,7 +40,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final currentUser = await _authService.getCurrentUser();
       if (currentUser != null) {
         final profile = await _databaseService.getUserProfile(currentUser.id);
-        if (profile != null) {
+        if (profile != null && mounted) {
           setState(() {
             _userProfile = profile;
             _nickname = profile['nickname'] ?? '';
@@ -49,9 +50,11 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e) {
       debugPrint('加載用戶資料錯誤: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -143,9 +146,11 @@ class _ProfilePageState extends State<ProfilePage> {
   // 顯示登出確認對話框
   void _showLogoutConfirmDialog() {
     // 重置狀態變量
-    setState(() {
-      _isLoggingOut = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoggingOut = false;
+      });
+    }
 
     showCustomConfirmationDialog(
       context: context,
@@ -173,9 +178,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // 顯示刪除帳號確認對話框
   void _showDeleteAccountConfirmDialog() {
-    setState(() {
-      _isDeletingAccount = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isDeletingAccount = false;
+      });
+    }
 
     showCustomConfirmationDialog(
       context: context,
