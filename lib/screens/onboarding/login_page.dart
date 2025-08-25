@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/user_status_service.dart';
 import '../../components/components.dart';
@@ -109,8 +110,11 @@ class _LoginPageState extends State<LoginPage> {
 
         // 登入成功，使用NavigationService來處理導航
         if (mounted) {
-          // 重新計算並持久化用餐時間
-          final userStatusService = UserStatusService();
+          // 重新計算並持久化用餐時間 - 使用 provider 中的實例
+          final userStatusService = Provider.of<UserStatusService>(
+            context,
+            listen: false,
+          );
           await userStatusService.updateDinnerTimeByUserStatus();
 
           final navigationService = NavigationService();

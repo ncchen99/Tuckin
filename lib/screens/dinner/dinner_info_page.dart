@@ -1015,181 +1015,78 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 獲取 UserStatusService 以便在 UI 中使用
-    final userStatusService = Provider.of<UserStatusService>(context);
+    return Consumer<UserStatusService>(
+      builder: (context, userStatusService, child) {
+        // 從 Provider 取得最新用戶狀態，若暫無則回退到本地快照
+        final String currentUserStatus =
+            userStatusService.userStatus ?? _userStatus;
 
-    // 從 Provider 取得最新用戶狀態，若暫無則回退到本地快照
-    final String currentUserStatus =
-        userStatusService.userStatus ?? _userStatus;
+        // 根據狀態決定顯示內容（改為使用 currentUserStatus，確保 Provider 更新可即時反映）
+        Widget content;
 
-    // 根據狀態決定顯示內容（改為使用 currentUserStatus，確保 Provider 更新可即時反映）
-    Widget content;
-
-    if (_isLoading) {
-      return WillPopScope(
-        onWillPop: () async {
-          return false; // 禁用返回按鈕
-        },
-        child: Scaffold(
-          body: Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/background/bg2.jpg'),
-                fit: BoxFit.cover,
-              ),
-            ),
-            child: Center(
-              child: LoadingImage(
-                width: 60.w,
-                height: 60.h,
-                color: const Color(0xFF23456B),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // 從 UserStatusService 獲取聚餐時間（僅供後續 FutureBuilder 回退參考，若未使用則不建立本地變數）
-
-    // 已移除 waiting_other_users 的 UI（改由 DinnerInfoWaitingPage 顯示）
-    // 構建出席/聚餐資訊的UI
-    {
-      // 定義卡片寬度，確保一致性
-      final cardWidth = MediaQuery.of(context).size.width - 48.w;
-
-      content = Column(
-        children: [
-          SizedBox(height: 10.h),
-
-          // 聚餐資訊卡片（結合餐廳資訊和時間）
-          Container(
-            width: cardWidth,
-            margin: EdgeInsets.symmetric(vertical: 8.h),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(15.r),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 5,
-                  offset: Offset(0, 2.h),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // 餐廳資訊部分 - 使用與預訂頁面相同的樣式
-                ClipRRect(
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(15.r),
-                    topRight: Radius.circular(15.r),
-                  ),
-                  child: GestureDetector(
-                    onTap: () {
-                      debugPrint('點擊了圖片，嘗試打開地圖: $_restaurantMapUrl');
-                      if (_restaurantMapUrl != null) {
-                        final Uri url = Uri.parse(_restaurantMapUrl!);
-                        launchUrl(url, mode: LaunchMode.externalApplication)
-                            .then((success) {
-                              if (!success && mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      '無法開啟地圖',
-                                      style: TextStyle(
-                                        fontFamily: 'OtsutomeFont',
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                            })
-                            .catchError((error) {
-                              debugPrint('打開地圖出錯: $error');
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '$error',
-                                      style: const TextStyle(
-                                        fontFamily: 'OtsutomeFont',
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                            });
-                      }
-                    },
-                    child:
-                        _restaurantImageUrl != null
-                            ? Image.network(
-                              _restaurantImageUrl!,
-                              width: double.infinity,
-                              height: 150.h,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  width: double.infinity,
-                                  height: 150.h,
-                                  color: Colors.grey[300],
-                                  child: Icon(
-                                    Icons.restaurant,
-                                    color: Colors.grey[600],
-                                    size: 50.sp,
-                                  ),
-                                );
-                              },
-                            )
-                            : Container(
-                              width: double.infinity,
-                              height: 150.h,
-                              color: Colors.grey[300],
-                              child: Icon(
-                                Icons.restaurant,
-                                color: Colors.grey[600],
-                                size: 50.sp,
-                              ),
-                            ),
+        if (_isLoading) {
+          return WillPopScope(
+            onWillPop: () async {
+              return false; // 禁用返回按鈕
+            },
+            child: Scaffold(
+              body: Container(
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage('assets/images/background/bg2.jpg'),
+                    fit: BoxFit.cover,
                   ),
                 ),
+                child: Center(
+                  child: LoadingImage(
+                    width: 60.w,
+                    height: 60.h,
+                    color: const Color(0xFF23456B),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
 
-                // 餐廳詳細資訊
-                Padding(
-                  padding: EdgeInsets.all(15.h),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 餐廳名稱
-                      Text(
-                        _restaurantName ?? '未指定餐廳',
-                        style: TextStyle(
-                          fontSize: 20.sp,
-                          fontFamily: 'OtsutomeFont',
-                          color: const Color(0xFF23456B),
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
+        // 從 UserStatusService 獲取聚餐時間（僅供後續 FutureBuilder 回退參考，若未使用則不建立本地變數）
+
+        // 已移除 waiting_other_users 的 UI（改由 DinnerInfoWaitingPage 顯示）
+        // 構建出席/聚餐資訊的UI
+        {
+          // 定義卡片寬度，確保一致性
+          final cardWidth = MediaQuery.of(context).size.width - 48.w;
+
+          content = Column(
+            children: [
+              SizedBox(height: 10.h),
+
+              // 聚餐資訊卡片（結合餐廳資訊和時間）
+              Container(
+                width: cardWidth,
+                margin: EdgeInsets.symmetric(vertical: 8.h),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(15.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 5,
+                      offset: Offset(0, 2.h),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // 餐廳資訊部分 - 使用與預訂頁面相同的樣式
+                    ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(15.r),
+                        topRight: Radius.circular(15.r),
                       ),
-
-                      SizedBox(height: 5.h),
-                      // 餐廳類別
-                      Text(
-                        _restaurantCategory ?? '未分類',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontFamily: 'OtsutomeFont',
-                          color: const Color(0xFF666666),
-                        ),
-                      ),
-
-                      SizedBox(height: 10.h),
-                      // 餐廳地址 - 可點擊
-                      GestureDetector(
+                      child: GestureDetector(
                         onTap: () {
-                          debugPrint('點擊了地址，嘗試打開地圖: $_restaurantMapUrl');
+                          debugPrint('點擊了圖片，嘗試打開地圖: $_restaurantMapUrl');
                           if (_restaurantMapUrl != null) {
                             final Uri url = Uri.parse(_restaurantMapUrl!);
                             launchUrl(url, mode: LaunchMode.externalApplication)
@@ -1224,315 +1121,441 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                 });
                           }
                         },
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _restaurantAddress ?? '地址未提供',
-                                style: TextStyle(
-                                  fontSize: 14.sp,
-                                  fontFamily: 'OtsutomeFont',
-                                  color: const Color(0xFF23456B),
+                        child:
+                            _restaurantImageUrl != null
+                                ? Image.network(
+                                  _restaurantImageUrl!,
+                                  width: double.infinity,
+                                  height: 150.h,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      width: double.infinity,
+                                      height: 150.h,
+                                      color: Colors.grey[300],
+                                      child: Icon(
+                                        Icons.restaurant,
+                                        color: Colors.grey[600],
+                                        size: 50.sp,
+                                      ),
+                                    );
+                                  },
+                                )
+                                : Container(
+                                  width: double.infinity,
+                                  height: 150.h,
+                                  color: Colors.grey[300],
+                                  child: Icon(
+                                    Icons.restaurant,
+                                    color: Colors.grey[600],
+                                    size: 50.sp,
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
 
-                // 分隔線
-                Container(
-                  height: 1,
-                  color: Colors.grey[300],
-                  margin: EdgeInsets.symmetric(horizontal: 12.w),
-                ),
-
-                // 聚餐時間部分
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 15.h,
-                    vertical: 15.h,
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    // 餐廳詳細資訊
+                    Padding(
+                      padding: EdgeInsets.all(15.h),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 左側時間信息
-                          SizedBox(
-                            width: cardWidth * 0.4,
+                          // 餐廳名稱
+                          Text(
+                            _restaurantName ?? '未指定餐廳',
+                            style: TextStyle(
+                              fontSize: 20.sp,
+                              fontFamily: 'OtsutomeFont',
+                              color: const Color(0xFF23456B),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+
+                          SizedBox(height: 5.h),
+                          // 餐廳類別
+                          Text(
+                            _restaurantCategory ?? '未分類',
+                            style: TextStyle(
+                              fontSize: 16.sp,
+                              fontFamily: 'OtsutomeFont',
+                              color: const Color(0xFF666666),
+                            ),
+                          ),
+
+                          SizedBox(height: 10.h),
+                          // 餐廳地址 - 可點擊
+                          GestureDetector(
+                            onTap: () {
+                              debugPrint('點擊了地址，嘗試打開地圖: $_restaurantMapUrl');
+                              if (_restaurantMapUrl != null) {
+                                final Uri url = Uri.parse(_restaurantMapUrl!);
+                                launchUrl(
+                                      url,
+                                      mode: LaunchMode.externalApplication,
+                                    )
+                                    .then((success) {
+                                      if (!success && mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              '無法開啟地圖',
+                                              style: TextStyle(
+                                                fontFamily: 'OtsutomeFont',
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    })
+                                    .catchError((error) {
+                                      debugPrint('打開地圖出錯: $error');
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              '$error',
+                                              style: const TextStyle(
+                                                fontFamily: 'OtsutomeFont',
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    });
+                              }
+                            },
                             child: Row(
                               children: [
-                                // 時間圖標 - 使用指定的圖標並添加陰影效果
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                    left: 0.w,
-                                    bottom: 5.h,
-                                  ),
-                                  child: SizedBox(
-                                    width: 35.w,
-                                    height: 35.h,
-                                    child: Stack(
-                                      clipBehavior: Clip.none, // 允許陰影超出容器範圍
-                                      children: [
-                                        // 底部陰影
-                                        Positioned(
-                                          left: 0,
-                                          top: 2.h,
-                                          child: Image.asset(
-                                            'assets/images/icon/clock.webp',
-                                            width: 35.w,
-                                            height: 35.h,
-                                            color: Colors.black.withOpacity(
-                                              0.4,
-                                            ),
-                                            colorBlendMode: BlendMode.srcIn,
-                                          ),
-                                        ),
-                                        // 主圖標
-                                        Image.asset(
-                                          'assets/images/icon/clock.webp',
-                                          width: 35.w,
-                                          height: 35.h,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                                SizedBox(width: 10.w),
-
-                                // 時間信息文字
                                 Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '聚餐時間',
-                                        style: TextStyle(
-                                          fontSize: 16.sp,
-                                          fontFamily: 'OtsutomeFont',
-                                          color: const Color(0xFF23456B),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      SizedBox(height: 2.h),
-                                      Text(
-                                        userStatusService
-                                            .simpleDinnerTimeDescription,
-                                        style: TextStyle(
-                                          fontSize: 14.sp,
-                                          fontFamily: 'OtsutomeFont',
-                                          color: const Color(0xFF666666),
-                                        ),
-                                      ),
-                                    ],
+                                  child: Text(
+                                    _restaurantAddress ?? '地址未提供',
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                        ],
+                      ),
+                    ),
 
-                          // 垂直分隔線
-                          Container(
-                            height: 45.h,
-                            width: 1.w,
-                            color: Colors.grey[300],
-                          ),
+                    // 分隔線
+                    Container(
+                      height: 1,
+                      color: Colors.grey[300],
+                      margin: EdgeInsets.symmetric(horizontal: 12.w),
+                    ),
 
-                          // 右側導航部分
-                          SizedBox(
-                            width: cardWidth * 0.4,
-                            child: InkWell(
-                              onTap: () {
-                                debugPrint(
-                                  '點擊了導航按鈕，嘗試打開地圖: $_restaurantMapUrl',
-                                );
-                                if (_restaurantMapUrl != null) {
-                                  final Uri url = Uri.parse(_restaurantMapUrl!);
-                                  launchUrl(
-                                        url,
-                                        mode: LaunchMode.externalApplication,
-                                      )
-                                      .then((success) {
-                                        if (!success && mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                '無法開啟地圖',
-                                                style: TextStyle(
-                                                  fontFamily: 'OtsutomeFont',
+                    // 聚餐時間部分
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 15.h,
+                        vertical: 15.h,
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              // 左側時間信息
+                              SizedBox(
+                                width: cardWidth * 0.4,
+                                child: Row(
+                                  children: [
+                                    // 時間圖標 - 使用指定的圖標並添加陰影效果
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        left: 0.w,
+                                        bottom: 5.h,
+                                      ),
+                                      child: SizedBox(
+                                        width: 35.w,
+                                        height: 35.h,
+                                        child: Stack(
+                                          clipBehavior: Clip.none, // 允許陰影超出容器範圍
+                                          children: [
+                                            // 底部陰影
+                                            Positioned(
+                                              left: 0,
+                                              top: 2.h,
+                                              child: Image.asset(
+                                                'assets/images/icon/clock.webp',
+                                                width: 35.w,
+                                                height: 35.h,
+                                                color: Colors.black.withOpacity(
+                                                  0.4,
                                                 ),
+                                                colorBlendMode: BlendMode.srcIn,
                                               ),
                                             ),
-                                          );
-                                        }
-                                      })
-                                      .catchError((error) {
-                                        debugPrint('打開地圖出錯: $error');
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                '打開地圖出錯: $error',
-                                                style: TextStyle(
-                                                  fontFamily: 'OtsutomeFont',
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      });
-                                }
-                              },
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  // 導航圖標
-                                  Padding(
-                                    padding: EdgeInsets.only(bottom: 5.h),
-                                    child: SizedBox(
-                                      width: 35.w,
-                                      height: 35.h,
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          // 底部陰影
-                                          Positioned(
-                                            left: 0,
-                                            top: 2.h,
-                                            child: Image.asset(
-                                              'assets/images/icon/navigation.webp',
+                                            // 主圖標
+                                            Image.asset(
+                                              'assets/images/icon/clock.webp',
                                               width: 35.w,
                                               height: 35.h,
-                                              color: Colors.black.withOpacity(
-                                                0.4,
-                                              ),
-                                              colorBlendMode: BlendMode.srcIn,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+
+                                    SizedBox(width: 10.w),
+
+                                    // 時間信息文字
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '聚餐時間',
+                                            style: TextStyle(
+                                              fontSize: 16.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                          // 主圖標
-                                          Image.asset(
-                                            'assets/images/icon/navigation.webp',
-                                            width: 35.w,
-                                            height: 35.h,
+                                          SizedBox(height: 2.h),
+                                          Consumer<UserStatusService>(
+                                            builder: (
+                                              context,
+                                              userStatusService,
+                                              child,
+                                            ) {
+                                              return Text(
+                                                userStatusService
+                                                    .simpleDinnerTimeDescription,
+                                                style: TextStyle(
+                                                  fontSize: 14.sp,
+                                                  fontFamily: 'OtsutomeFont',
+                                                  color: const Color(
+                                                    0xFF666666,
+                                                  ),
+                                                ),
+                                              );
+                                            },
                                           ),
                                         ],
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(width: 10.w),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  ],
+                                ),
+                              ),
+
+                              // 垂直分隔線
+                              Container(
+                                height: 45.h,
+                                width: 1.w,
+                                color: Colors.grey[300],
+                              ),
+
+                              // 右側導航部分
+                              SizedBox(
+                                width: cardWidth * 0.4,
+                                child: InkWell(
+                                  onTap: () {
+                                    debugPrint(
+                                      '點擊了導航按鈕，嘗試打開地圖: $_restaurantMapUrl',
+                                    );
+                                    if (_restaurantMapUrl != null) {
+                                      final Uri url = Uri.parse(
+                                        _restaurantMapUrl!,
+                                      );
+                                      launchUrl(
+                                            url,
+                                            mode:
+                                                LaunchMode.externalApplication,
+                                          )
+                                          .then((success) {
+                                            if (!success && mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    '無法開啟地圖',
+                                                    style: TextStyle(
+                                                      fontFamily:
+                                                          'OtsutomeFont',
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          })
+                                          .catchError((error) {
+                                            debugPrint('打開地圖出錯: $error');
+                                            if (mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    '打開地圖出錯: $error',
+                                                    style: TextStyle(
+                                                      fontFamily:
+                                                          'OtsutomeFont',
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          });
+                                    }
+                                  },
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        '導航',
-                                        style: TextStyle(
-                                          fontSize: 16.sp,
-                                          fontFamily: 'OtsutomeFont',
-                                          color: const Color(0xFF23456B),
+                                      // 導航圖標
+                                      Padding(
+                                        padding: EdgeInsets.only(bottom: 5.h),
+                                        child: SizedBox(
+                                          width: 35.w,
+                                          height: 35.h,
+                                          child: Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              // 底部陰影
+                                              Positioned(
+                                                left: 0,
+                                                top: 2.h,
+                                                child: Image.asset(
+                                                  'assets/images/icon/navigation.webp',
+                                                  width: 35.w,
+                                                  height: 35.h,
+                                                  color: Colors.black
+                                                      .withOpacity(0.4),
+                                                  colorBlendMode:
+                                                      BlendMode.srcIn,
+                                                ),
+                                              ),
+                                              // 主圖標
+                                              Image.asset(
+                                                'assets/images/icon/navigation.webp',
+                                                width: 35.w,
+                                                height: 35.h,
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                      SizedBox(height: 2.h),
-                                      Text(
-                                        'Google Map',
-                                        style: TextStyle(
-                                          fontSize: 14.sp,
-                                          fontFamily: 'OtsutomeFont',
-                                          color: const Color(0xFF666666),
-                                        ),
+                                      SizedBox(width: 10.w),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '導航',
+                                            style: TextStyle(
+                                              fontSize: 16.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                            ),
+                                          ),
+                                          SizedBox(height: 2.h),
+                                          Text(
+                                            'Google Map',
+                                            style: TextStyle(
+                                              fontSize: 14.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF666666),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          SizedBox(height: 20.h),
-
-          // 替換舊的提示卡片為根據狀態顯示的卡片
-          _buildStatusPromptCard(),
-        ],
-      );
-    }
-
-    return WillPopScope(
-      onWillPop: () async {
-        return false; // 禁用返回按鈕
-      },
-      child: Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('assets/images/background/bg2.jpg'),
-              fit: BoxFit.cover,
-            ),
-          ),
-          child: SafeArea(
-            child: Stack(
-              children: [
-                // 右下角背景圖片
-                Positioned(
-                  right: -7.w, // 負值使圖片右側超出螢幕
-                  bottom: -45.h, // 負值使圖片底部超出螢幕
-                  child: Opacity(
-                    opacity: 0.65, // 降低透明度，使圖片更加融入背景
-                    child: ColorFiltered(
-                      // 降低彩度的矩陣
-                      colorFilter: const ColorFilter.matrix(<double>[
-                        0.6, 0.1, 0.1, 0, 0, // R影響
-                        0.1, 0.6, 0.1, 0, 0, // G影響
-                        0.1, 0.1, 0.6, 0, 0, // B影響
-                        0, 0, 0, 1, 0, // A影響
-                      ]),
-                      child: Image.asset(
-                        'assets/images/illustrate/p3.webp',
-                        width: 220.w, // 增大尺寸
-                        height: 220.h, // 增大尺寸
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // 主要內容
-                Column(
-                  children: [
-                    // 頂部導航欄
-                    HeaderBar(title: _getStatusTextFor(currentUserStatus)),
-
-                    // 主要內容
-                    Expanded(
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: content,
                       ),
                     ),
                   ],
                 ),
-              ],
+              ),
+
+              SizedBox(height: 20.h),
+
+              // 替換舊的提示卡片為根據狀態顯示的卡片
+              _buildStatusPromptCard(),
+            ],
+          );
+        }
+
+        return WillPopScope(
+          onWillPop: () async {
+            return false; // 禁用返回按鈕
+          },
+          child: Scaffold(
+            body: Container(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage('assets/images/background/bg2.jpg'),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: SafeArea(
+                child: Stack(
+                  children: [
+                    // 右下角背景圖片
+                    Positioned(
+                      right: -7.w, // 負值使圖片右側超出螢幕
+                      bottom: -45.h, // 負值使圖片底部超出螢幕
+                      child: Opacity(
+                        opacity: 0.65, // 降低透明度，使圖片更加融入背景
+                        child: ColorFiltered(
+                          // 降低彩度的矩陣
+                          colorFilter: const ColorFilter.matrix(<double>[
+                            0.6, 0.1, 0.1, 0, 0, // R影響
+                            0.1, 0.6, 0.1, 0, 0, // G影響
+                            0.1, 0.1, 0.6, 0, 0, // B影響
+                            0, 0, 0, 1, 0, // A影響
+                          ]),
+                          child: Image.asset(
+                            'assets/images/illustrate/p3.webp',
+                            width: 220.w, // 增大尺寸
+                            height: 220.h, // 增大尺寸
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // 主要內容
+                    Column(
+                      children: [
+                        // 頂部導航欄
+                        HeaderBar(title: _getStatusTextFor(currentUserStatus)),
+
+                        // 主要內容
+                        Expanded(
+                          child: SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            child: content,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

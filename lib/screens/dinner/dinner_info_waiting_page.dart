@@ -9,8 +9,6 @@ class DinnerInfoWaitingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userStatusService = Provider.of<UserStatusService>(context);
-
     return WillPopScope(
       onWillPop: () async => false,
       child: Scaffold(
@@ -102,10 +100,12 @@ class DinnerInfoWaitingPage extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  SizedBox(
-                                    width: 75.w,
-                                    height: 75.h,
-                                    child: () {
+                                  Consumer<UserStatusService>(
+                                    builder: (
+                                      context,
+                                      userStatusService,
+                                      child,
+                                    ) {
                                       String iconPath =
                                           'assets/images/icon/thu.webp';
                                       if (userStatusService
@@ -119,30 +119,34 @@ class DinnerInfoWaitingPage extends StatelessWidget {
                                                 ? 'assets/images/icon/mon.webp'
                                                 : 'assets/images/icon/thu.webp';
                                       }
-                                      return Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          Positioned(
-                                            left: 0,
-                                            top: 3.h,
-                                            child: Image.asset(
+                                      return SizedBox(
+                                        width: 75.w,
+                                        height: 75.h,
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            Positioned(
+                                              left: 0,
+                                              top: 3.h,
+                                              child: Image.asset(
+                                                iconPath,
+                                                width: 75.w,
+                                                height: 75.h,
+                                                color: Colors.black.withOpacity(
+                                                  0.4,
+                                                ),
+                                                colorBlendMode: BlendMode.srcIn,
+                                              ),
+                                            ),
+                                            Image.asset(
                                               iconPath,
                                               width: 75.w,
                                               height: 75.h,
-                                              color: Colors.black.withOpacity(
-                                                0.4,
-                                              ),
-                                              colorBlendMode: BlendMode.srcIn,
                                             ),
-                                          ),
-                                          Image.asset(
-                                            iconPath,
-                                            width: 75.w,
-                                            height: 75.h,
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       );
-                                    }(),
+                                    },
                                   ),
                                   SizedBox(width: 10.w),
                                   Column(
@@ -159,15 +163,23 @@ class DinnerInfoWaitingPage extends StatelessWidget {
                                         ),
                                       ),
                                       SizedBox(height: 4.h),
-                                      Text(
-                                        userStatusService
-                                            .fullDinnerTimeDescription,
-                                        style: TextStyle(
-                                          fontSize: 18.sp,
-                                          fontFamily: 'OtsutomeFont',
-                                          color: const Color(0xFF23456B),
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                      Consumer<UserStatusService>(
+                                        builder: (
+                                          context,
+                                          userStatusService,
+                                          child,
+                                        ) {
+                                          return Text(
+                                            userStatusService
+                                                .fullDinnerTimeDescription,
+                                            style: TextStyle(
+                                              fontSize: 18.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ],
                                   ),
