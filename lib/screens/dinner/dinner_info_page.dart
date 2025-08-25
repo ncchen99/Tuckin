@@ -1344,32 +1344,14 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                         ),
                                       ),
                                       SizedBox(height: 2.h),
-                                      // 使用 FutureBuilder 確保時間存在
-                                      FutureBuilder<DateTime>(
-                                        future:
-                                            userStatusService.getDinnerTime(),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.hasData) {
-                                            final dinnerTime = snapshot.data!;
-                                            return Text(
-                                              '${dinnerTime.month}月${dinnerTime.day}日 ${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}',
-                                              style: TextStyle(
-                                                fontSize: 14.sp,
-                                                fontFamily: 'OtsutomeFont',
-                                                color: const Color(0xFF666666),
-                                              ),
-                                            );
-                                          } else {
-                                            return Text(
-                                              '時間待定',
-                                              style: TextStyle(
-                                                fontSize: 14.sp,
-                                                fontFamily: 'OtsutomeFont',
-                                                color: const Color(0xFF666666),
-                                              ),
-                                            );
-                                          }
-                                        },
+                                      Text(
+                                        userStatusService
+                                            .simpleDinnerTimeDescription,
+                                        style: TextStyle(
+                                          fontSize: 14.sp,
+                                          fontFamily: 'OtsutomeFont',
+                                          color: const Color(0xFF666666),
+                                        ),
                                       ),
                                     ],
                                   ),

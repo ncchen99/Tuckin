@@ -266,6 +266,117 @@ class DinnerTimeUtils {
     );
   }
 
+  /// 為聚餐流程提供穩定的聚餐時間計算（聚餐後+52小時才切換）
+  /// 規則：只有在當週聚餐時間過後 52 小時，才會切換到「下週」的聚餐日期；
+  /// 否則（含聚餐前與聚餐後 52 小時內）都顯示「本週」的聚餐日期與時間。
+  static DinnerTimeInfo calculateDinnerTimeInfoForFlow() {
+    final now = TimeService().now();
+
+    // 依據目前時間判斷本週是單/雙週，進而決定聚餐是週一或週四
+    final int weekNumber = getIsoWeekNumber(now);
+    final bool isSingleWeek = weekNumber % 2 == 1;
+    final int targetWeekday =
+        isSingleWeek ? DateTime.monday : DateTime.thursday;
+
+    // 計算本週日（沿用現有演算法以保持一致性）
+    final int currentDay = now.weekday;
+    int daysToSunday =
+        currentDay == DateTime.sunday ? 0 : (DateTime.sunday - currentDay);
+    DateTime thisWeekSunday = now.subtract(Duration(days: 7 - daysToSunday));
+
+    // 本週的聚餐日期與時間（18:00）
+    final DateTime currentWeekTarget = thisWeekSunday.add(
+      Duration(days: targetWeekday),
+    );
+    final DateTime currentDinnerTime = DateTime(
+      currentWeekTarget.year,
+      currentWeekTarget.month,
+      currentWeekTarget.day,
+      18,
+      0,
+    );
+
+    // 下週的聚餐日期與時間（18:00）
+    final int nextWeekNumber = weekNumber + 1;
+    final bool isNextWeekSingle = nextWeekNumber % 2 == 1;
+    final int nextTargetWeekday =
+        isNextWeekSingle ? DateTime.monday : DateTime.thursday;
+    final DateTime nextWeekSunday = thisWeekSunday.add(const Duration(days: 7));
+    final DateTime nextWeekTarget = nextWeekSunday.add(
+      Duration(days: nextTargetWeekday),
+    );
+    final DateTime nextDinnerTime = DateTime(
+      nextWeekTarget.year,
+      nextWeekTarget.month,
+      nextWeekTarget.day,
+      18,
+      0,
+    );
+
+    // 切換門檻：當週聚餐時間 + 52 小時
+    final DateTime switchToNextThreshold = currentDinnerTime.add(
+      const Duration(hours: 52),
+    );
+
+    DateTime selectedDinnerDate;
+    DateTime selectedDinnerTime;
+
+    if (now.isAfter(switchToNextThreshold)) {
+      // 超過當週聚餐時間 + 52 小時 → 顯示下週
+      selectedDinnerDate = nextWeekTarget;
+      selectedDinnerTime = nextDinnerTime;
+      debugPrint('流程模式：已超過當週聚餐+52小時，顯示下週聚餐');
+    } else {
+      // 其餘時間（包含聚餐前與聚餐後 52 小時內）→ 顯示本週
+      selectedDinnerDate = currentWeekTarget;
+      selectedDinnerTime = currentDinnerTime;
+      debugPrint('流程模式：尚未超過當週聚餐+52小時，顯示本週聚餐');
+    }
+
+    // 仍沿用既有欄位計算，方便前端共用顯示
+    final DateTime joinPhaseStart = selectedDinnerTime.subtract(
+      const Duration(hours: 60),
+    );
+    final DateTime joinPhaseEnd = selectedDinnerTime.subtract(
+      const Duration(hours: 36),
+    );
+    final DateTime cancelDeadline = joinPhaseStart;
+
+    String weekdayText = '';
+    if (selectedDinnerDate.weekday == DateTime.monday) {
+      weekdayText = '星期一';
+    } else if (selectedDinnerDate.weekday == DateTime.thursday) {
+      weekdayText = '星期四';
+    } else {
+      weekdayText = '未知';
+      debugPrint('錯誤：流程模式計算的聚餐日既不是星期一也不是星期四: $selectedDinnerDate');
+    }
+
+    // 流程模式不區分頁面階段，固定為預約階段以維持 UI 一致
+    const DinnerPageStage currentStage = DinnerPageStage.reserve;
+
+    debugPrint(
+      '流程模式 - 選擇的聚餐日期: ${DateFormat('yyyy-MM-dd').format(selectedDinnerDate)} ($weekdayText)',
+    );
+    debugPrint(
+      '流程模式 - 聚餐時間: ${DateFormat('yyyy-MM-dd HH:mm').format(selectedDinnerTime)}',
+    );
+    debugPrint(
+      '流程模式 - 切換門檻(聚餐+52h): ${DateFormat('yyyy-MM-dd HH:mm').format(switchToNextThreshold)}',
+    );
+
+    return DinnerTimeInfo(
+      nextDinnerDate: selectedDinnerDate,
+      nextDinnerTime: selectedDinnerTime,
+      isSingleWeek: isSingleWeek,
+      weekdayText: weekdayText,
+      currentStage: currentStage,
+      cancelDeadline: cancelDeadline,
+      joinPhaseStart: joinPhaseStart,
+      joinPhaseEnd: joinPhaseEnd,
+    );
+  }
+
   // ================== 時間格式化方法 ==================
 
   /// 獲取星期幾的中文全稱
@@ -312,6 +423,13 @@ class DinnerTimeUtils {
     final weekdayShort = getWeekdayShort(dateTime);
     final timeOnly = formatDinnerTimeOnly(dateTime);
     return '${dateTime.month}月${dateTime.day}日（$weekdayShort）$timeOnly';
+  }
+
+  /// 獲取聚餐日期與時間的簡潔描述（M月d日 HH:mm）
+  static String getDinnerTimeDescriptionSimple(DateTime? dateTime) {
+    if (dateTime == null) return '時間待定';
+    final timeOnly = formatDinnerTimeOnly(dateTime);
+    return '${dateTime.month}月${dateTime.day}日 $timeOnly';
   }
 
   /// 獲取取消截止時間的完整描述（M月d日(weekday) HH:mm 前可以取消預約）

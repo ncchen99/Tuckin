@@ -103,6 +103,10 @@ class UserStatusService with ChangeNotifier {
   String get fullDinnerTimeDescription =>
       DinnerTimeUtils.getFullDinnerTimeDescription(_confirmedDinnerTime);
 
+  // 新增：獲取聚餐日期與時間的簡潔描述（M月d日 HH:mm）
+  String get simpleDinnerTimeDescription =>
+      DinnerTimeUtils.getDinnerTimeDescriptionSimple(_confirmedDinnerTime);
+
   // 獲取取消截止時間的完整描述（M月d日(weekday) HH:mm 前可以取消預約）
   String get cancelDeadlineDescription =>
       DinnerTimeUtils.getCancelDeadlineDescription(_cancelDeadline);
