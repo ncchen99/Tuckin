@@ -38,7 +38,7 @@ class _DinnerReservationPageState extends State<DinnerReservationPage>
   // 已移除本地時間計算與整點更新計時器，改由 UserStatusService 統一處理
 
   // 按鈕文字
-  String _buttonText = '預約';
+  final String _buttonText = '預約';
   // 整點更新計時器
   Timer? _hourlyTimer;
 

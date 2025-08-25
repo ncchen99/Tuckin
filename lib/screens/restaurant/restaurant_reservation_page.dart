@@ -1400,253 +1400,158 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
             ),
           ),
           child: SafeArea(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: [
-                  // 頂部導航欄 - 移到滾動區域內
-                  HeaderBar(title: '餐廳預訂'),
-
-                  // 主要內容
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24.w),
+            child: Column(
+              children: [
+                // 主要內容區域使用Expanded包裹，避免黑邊
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: 20.h),
-                        // 標題
-                        Text(
-                          '確認有營業',
-                          style: TextStyle(
-                            fontSize: 24.sp,
-                            fontFamily: 'OtsutomeFont',
-                            color: const Color(0xFF23456B),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 10.h),
-                        // 小標題
-                        Text(
-                          '可以的話幫忙訂位',
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            fontFamily: 'OtsutomeFont',
-                            color: const Color(0xFF23456B),
-                          ),
-                        ),
-                        SizedBox(height: 25.h),
+                        // 頂部導航欄 - 移到滾動區域內
+                        HeaderBar(title: '餐廳預訂'),
 
-                        // 餐廳資訊卡片
-                        Container(
-                          width: cardWidth,
-                          margin: EdgeInsets.symmetric(vertical: 0.h),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(15.r),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 5,
-                                offset: Offset(0, 2.h),
-                              ),
-                            ],
-                          ),
+                        // 主要內容
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24.w),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 餐廳圖片和上半部分 - 整體可點擊
-                              GestureDetector(
-                                onTap: () => _openMap(_restaurantMapUrl),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // 餐廳圖片
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: Radius.circular(15.r),
-                                        topRight: Radius.circular(15.r),
-                                      ),
-                                      child:
-                                          _restaurantImageUrl != null
-                                              ? Image.network(
-                                                _restaurantImageUrl!,
-                                                width: double.infinity,
-                                                height: 150.h,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (
-                                                  context,
-                                                  error,
-                                                  stackTrace,
-                                                ) {
-                                                  return Container(
-                                                    width: double.infinity,
-                                                    height: 150.h,
-                                                    color: Colors.grey[300],
-                                                    child: Icon(
-                                                      Icons.restaurant,
-                                                      color: Colors.grey[600],
-                                                      size: 50.sp,
-                                                    ),
-                                                  );
-                                                },
-                                              )
-                                              : Container(
-                                                width: double.infinity,
-                                                height: 150.h,
-                                                color: Colors.grey[300],
-                                                child: Icon(
-                                                  Icons.restaurant,
-                                                  color: Colors.grey[600],
-                                                  size: 50.sp,
-                                                ),
-                                              ),
-                                    ),
+                              SizedBox(height: 20.h),
+                              // 標題
+                              Text(
+                                '確認有營業',
+                                style: TextStyle(
+                                  fontSize: 24.sp,
+                                  fontFamily: 'OtsutomeFont',
+                                  color: const Color(0xFF23456B),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 10.h),
+                              // 小標題
+                              Text(
+                                '可以的話幫忙訂位',
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontFamily: 'OtsutomeFont',
+                                  color: const Color(0xFF23456B),
+                                ),
+                              ),
+                              SizedBox(height: 25.h),
 
-                                    // 餐廳詳細資訊
-                                    Padding(
-                                      padding: EdgeInsets.all(15.h),
+                              // 餐廳資訊卡片
+                              Container(
+                                width: cardWidth,
+                                margin: EdgeInsets.symmetric(vertical: 0.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(15.r),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 5,
+                                      offset: Offset(0, 2.h),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    // 餐廳圖片和上半部分 - 整體可點擊
+                                    GestureDetector(
+                                      onTap: () => _openMap(_restaurantMapUrl),
                                       child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          // 餐廳名稱
-                                          Text(
-                                            _restaurantName ?? '未指定餐廳',
-                                            style: TextStyle(
-                                              fontSize: 20.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
+                                          // 餐廳圖片
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.only(
+                                              topLeft: Radius.circular(15.r),
+                                              topRight: Radius.circular(15.r),
                                             ),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
-
-                                          SizedBox(height: 8.h),
-                                          // 餐廳地址
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  _restaurantAddress ?? '地址未提供',
-                                                  style: TextStyle(
-                                                    fontSize: 14.sp,
-                                                    fontFamily: 'OtsutomeFont',
-                                                    color: const Color(
-                                                      0xFF23456B,
+                                            child:
+                                                _restaurantImageUrl != null
+                                                    ? Image.network(
+                                                      _restaurantImageUrl!,
+                                                      width: double.infinity,
+                                                      height: 150.h,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (
+                                                        context,
+                                                        error,
+                                                        stackTrace,
+                                                      ) {
+                                                        return Container(
+                                                          width:
+                                                              double.infinity,
+                                                          height: 150.h,
+                                                          color:
+                                                              Colors.grey[300],
+                                                          child: Icon(
+                                                            Icons.restaurant,
+                                                            color:
+                                                                Colors
+                                                                    .grey[600],
+                                                            size: 50.sp,
+                                                          ),
+                                                        );
+                                                      },
+                                                    )
+                                                    : Container(
+                                                      width: double.infinity,
+                                                      height: 150.h,
+                                                      color: Colors.grey[300],
+                                                      child: Icon(
+                                                        Icons.restaurant,
+                                                        color: Colors.grey[600],
+                                                        size: 50.sp,
+                                                      ),
                                                     ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
 
-                              // 分隔線
-                              Container(
-                                height: 1,
-                                color: Colors.grey[300],
-                                margin: EdgeInsets.symmetric(horizontal: 12.w),
-                              ),
-
-                              // 聚餐時間和人數部分
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 15.h,
-                                  vertical: 15.h,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    // 左側聚餐時間
-                                    SizedBox(
-                                      width: cardWidth * 0.4,
-                                      child: Row(
-                                        children: [
-                                          // 時間圖標
+                                          // 餐廳詳細資訊
                                           Padding(
-                                            padding: EdgeInsets.only(
-                                              bottom: 5.h,
-                                            ),
-                                            child: SizedBox(
-                                              width: 35.w,
-                                              height: 35.h,
-                                              child: Stack(
-                                                clipBehavior: Clip.none,
-                                                children: [
-                                                  // 底部陰影
-                                                  Positioned(
-                                                    left: 0,
-                                                    top: 2.h,
-                                                    child: Image.asset(
-                                                      'assets/images/icon/clock.webp',
-                                                      width: 35.w,
-                                                      height: 35.h,
-                                                      color: Colors.black
-                                                          .withOpacity(0.4),
-                                                      colorBlendMode:
-                                                          BlendMode.srcIn,
-                                                    ),
-                                                  ),
-                                                  // 主圖標
-                                                  Image.asset(
-                                                    'assets/images/icon/clock.webp',
-                                                    width: 35.w,
-                                                    height: 35.h,
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-
-                                          SizedBox(width: 10.w),
-
-                                          // 時間資訊文字
-                                          Expanded(
+                                            padding: EdgeInsets.all(15.h),
                                             child: Column(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
+                                                // 餐廳名稱
                                                 Text(
-                                                  '聚餐時間',
+                                                  _restaurantName ?? '未指定餐廳',
                                                   style: TextStyle(
-                                                    fontSize: 16.sp,
+                                                    fontSize: 20.sp,
                                                     fontFamily: 'OtsutomeFont',
                                                     color: const Color(
                                                       0xFF23456B,
                                                     ),
                                                     fontWeight: FontWeight.bold,
                                                   ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  maxLines: 1,
                                                 ),
-                                                SizedBox(height: 2.h),
-                                                Consumer<UserStatusService>(
-                                                  builder: (
-                                                    context,
-                                                    userStatusService,
-                                                    child,
-                                                  ) {
-                                                    final dinnerTime =
-                                                        userStatusService
-                                                            .confirmedDinnerTime;
-                                                    return Text(
-                                                      dinnerTime != null
-                                                          ? '${dinnerTime.month}月${dinnerTime.day}日 ${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}'
-                                                          : '時間待定',
-                                                      style: TextStyle(
-                                                        fontSize: 12.sp,
-                                                        fontFamily:
-                                                            'OtsutomeFont',
-                                                        color: const Color(
-                                                          0xFF666666,
+
+                                                SizedBox(height: 8.h),
+                                                // 餐廳地址
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        _restaurantAddress ??
+                                                            '地址未提供',
+                                                        style: TextStyle(
+                                                          fontSize: 14.sp,
+                                                          fontFamily:
+                                                              'OtsutomeFont',
+                                                          color: const Color(
+                                                            0xFF23456B,
+                                                          ),
                                                         ),
                                                       ),
-                                                    );
-                                                  },
+                                                    ),
+                                                  ],
                                                 ),
                                               ],
                                             ),
@@ -1655,95 +1560,448 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                       ),
                                     ),
 
-                                    // 垂直分隔線
+                                    // 分隔線
                                     Container(
-                                      height: 45.h,
-                                      width: 1.w,
+                                      height: 1,
                                       color: Colors.grey[300],
+                                      margin: EdgeInsets.symmetric(
+                                        horizontal: 12.w,
+                                      ),
                                     ),
 
-                                    // 右側人數部分
-                                    SizedBox(
-                                      width: cardWidth * 0.4,
+                                    // 聚餐時間和人數部分
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 15.h,
+                                        vertical: 15.h,
+                                      ),
                                       child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceEvenly,
                                         children: [
-                                          // 人數圖標
-                                          Padding(
-                                            padding: EdgeInsets.only(
-                                              bottom: 5.h,
-                                            ),
-                                            child: SizedBox(
-                                              width: 35.w,
-                                              height: 35.h,
-                                              child: Stack(
-                                                clipBehavior: Clip.none,
-                                                children: [
-                                                  // 底部陰影
-                                                  Positioned(
-                                                    left: 0,
-                                                    top: 2.h,
-                                                    child: Image.asset(
-                                                      'assets/images/icon/attendee.webp',
-                                                      width: 35.w,
-                                                      height: 35.h,
-                                                      color: Colors.black
-                                                          .withOpacity(0.4),
-                                                      colorBlendMode:
-                                                          BlendMode.srcIn,
-                                                    ),
+                                          // 左側聚餐時間
+                                          SizedBox(
+                                            width: cardWidth * 0.4,
+                                            child: Row(
+                                              children: [
+                                                // 時間圖標
+                                                Padding(
+                                                  padding: EdgeInsets.only(
+                                                    bottom: 5.h,
                                                   ),
-                                                  // 主圖標
-                                                  Image.asset(
-                                                    'assets/images/icon/attendee.webp',
+                                                  child: SizedBox(
                                                     width: 35.w,
                                                     height: 35.h,
+                                                    child: Stack(
+                                                      clipBehavior: Clip.none,
+                                                      children: [
+                                                        // 底部陰影
+                                                        Positioned(
+                                                          left: 0,
+                                                          top: 2.h,
+                                                          child: Image.asset(
+                                                            'assets/images/icon/clock.webp',
+                                                            width: 35.w,
+                                                            height: 35.h,
+                                                            color: Colors.black
+                                                                .withOpacity(
+                                                                  0.4,
+                                                                ),
+                                                            colorBlendMode:
+                                                                BlendMode.srcIn,
+                                                          ),
+                                                        ),
+                                                        // 主圖標
+                                                        Image.asset(
+                                                          'assets/images/icon/clock.webp',
+                                                          width: 35.w,
+                                                          height: 35.h,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+
+                                                SizedBox(width: 10.w),
+
+                                                // 時間資訊文字
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        '聚餐時間',
+                                                        style: TextStyle(
+                                                          fontSize: 16.sp,
+                                                          fontFamily:
+                                                              'OtsutomeFont',
+                                                          color: const Color(
+                                                            0xFF23456B,
+                                                          ),
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      SizedBox(height: 2.h),
+                                                      Consumer<
+                                                        UserStatusService
+                                                      >(
+                                                        builder: (
+                                                          context,
+                                                          userStatusService,
+                                                          child,
+                                                        ) {
+                                                          final dinnerTime =
+                                                              userStatusService
+                                                                  .confirmedDinnerTime;
+                                                          return Text(
+                                                            dinnerTime != null
+                                                                ? '${dinnerTime.month}月${dinnerTime.day}日 ${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}'
+                                                                : '時間待定',
+                                                            style: TextStyle(
+                                                              fontSize: 12.sp,
+                                                              fontFamily:
+                                                                  'OtsutomeFont',
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF666666,
+                                                                  ),
+                                                            ),
+                                                          );
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // 垂直分隔線
+                                          Container(
+                                            height: 45.h,
+                                            width: 1.w,
+                                            color: Colors.grey[300],
+                                          ),
+
+                                          // 右側人數部分
+                                          SizedBox(
+                                            width: cardWidth * 0.4,
+                                            child: Row(
+                                              children: [
+                                                // 人數圖標
+                                                Padding(
+                                                  padding: EdgeInsets.only(
+                                                    bottom: 5.h,
+                                                  ),
+                                                  child: SizedBox(
+                                                    width: 35.w,
+                                                    height: 35.h,
+                                                    child: Stack(
+                                                      clipBehavior: Clip.none,
+                                                      children: [
+                                                        // 底部陰影
+                                                        Positioned(
+                                                          left: 0,
+                                                          top: 2.h,
+                                                          child: Image.asset(
+                                                            'assets/images/icon/attendee.webp',
+                                                            width: 35.w,
+                                                            height: 35.h,
+                                                            color: Colors.black
+                                                                .withOpacity(
+                                                                  0.4,
+                                                                ),
+                                                            colorBlendMode:
+                                                                BlendMode.srcIn,
+                                                          ),
+                                                        ),
+                                                        // 主圖標
+                                                        Image.asset(
+                                                          'assets/images/icon/attendee.webp',
+                                                          width: 35.w,
+                                                          height: 35.h,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                                SizedBox(width: 10.w),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        '用餐人數',
+                                                        style: TextStyle(
+                                                          fontSize: 16.sp,
+                                                          fontFamily:
+                                                              'OtsutomeFont',
+                                                          color: const Color(
+                                                            0xFF23456B,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      SizedBox(height: 2.h),
+                                                      Consumer<
+                                                        UserStatusService
+                                                      >(
+                                                        builder: (
+                                                          context,
+                                                          userStatusService,
+                                                          child,
+                                                        ) {
+                                                          // 從UserStatusService獲取人數，如未設置則顯示2人
+                                                          final attendees =
+                                                              userStatusService
+                                                                  .attendees ??
+                                                              2;
+                                                          return Text(
+                                                            '$attendees人',
+                                                            style: TextStyle(
+                                                              fontSize: 12.sp,
+                                                              fontFamily:
+                                                                  'OtsutomeFont',
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF666666,
+                                                                  ),
+                                                            ),
+                                                          );
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // 分隔線
+                                    Container(
+                                      height: 1,
+                                      color: Colors.grey[300],
+                                      margin: EdgeInsets.symmetric(
+                                        horizontal: 12.w,
+                                      ),
+                                    ),
+
+                                    // 聯絡資訊部分 - 電話和網站
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 15.h,
+                                        vertical: 15.h,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          // 左側電話資訊
+                                          SizedBox(
+                                            width: cardWidth * 0.4,
+                                            child: InkWell(
+                                              onTap: () {
+                                                if (_restaurantPhone != null) {
+                                                  _makePhoneCall(
+                                                    _restaurantPhone!,
+                                                  );
+                                                }
+                                              },
+                                              child: Row(
+                                                children: [
+                                                  // 電話圖標 - 使用指定的圖標並添加陰影效果
+                                                  Padding(
+                                                    padding: EdgeInsets.only(
+                                                      bottom: 5.h,
+                                                    ),
+                                                    child: SizedBox(
+                                                      width: 35.w,
+                                                      height: 35.h,
+                                                      child: Stack(
+                                                        clipBehavior:
+                                                            Clip.none, // 允許陰影超出容器範圍
+                                                        children: [
+                                                          // 底部陰影
+                                                          Positioned(
+                                                            left: 0,
+                                                            top: 2.h,
+                                                            child: Image.asset(
+                                                              'assets/images/icon/phone.webp',
+                                                              width: 35.w,
+                                                              height: 35.h,
+                                                              color: Colors
+                                                                  .black
+                                                                  .withOpacity(
+                                                                    0.4,
+                                                                  ),
+                                                              colorBlendMode:
+                                                                  BlendMode
+                                                                      .srcIn,
+                                                            ),
+                                                          ),
+                                                          // 主圖標
+                                                          Image.asset(
+                                                            'assets/images/icon/phone.webp',
+                                                            width: 35.w,
+                                                            height: 35.h,
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+
+                                                  SizedBox(width: 10.w),
+
+                                                  // 電話資訊文字
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          '電話',
+                                                          style: TextStyle(
+                                                            fontSize: 16.sp,
+                                                            fontFamily:
+                                                                'OtsutomeFont',
+                                                            color: const Color(
+                                                              0xFF23456B,
+                                                            ),
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                        SizedBox(height: 2.h),
+                                                        Text(
+                                                          _restaurantPhone ??
+                                                              '未提供',
+                                                          style: TextStyle(
+                                                            fontSize: 12.sp,
+                                                            fontFamily:
+                                                                'OtsutomeFont',
+                                                            color: const Color(
+                                                              0xFF666666,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ],
                                               ),
                                             ),
                                           ),
-                                          SizedBox(width: 10.w),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '用餐人數',
-                                                  style: TextStyle(
-                                                    fontSize: 16.sp,
-                                                    fontFamily: 'OtsutomeFont',
-                                                    color: const Color(
-                                                      0xFF23456B,
+
+                                          // 垂直分隔線
+                                          Container(
+                                            height: 45.h,
+                                            width: 1.w,
+                                            color: Colors.grey[300],
+                                          ),
+
+                                          // 右側網站部分
+                                          SizedBox(
+                                            width: cardWidth * 0.4,
+                                            child: InkWell(
+                                              onTap: () {
+                                                if (_restaurantWebsite !=
+                                                        null &&
+                                                    _restaurantWebsite !=
+                                                        "未提供") {
+                                                  _openWebsite(
+                                                    _restaurantWebsite!,
+                                                  );
+                                                }
+                                              },
+                                              child: Row(
+                                                children: [
+                                                  // 網站圖標
+                                                  Padding(
+                                                    padding: EdgeInsets.only(
+                                                      bottom: 5.h,
+                                                    ),
+                                                    child: SizedBox(
+                                                      width: 35.w,
+                                                      height: 35.h,
+                                                      child: Stack(
+                                                        clipBehavior: Clip.none,
+                                                        children: [
+                                                          // 底部陰影
+                                                          Positioned(
+                                                            left: 0,
+                                                            top: 2.h,
+                                                            child: Image.asset(
+                                                              'assets/images/icon/link.webp',
+                                                              width: 35.w,
+                                                              height: 35.h,
+                                                              color: Colors
+                                                                  .black
+                                                                  .withOpacity(
+                                                                    0.4,
+                                                                  ),
+                                                              colorBlendMode:
+                                                                  BlendMode
+                                                                      .srcIn,
+                                                            ),
+                                                          ),
+                                                          // 主圖標
+                                                          Image.asset(
+                                                            'assets/images/icon/link.webp',
+                                                            width: 35.w,
+                                                            height: 35.h,
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
-                                                SizedBox(height: 2.h),
-                                                Consumer<UserStatusService>(
-                                                  builder: (
-                                                    context,
-                                                    userStatusService,
-                                                    child,
-                                                  ) {
-                                                    // 從UserStatusService獲取人數，如未設置則顯示2人
-                                                    final attendees =
-                                                        userStatusService
-                                                            .attendees ??
-                                                        2;
-                                                    return Text(
-                                                      '$attendees人',
-                                                      style: TextStyle(
-                                                        fontSize: 12.sp,
-                                                        fontFamily:
-                                                            'OtsutomeFont',
-                                                        color: const Color(
-                                                          0xFF666666,
+                                                  SizedBox(width: 10.w),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          '網站',
+                                                          style: TextStyle(
+                                                            fontSize: 16.sp,
+                                                            fontFamily:
+                                                                'OtsutomeFont',
+                                                            color: const Color(
+                                                              0xFF23456B,
+                                                            ),
+                                                          ),
                                                         ),
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                              ],
+                                                        SizedBox(height: 2.h),
+                                                        Text(
+                                                          _restaurantWebsite !=
+                                                                      null &&
+                                                                  _restaurantWebsite !=
+                                                                      "未提供"
+                                                              ? '點擊前往'
+                                                              : '未提供',
+                                                          style: TextStyle(
+                                                            fontSize: 12.sp,
+                                                            fontFamily:
+                                                                'OtsutomeFont',
+                                                            color: const Color(
+                                                              0xFF666666,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1753,260 +2011,57 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                 ),
                               ),
 
-                              // 分隔線
-                              Container(
-                                height: 1,
-                                color: Colors.grey[300],
-                                margin: EdgeInsets.symmetric(horizontal: 12.w),
-                              ),
+                              SizedBox(height: 40.h),
 
-                              // 聯絡資訊部分 - 電話和網站
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 15.h,
-                                  vertical: 15.h,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    // 左側電話資訊
-                                    SizedBox(
-                                      width: cardWidth * 0.4,
-                                      child: InkWell(
-                                        onTap: () {
-                                          if (_restaurantPhone != null) {
-                                            _makePhoneCall(_restaurantPhone!);
-                                          }
-                                        },
-                                        child: Row(
+                              // 確認按鈕
+                              Center(
+                                child:
+                                    _isProcessingAction
+                                        ? Container(
+                                          margin: EdgeInsets.only(bottom: 15.h),
+                                          child: LoadingImage(
+                                            width: 60.w,
+                                            height: 60.h,
+                                            color: const Color(0xFFB33D1C),
+                                          ),
+                                        )
+                                        : Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
-                                            // 電話圖標 - 使用指定的圖標並添加陰影效果
-                                            Padding(
-                                              padding: EdgeInsets.only(
-                                                bottom: 5.h,
-                                              ),
-                                              child: SizedBox(
-                                                width: 35.w,
-                                                height: 35.h,
-                                                child: Stack(
-                                                  clipBehavior:
-                                                      Clip.none, // 允許陰影超出容器範圍
-                                                  children: [
-                                                    // 底部陰影
-                                                    Positioned(
-                                                      left: 0,
-                                                      top: 2.h,
-                                                      child: Image.asset(
-                                                        'assets/images/icon/phone.webp',
-                                                        width: 35.w,
-                                                        height: 35.h,
-                                                        color: Colors.black
-                                                            .withOpacity(0.4),
-                                                        colorBlendMode:
-                                                            BlendMode.srcIn,
-                                                      ),
-                                                    ),
-                                                    // 主圖標
-                                                    Image.asset(
-                                                      'assets/images/icon/phone.webp',
-                                                      width: 35.w,
-                                                      height: 35.h,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
+                                            // 左側藍色按鈕 - 這間無法
+                                            ImageButton(
+                                              text: '這間無法',
+                                              imagePath:
+                                                  'assets/images/ui/button/blue_l.webp',
+                                              width: 150.w,
+                                              height: 70.h,
+                                              onPressed: _handleCannotReserve,
                                             ),
-
-                                            SizedBox(width: 10.w),
-
-                                            // 電話資訊文字
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    '電話',
-                                                    style: TextStyle(
-                                                      fontSize: 16.sp,
-                                                      fontFamily:
-                                                          'OtsutomeFont',
-                                                      color: const Color(
-                                                        0xFF23456B,
-                                                      ),
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: 2.h),
-                                                  Text(
-                                                    _restaurantPhone ?? '未提供',
-                                                    style: TextStyle(
-                                                      fontSize: 12.sp,
-                                                      fontFamily:
-                                                          'OtsutomeFont',
-                                                      color: const Color(
-                                                        0xFF666666,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                            SizedBox(width: 20.w),
+                                            // 右側橘色按鈕 - 已確認
+                                            ImageButton(
+                                              text: '已確認',
+                                              imagePath:
+                                                  'assets/images/ui/button/red_m.webp',
+                                              width: 150.w,
+                                              height: 70.h,
+                                              onPressed:
+                                                  _handleReservationConfirm,
                                             ),
                                           ],
                                         ),
-                                      ),
-                                    ),
-
-                                    // 垂直分隔線
-                                    Container(
-                                      height: 45.h,
-                                      width: 1.w,
-                                      color: Colors.grey[300],
-                                    ),
-
-                                    // 右側網站部分
-                                    SizedBox(
-                                      width: cardWidth * 0.4,
-                                      child: InkWell(
-                                        onTap: () {
-                                          if (_restaurantWebsite != null &&
-                                              _restaurantWebsite != "未提供") {
-                                            _openWebsite(_restaurantWebsite!);
-                                          }
-                                        },
-                                        child: Row(
-                                          children: [
-                                            // 網站圖標
-                                            Padding(
-                                              padding: EdgeInsets.only(
-                                                bottom: 5.h,
-                                              ),
-                                              child: SizedBox(
-                                                width: 35.w,
-                                                height: 35.h,
-                                                child: Stack(
-                                                  clipBehavior: Clip.none,
-                                                  children: [
-                                                    // 底部陰影
-                                                    Positioned(
-                                                      left: 0,
-                                                      top: 2.h,
-                                                      child: Image.asset(
-                                                        'assets/images/icon/link.webp',
-                                                        width: 35.w,
-                                                        height: 35.h,
-                                                        color: Colors.black
-                                                            .withOpacity(0.4),
-                                                        colorBlendMode:
-                                                            BlendMode.srcIn,
-                                                      ),
-                                                    ),
-                                                    // 主圖標
-                                                    Image.asset(
-                                                      'assets/images/icon/link.webp',
-                                                      width: 35.w,
-                                                      height: 35.h,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                            SizedBox(width: 10.w),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    '網站',
-                                                    style: TextStyle(
-                                                      fontSize: 16.sp,
-                                                      fontFamily:
-                                                          'OtsutomeFont',
-                                                      color: const Color(
-                                                        0xFF23456B,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: 2.h),
-                                                  Text(
-                                                    _restaurantWebsite !=
-                                                                null &&
-                                                            _restaurantWebsite !=
-                                                                "未提供"
-                                                        ? '點擊前往'
-                                                        : '未提供',
-                                                    style: TextStyle(
-                                                      fontSize: 12.sp,
-                                                      fontFamily:
-                                                          'OtsutomeFont',
-                                                      color: const Color(
-                                                        0xFF666666,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ),
+
+                              SizedBox(height: 30.h),
                             ],
                           ),
                         ),
-
-                        SizedBox(height: 40.h),
-
-                        // 確認按鈕
-                        Center(
-                          child:
-                              _isProcessingAction
-                                  ? Container(
-                                    margin: EdgeInsets.only(bottom: 15.h),
-                                    child: LoadingImage(
-                                      width: 60.w,
-                                      height: 60.h,
-                                      color: const Color(0xFFB33D1C),
-                                    ),
-                                  )
-                                  : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      // 左側藍色按鈕 - 這間無法
-                                      ImageButton(
-                                        text: '這間無法',
-                                        imagePath:
-                                            'assets/images/ui/button/blue_l.webp',
-                                        width: 150.w,
-                                        height: 70.h,
-                                        onPressed: _handleCannotReserve,
-                                      ),
-                                      SizedBox(width: 20.w),
-                                      // 右側橘色按鈕 - 已確認
-                                      ImageButton(
-                                        text: '已確認',
-                                        imagePath:
-                                            'assets/images/ui/button/red_m.webp',
-                                        width: 150.w,
-                                        height: 70.h,
-                                        onPressed: _handleReservationConfirm,
-                                      ),
-                                    ],
-                                  ),
-                        ),
-
-                        SizedBox(height: 30.h),
                       ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
