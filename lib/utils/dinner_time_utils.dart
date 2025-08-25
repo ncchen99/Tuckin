@@ -266,46 +266,6 @@ class DinnerTimeUtils {
     );
   }
 
-  /// 取得取消預約截止日期的文字說明
-  static String getCancelDeadlineText(DateTime dinnerDate) {
-    // 取得聚餐日期的前兩天早上6點（即預約取消截止時間）
-    DateTime cancelDeadline = DateTime(
-      dinnerDate.year,
-      dinnerDate.month,
-      dinnerDate.day,
-      6, // 早上6點
-      0,
-    ).subtract(const Duration(days: 2));
-
-    // 確定是星期幾
-    String weekdayText = '';
-    switch (cancelDeadline.weekday) {
-      case DateTime.monday:
-        weekdayText = '周一';
-        break;
-      case DateTime.tuesday:
-        weekdayText = '周二';
-        break;
-      case DateTime.wednesday:
-        weekdayText = '周三';
-        break;
-      case DateTime.thursday:
-        weekdayText = '周四';
-        break;
-      case DateTime.friday:
-        weekdayText = '周五';
-        break;
-      case DateTime.saturday:
-        weekdayText = '周六';
-        break;
-      case DateTime.sunday:
-        weekdayText = '周日';
-        break;
-    }
-
-    return '$weekdayText 6:00 前可以取消預約';
-  }
-
   // ================== 時間格式化方法 ==================
 
   /// 獲取星期幾的中文全稱
