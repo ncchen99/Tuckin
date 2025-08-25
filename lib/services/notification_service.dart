@@ -62,12 +62,12 @@ class NotificationService {
         saveTokenToSupabase();
       });
 
-      // 設置前台通知選項
+      // 設置前台通知選項 - 關閉自動顯示，改由本地通知處理
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-            alert: true,
+            alert: false, // 關閉 Firebase 自動通知顯示
             badge: true,
-            sound: true,
+            sound: false, // 關閉 Firebase 的聲音，改由本地通知處理
           );
 
       // 處理後台消息
@@ -184,6 +184,30 @@ class NotificationService {
     }
   }
 
+  // 清除用戶的 FCM token 從 Supabase
+  Future<bool> clearUserTokenFromSupabase() async {
+    try {
+      // 獲取當前用戶
+      final currentUser = _supabaseService.auth.currentUser;
+      if (currentUser == null) {
+        debugPrint('用戶未登入，無法清除FCM Token');
+        return false;
+      }
+
+      // 刪除該用戶的所有 FCM token 記錄
+      await _supabaseService.client
+          .from('user_device_tokens')
+          .delete()
+          .eq('user_id', currentUser.id);
+
+      debugPrint('已成功清除用戶 ${currentUser.id} 的 FCM Token');
+      return true;
+    } catch (e) {
+      debugPrint('清除FCM Token發生異常: $e');
+      return false;
+    }
+  }
+
   // 處理點擊通知
   void _handleNotificationClick(RemoteMessage message) {
     debugPrint('點擊了通知: ${message.data}');
@@ -258,12 +282,12 @@ class NotificationService {
       await _localNotifications.cancelAll();
       debugPrint('所有本地通知已清除');
 
-      // 清除 Firebase 的通知 (僅限 Android)
+      // 保持 Firebase 前台通知設定一致
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-            alert: false,
-            badge: false,
-            sound: false,
+            alert: false, // 保持關閉自動通知顯示
+            badge: true, // 保持徽章功能
+            sound: false, // 保持關閉自動聲音
           );
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
@@ -315,12 +339,12 @@ class NotificationService {
       await _localNotifications.cancelAll();
       debugPrint('初始化時所有本地通知已清除');
 
-      // 清除 Firebase 的通知 (僅限 Android)
+      // 保持 Firebase 前台通知設定一致
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-            alert: false,
-            badge: false,
-            sound: false,
+            alert: false, // 保持關閉自動通知顯示
+            badge: true, // 保持徽章功能
+            sound: false, // 保持關閉自動聲音
           );
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
@@ -334,12 +358,12 @@ class NotificationService {
       await _localNotifications.cancelAll();
       debugPrint('登出時所有本地通知已清除（包括排程通知）');
 
-      // 清除 Firebase 的通知 (僅限 Android)
+      // 保持 Firebase 前台通知設定一致
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-            alert: false,
-            badge: false,
-            sound: false,
+            alert: false, // 保持關閉自動通知顯示
+            badge: true, // 保持徽章功能
+            sound: false, // 保持關閉自動聲音
           );
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {

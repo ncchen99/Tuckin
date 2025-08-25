@@ -268,23 +268,54 @@ class RealtimeService with WidgetsBindingObserver {
 
     try {
       final newRecord = payload.newRecord;
-      final status = newRecord['status'] as String?;
+      final receivedStatus = newRecord['status'] as String?;
 
-      debugPrint('RealtimeService: 用戶狀態變更 - 新狀態: $status');
+      debugPrint('RealtimeService: 用戶狀態變更 - 接收到的狀態: $receivedStatus');
 
-      if (status != null) {
-        if (_lastUserStatus != status) {
-          debugPrint('RealtimeService: 用戶狀態已改變，從 $_lastUserStatus 變為 $status');
-          _lastUserStatus = status;
-
-          // 異步檢查用戶是否已登入，只有登入狀態才導航
-          _checkLoginAndNavigate(status);
-        } else {
-          debugPrint('RealtimeService: 用戶狀態未改變，保持當前頁面');
-        }
+      if (receivedStatus != null && _userId != null) {
+        // 先驗證接收到的狀態是否與資料庫中的實際狀態相符
+        _verifyAndUpdateStatus(receivedStatus);
       }
     } catch (e) {
       debugPrint('RealtimeService: 處理狀態變更事件時發生錯誤 - $e');
+    }
+  }
+
+  // 新增：驗證並更新狀態的方法
+  Future<void> _verifyAndUpdateStatus(String receivedStatus) async {
+    try {
+      debugPrint('RealtimeService: 開始驗證接收到的狀態: $receivedStatus');
+
+      // 從資料庫獲取當前實際狀態
+      final actualStatus = await _databaseService.getUserStatus(_userId!);
+
+      debugPrint(
+        'RealtimeService: 資料庫實際狀態: $actualStatus, 接收到的狀態: $receivedStatus',
+      );
+
+      // 檢查接收到的狀態是否與資料庫實際狀態相符
+      if (actualStatus == receivedStatus) {
+        debugPrint('RealtimeService: 狀態驗證成功，狀態確實為: $actualStatus');
+
+        // 再檢查是否與上一個已知狀態不同
+        if (_lastUserStatus != actualStatus) {
+          debugPrint(
+            'RealtimeService: 用戶狀態已改變，從 $_lastUserStatus 變為 $actualStatus',
+          );
+          _lastUserStatus = actualStatus;
+
+          // 異步檢查用戶是否已登入，只有登入狀態才導航
+          _checkLoginAndNavigate(actualStatus);
+        } else {
+          debugPrint('RealtimeService: 用戶狀態未改變，保持當前頁面');
+        }
+      } else {
+        debugPrint(
+          'RealtimeService: 狀態驗證失敗！接收到的狀態 ($receivedStatus) 與資料庫實際狀態 ($actualStatus) 不符，忽略此次變更',
+        );
+      }
+    } catch (e) {
+      debugPrint('RealtimeService: 驗證狀態時發生錯誤 - $e');
     }
   }
 

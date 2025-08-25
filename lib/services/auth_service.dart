@@ -17,7 +17,6 @@ class AuthService {
 
   // 取得 Supabase 服務的實例
   final SupabaseService _supabaseService = SupabaseService();
-  final ApiService _apiService = ApiService();
   final ErrorHandler _errorHandler = ErrorHandler();
   final UserStatusService _userStatusService = UserStatusService();
 
@@ -144,18 +143,33 @@ class AuthService {
       await _userStatusService.resetDiningData();
       debugPrint('AuthService: 已重置聚餐相關資料');
 
+      // 清除用戶的 FCM token（在清除通知之前）
+      final notificationService = NotificationService();
+      await notificationService.clearUserTokenFromSupabase();
+      debugPrint('AuthService: 已清除用戶 FCM Token');
+
       // 清除所有通知（包括排程通知）
-      await NotificationService().clearAllNotificationsOnLogout();
+      await notificationService.clearAllNotificationsOnLogout();
 
       // 登出 Google 賬號
       if (_googleSignIn != null) {
-        await _googleSignIn!.disconnect();
-        debugPrint('AuthService: Google 賬號已登出');
+        try {
+          // 只使用 signOut()，避免 disconnect() 的 PlatformException 錯誤
+          await _googleSignIn!.signOut();
+          debugPrint('AuthService: Google 賬號已登出');
+        } catch (googleError) {
+          debugPrint('AuthService: Google 登出錯誤 - $googleError');
+          // 即使 Google 登出失敗，也繼續進行 Supabase 登出
+        }
       }
 
-      // 登出 Supabase
-      await _supabaseService.auth.signOut();
-      debugPrint('AuthService: 用戶已成功登出');
+      // 登出 Supabase（確保完全清除會話）
+      await _supabaseService.auth.signOut(scope: SignOutScope.global);
+      debugPrint('AuthService: Supabase 用戶已成功登出（全局範圍）');
+
+      // 重置 GoogleSignIn 實例，確保下次登入時重新初始化
+      _googleSignIn = null;
+      debugPrint('AuthService: GoogleSignIn 實例已重置，下次登入將重新初始化');
     } catch (e) {
       debugPrint('AuthService: 登出時發生錯誤 - $e');
       _errorHandler.handleApiError(

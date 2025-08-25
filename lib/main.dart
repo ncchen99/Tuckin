@@ -219,7 +219,7 @@ void main() async {
     MaterialApp(
       debugShowCheckedModeBanner: false,
       home: LoadingScreen(
-        status: '正在初始化...',
+        status: '',
         statusTextStyle: TextStyle(
           fontSize: 12,
           color: const Color(0xFF23456B),
