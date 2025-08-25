@@ -4,7 +4,7 @@ pydantic==2.4.0
 python-dotenv==1.0.0
 supabase==1.0.3
 firebase-admin==6.2.0
-requests==2.32.2
+requests==2.32.4
 python-multipart==0.0.18
 boto3==1.28.45
 gunicorn>=23.0.0
