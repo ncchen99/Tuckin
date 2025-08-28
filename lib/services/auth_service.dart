@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:io';
 import 'supabase_service.dart';
 import 'api_service.dart';
 import 'error_handler.dart';
@@ -59,20 +60,30 @@ class AuthService {
     try {
       // 從環境變量中獲取 Google 客戶端 ID
       final androidClientId = dotenv.env['GOOGLE_CLIENT_ID_ANDROID'];
+      final iosClientId = dotenv.env['GOOGLE_CLIENT_ID_IOS'];
       final webClientId = dotenv.env['GOOGLE_CLIENT_ID_WEB'];
 
-      debugPrint('使用 Google 客戶端 ID: $androidClientId');
+      // 根據平台選擇對應的客戶端 ID
+      String? clientId;
+      if (Platform.isAndroid) {
+        clientId = androidClientId;
+        debugPrint('使用 Android Google 客戶端 ID: $androidClientId');
+      } else if (Platform.isIOS) {
+        clientId = iosClientId;
+        debugPrint('使用 iOS Google 客戶端 ID: $iosClientId');
+      }
+
       debugPrint('使用 Web 客戶端 ID: $webClientId');
 
-      if (androidClientId == null || webClientId == null) {
+      if (clientId == null || webClientId == null) {
         throw ApiError(message: 'Google 客戶端 ID 配置缺失', isServerError: false);
       }
 
       // 使用谷歌登入
       _googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
-        clientId: androidClientId,
-        serverClientId: webClientId,
+        clientId: clientId, // 根據平台使用對應的客戶端 ID
+        serverClientId: webClientId, // Web Client ID，給 Supabase 驗證用
       );
 
       // 啟動 Google 登入流程
