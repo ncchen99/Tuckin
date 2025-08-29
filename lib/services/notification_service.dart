@@ -58,16 +58,16 @@ class NotificationService {
 
       // 設置 token 刷新監聽
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-        debugPrint('FCM Token 已更新: $newToken');
+        debugPrint('FCM Token 已更新 (${_getPlatformName()}): $newToken');
         saveTokenToSupabase();
       });
 
-      // 設置前台通知選項 - 關閉自動顯示，改由本地通知處理
+      // 設置前台通知選項 - iOS 需要開啟以確保前景通知正常顯示
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-            alert: false, // 關閉 Firebase 自動通知顯示
+            alert: true, // iOS 需要開啟以接收前景通知
             badge: true,
-            sound: false, // 關閉 Firebase 的聲音，改由本地通知處理
+            sound: true, // iOS 需要開啟以播放通知聲音
           );
 
       // 處理後台消息
@@ -105,13 +105,25 @@ class NotificationService {
   // 初始化本地通知
   Future<void> _initNotifications() async {
     _localNotifications = FlutterLocalNotificationsPlugin();
+
+    // iOS 初始化設定
+    const DarwinInitializationSettings iosInitSettings =
+        DarwinInitializationSettings(
+          requestSoundPermission: true,
+          requestBadgePermission: true,
+          requestAlertPermission: true,
+          onDidReceiveLocalNotification: _onDidReceiveLocalNotification,
+        );
+
     await _localNotifications.initialize(
-      InitializationSettings(
+      const InitializationSettings(
         android: AndroidInitializationSettings('@drawable/notification_icon'),
+        iOS: iosInitSettings,
       ),
+      onDidReceiveNotificationResponse: _onDidReceiveNotificationResponse,
     );
 
-    // 創建通知頻道
+    // 創建通知頻道（僅 Android 需要）
     await _createNotificationChannels();
   }
 
@@ -135,14 +147,29 @@ class NotificationService {
     }
   }
 
+  // 獲取平台名稱
+  String _getPlatformName() {
+    try {
+      // 導入 dart:io 來檢測平台
+      if (const bool.fromEnvironment('dart.library.io')) {
+        return 'iOS/Android';
+      }
+      return 'Web';
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
+
   // 保存 FCM token 到 Supabase
   Future<bool> saveTokenToSupabase() async {
     try {
       final token = await _firebaseMessaging.getToken();
       if (token == null) {
-        debugPrint('無法獲取FCM Token');
+        debugPrint('無法獲取FCM Token (${_getPlatformName()})');
         return false;
       }
+
+      debugPrint('獲取到 FCM Token (${_getPlatformName()}): $token');
 
       // 獲取當前用戶
       final currentUser = _supabaseService.auth.currentUser;
@@ -243,6 +270,32 @@ class NotificationService {
     }
   }
 
+  // iOS 舊版本本地通知處理（iOS 10 以下）
+  static Future<void> _onDidReceiveLocalNotification(
+    int id,
+    String? title,
+    String? body,
+    String? payload,
+  ) async {
+    debugPrint('iOS 舊版本收到本地通知: $title');
+    // 可以在這裡處理舊版本 iOS 的通知邏輯
+  }
+
+  // 通知響應處理（點擊通知時觸發）
+  static void _onDidReceiveNotificationResponse(NotificationResponse response) {
+    final String? payload = response.payload;
+    debugPrint('點擊了通知，payload: $payload');
+
+    if (payload != null) {
+      // 解析 payload 並處理相應的導航邏輯
+      if (payload.contains('attendance_confirmation') ||
+          payload.contains('waiting_restaurant')) {
+        // 這裡可以添加導航邏輯，但需要通過 NavigationService 處理
+        debugPrint('需要導航到餐廳選擇頁面');
+      }
+    }
+  }
+
   // 處理前台消息
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('收到前台消息: ${message.notification?.title}');
@@ -270,6 +323,11 @@ class NotificationService {
             // 確保小圖示可見
             color: const Color(0xFFB33D1C),
           ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
         ),
         payload: modifiedData.toString(),
       );
@@ -285,9 +343,9 @@ class NotificationService {
       // 保持 Firebase 前台通知設定一致
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-            alert: false, // 保持關閉自動通知顯示
+            alert: true, // iOS 需要開啟以接收前景通知
             badge: true, // 保持徽章功能
-            sound: false, // 保持關閉自動聲音
+            sound: true, // iOS 需要開啟以播放通知聲音
           );
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
@@ -342,9 +400,9 @@ class NotificationService {
       // 保持 Firebase 前台通知設定一致
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-            alert: false, // 保持關閉自動通知顯示
+            alert: true, // iOS 需要開啟以接收前景通知
             badge: true, // 保持徽章功能
-            sound: false, // 保持關閉自動聲音
+            sound: true, // iOS 需要開啟以播放通知聲音
           );
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
@@ -361,9 +419,9 @@ class NotificationService {
       // 保持 Firebase 前台通知設定一致
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-            alert: false, // 保持關閉自動通知顯示
+            alert: true, // iOS 需要開啟以接收前景通知
             badge: true, // 保持徽章功能
-            sound: false, // 保持關閉自動聲音
+            sound: true, // iOS 需要開啟以播放通知聲音
           );
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
@@ -417,8 +475,17 @@ class NotificationService {
         color: const Color(0xFFB33D1C),
       );
 
+      // iOS 通知設定
+      const DarwinNotificationDetails iosNotificationDetails =
+          DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          );
+
       final platformChannelSpecifics = NotificationDetails(
         android: androidPlatformChannelSpecifics,
+        iOS: iosNotificationDetails,
       );
 
       final tz.TZDateTime tzScheduledDate = tz.TZDateTime.from(
@@ -569,8 +636,17 @@ class NotificationService {
             color: Color(0xFFB33D1C),
           );
 
+      // iOS 預約提醒通知設定
+      const DarwinNotificationDetails iosReservationNotificationDetails =
+          DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          );
+
       const NotificationDetails platformChannelSpecifics = NotificationDetails(
         android: androidPlatformChannelSpecifics,
+        iOS: iosReservationNotificationDetails,
       );
 
       final tz.TZDateTime tzScheduledDate = tz.TZDateTime.from(
