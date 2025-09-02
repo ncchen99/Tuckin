@@ -65,7 +65,7 @@ class _LoadingScreenState extends State<LoadingScreen>
 
   late final List<String> _avatars;
   late AnimationController _controller;
-  late Animation<double> _moveAnimation;
+  Animation<double>? _moveAnimation;
   String _currentAvatar = '';
   final Random _random = Random();
 
@@ -83,28 +83,7 @@ class _LoadingScreenState extends State<LoadingScreen>
       duration: Duration(milliseconds: widget.animationDuration),
     );
 
-    // 調整動畫流程：從下往上，再從上往下 (增大比例)
-    _moveAnimation = TweenSequence([
-      // 從下往上 (-37.5 → 3.75)
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: -37.5,
-          end: 3.75,
-        ).chain(CurveTween(curve: Curves.easeOut)),
-        weight: 50,
-      ),
-      // 從上往下 (3.75 → -37.5)
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: 3.75,
-          end: -37.5,
-        ).chain(CurveTween(curve: Curves.easeIn)),
-        weight: 50,
-      ),
-    ]).animate(_controller);
-
     _controller.addStatusListener(_onAnimationStatus);
-    _controller.forward();
 
     // 處理加載完成後的回調
     if (widget.onLoadingComplete != null) {
@@ -123,9 +102,36 @@ class _LoadingScreenState extends State<LoadingScreen>
     }
   }
 
+  void _initializeAnimation() {
+    // 調整動畫流程：從下往上，再從上往下 (手機版本減少幅度)
+    double moveStart = sizeConfig.isTablet ? -37.5 : -30.0;
+    double moveEnd = sizeConfig.isTablet ? 3.75 : 3.0;
+
+    _moveAnimation = TweenSequence([
+      // 從下往上
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: moveStart,
+          end: moveEnd,
+        ).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 50,
+      ),
+      // 從上往下
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: moveEnd,
+          end: moveStart,
+        ).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 50,
+      ),
+    ]).animate(_controller);
+
+    _controller.forward();
+  }
+
   void _onAnimationStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
-      // 當動畫完成時，此時人物處於最底部 (-37.5)，更換頭像
+      // 當動畫完成時，此時人物處於最底部，更換頭像
       _pickRandomAvatar();
       _controller.reset();
       _controller.forward();
@@ -153,6 +159,11 @@ class _LoadingScreenState extends State<LoadingScreen>
   Widget build(BuildContext context) {
     // 初始化屏幕配置
     sizeConfig.init(context);
+
+    // 初始化動畫（確保在 sizeConfig 初始化後）
+    if (_moveAnimation == null) {
+      _initializeAnimation();
+    }
 
     return Scaffold(
       body: AnimatedOpacity(
@@ -194,19 +205,20 @@ class _LoadingScreenState extends State<LoadingScreen>
                         ),
                       ),
                       // 人物動畫
-                      AnimatedBuilder(
-                        animation: _moveAnimation,
-                        builder: (context, child) {
-                          // 針對 iPad 調整人物基礎位置
-                          double basePosition =
-                              sizeConfig.isTablet ? 82.5.h : 53.25.h;
-                          return Positioned(
-                            bottom: _moveAnimation.value + basePosition,
-                            child: child!,
-                          );
-                        },
-                        child: Image.asset(_currentAvatar, width: 67.5.w),
-                      ),
+                      if (_moveAnimation != null)
+                        AnimatedBuilder(
+                          animation: _moveAnimation!,
+                          builder: (context, child) {
+                            // 針對 iPad 調整人物基礎位置
+                            double basePosition =
+                                sizeConfig.isTablet ? 82.5.h : 53.25.h;
+                            return Positioned(
+                              bottom: _moveAnimation!.value + basePosition,
+                              child: child!,
+                            );
+                          },
+                          child: Image.asset(_currentAvatar, width: 60.w),
+                        ),
                       // 碗前景陰影
                       Positioned(
                         bottom: sizeConfig.isTablet ? 12.h : 7.5.h,
