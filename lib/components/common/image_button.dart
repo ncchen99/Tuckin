@@ -58,22 +58,25 @@ class _ImageButtonState extends State<ImageButton> {
             ? (widget.textStyle.fontSize ?? 16)
             : (widget.textStyle.fontSize ?? 18);
 
-    // 獲取系統字體縮放因子
-    final textScaleFactor = MediaQuery.of(context).textScaleFactor;
+    // 計算基於像素密度的字體縮放因子
+    // 這樣可以確保在不同解析度的螢幕上字體的實際顯示大小保持一致
+    final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+    final standardPixelRatio = 2.0; // 設計稿基準像素密度
 
-    // 計算屏幕寬度比例因子 (相對於設計稿寬度)
-    final screenWidthFactor =
+    // 計算像素密度縮放因子，高解析度螢幕需要更大的字體
+    final pixelDensityFactor = devicePixelRatio / standardPixelRatio;
+
+    // 同時考慮螢幕寬度的邏輯像素比例（用於適應不同尺寸的設備）
+    final logicalWidthFactor =
         MediaQuery.of(context).size.width / sizeConfig.designWidth;
 
-    // 結合系統字體縮放因子和屏幕寬度來計算最終字體大小
-    // 使用加權平均，讓系統字體設定和屏幕尺寸都有影響
-    // 權重可以調整，這裡使用0.7和0.3的權重
-    final combinedFactor = (textScaleFactor * 0.7) + (screenWidthFactor * 0.3);
+    // 綜合考慮像素密度、螢幕尺寸和系統字體設定的影響
+    final combinedFactor = 2.2 * logicalWidthFactor * pixelDensityFactor;
 
     // 計算最終字體大小，並設置上下限
     // 下限確保字體不會太小，上限確保字體不會太大
     final double minFontSize = baseFontSize * 0.9; // 最小為基礎大小的80%
-    final double maxFontSize = baseFontSize * 1.1; // 最大為基礎大小的150%
+    final double maxFontSize = baseFontSize * 1.5; // 最大為基礎大小的150%
 
     final adaptiveFontSize = (baseFontSize * combinedFactor).clamp(
       minFontSize,
