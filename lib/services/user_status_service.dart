@@ -56,8 +56,14 @@ class UserStatusService with ChangeNotifier {
   static const int helpingReservationValiditySeconds = 596; // 9分56秒
 
   UserStatusService() {
-    _loadFromPrefs();
     debugPrint('UserStatusService 已創建，並開始從持久化存儲載入數據');
+    _initializeAsync();
+  }
+  
+  // 添加異步初始化方法
+  void _initializeAsync() async {
+    await _loadFromPrefs();
+    debugPrint('UserStatusService 數據載入完成');
   }
 
   // 初始化完成通知器（確保在使用者狀態載入後再進行時間計算）
