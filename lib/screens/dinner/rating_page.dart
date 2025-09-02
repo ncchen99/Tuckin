@@ -725,7 +725,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                                             ),
                                           ),
 
-                                      SizedBox(height: 40.h),
+                                      SizedBox(height: 20.h),
 
                                       // 底部提示信息 - 垂直排列，寬度與卡片一致
                                       Container(
@@ -733,8 +733,17 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                                         decoration: BoxDecoration(
                                           color: Colors.white.withOpacity(0.7),
                                           borderRadius: BorderRadius.circular(
-                                            10.r,
+                                            15.r,
                                           ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.1,
+                                              ),
+                                              blurRadius: 5,
+                                              offset: Offset(0, 2.h),
+                                            ),
+                                          ],
                                         ),
                                         child: Material(
                                           color: Colors.transparent,
@@ -816,7 +825,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                                         ),
                                       ),
 
-                                      SizedBox(height: 40.h),
+                                      SizedBox(height: 45.h),
 
                                       // 提交按鈕
                                       _isSubmitting
@@ -828,7 +837,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                                           : ImageButton(
                                             text: '送出評分',
                                             imagePath:
-                                                'assets/images/ui/button/red_m.webp',
+                                                'assets/images/ui/button/red_l.webp',
                                             width: 160.w,
                                             height: 70.h,
                                             onPressed:
