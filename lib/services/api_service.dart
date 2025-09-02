@@ -28,8 +28,8 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
-  // 默認超時時間為10秒
-  static const Duration defaultTimeout = Duration(seconds: 10);
+  // 默認超時時間為15秒（iOS可能需要更長時間）
+  static const Duration defaultTimeout = Duration(seconds: 15);
 
   // 後端API基礎URL
   final String baseUrl = 'https://tuckin-api-c6943d8e20da.herokuapp.com/api';
@@ -42,9 +42,6 @@ class ApiService {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
-
-  // 儲存 Token 的 Key
-  final String _tokenKey = 'auth_token';
 
   /// 包裝 API 請求並處理錯誤
   Future<T> handleRequest<T>({
@@ -125,13 +122,18 @@ class ApiService {
       }
 
       debugPrint('發送GET請求: $url');
+      debugPrint('請求標頭: $requestHeaders');
 
       // 創建URI對象
       final uri = Uri.parse(url);
 
-      // 使用http庫發送請求
+      // 使用http庫發送請求，iOS 平台使用更長的超時時間
+      final Duration requestTimeout =
+          Platform.isIOS ? const Duration(seconds: 20) : defaultTimeout;
+
       final response = await handleRequest(
         request: () => http.get(uri, headers: requestHeaders),
+        timeout: requestTimeout,
       );
 
       debugPrint('GET響應狀態碼: ${response.statusCode}');

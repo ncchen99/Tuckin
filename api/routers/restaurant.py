@@ -141,11 +141,26 @@ async def search_restaurants(
                     return [RestaurantResponse(**existing_restaurant.data[0])]
         
         if not valid_place_id:
-            logger.warning(f"[{request_id}] 使用所有方法都無法獲取有效的地點ID。原始URL: {full_url}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="無法從Google Map連結提取地點ID"
-            )
+            logger.warning(f"[{request_id}] 無法從URL提取地點ID，嘗試使用地點名稱搜索")
+            
+            # 最後嘗試：使用地點名稱進行Google Places Text Search
+            if place_name:
+                logger.info(f"[{request_id}] 使用地點名稱進行Google Places Text Search: {place_name}")
+                lat, lng = coordinates if coordinates else (None, None)
+                search_place_id = await search_place_by_text(place_name, lat, lng)
+                if search_place_id:
+                    valid_place_id = search_place_id
+                    logger.info(f"[{request_id}] Text Search成功獲取place_id: {valid_place_id}")
+                else:
+                    logger.warning(f"[{request_id}] Text Search也無法找到地點")
+            
+            # 如果所有方法都失敗，才拋出錯誤
+            if not valid_place_id:
+                logger.error(f"[{request_id}] 使用所有方法都無法獲取有效的地點ID。原始URL: {full_url}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="無法從Google Map連結提取地點ID，請檢查連結是否正確"
+                )
         
         logger.info(f"[{request_id}] 最終使用的有效place_id: {valid_place_id}")
         

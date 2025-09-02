@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'dart:io';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/restaurant_service.dart';
 import 'package:tuckin/services/matching_service.dart';
@@ -128,13 +129,19 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   bool _isGoogleMapLink(String link) {
     if (link.isEmpty) return false;
 
+    // 移除連結中的空白字符
+    final cleanLink = link.trim();
+
     // 檢查是否為Google Map連結（短網址或完整網址）
     final bool isGoogleMapsLink =
-        link.contains('maps.google.com') ||
-        link.contains('goo.gl/maps') ||
-        link.contains('maps.app.goo.gl') ||
-        link.contains('google.com/maps');
+        cleanLink.contains('maps.google.com') ||
+        cleanLink.contains('goo.gl/maps') ||
+        cleanLink.contains('maps.app.goo.gl') ||
+        cleanLink.contains('google.com/maps') ||
+        cleanLink.contains('maps.google.com.tw') ||
+        cleanLink.contains('www.google.com/maps');
 
+    debugPrint('檢查Google Maps連結: $cleanLink, 結果: $isGoogleMapsLink');
     return isGoogleMapsLink;
   }
 
@@ -145,234 +152,273 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
 
     showDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false, // 完全禁用點擊外部關閉
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              insetPadding: EdgeInsets.symmetric(horizontal: 20.w),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                child: Container(
-                  width: 320.w,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(20.r),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 15,
-                        spreadRadius: 1,
-                        offset: Offset(0, 8.h),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(height: 15.h),
-                      // 標題
-                      Container(
-                        width: double.infinity,
-                        margin: EdgeInsets.symmetric(horizontal: 15.w),
-                        padding: EdgeInsets.symmetric(vertical: 10.h),
-                        child: Column(
-                          children: [
-                            // 圖標
-                            SizedBox(
-                              width: 55.w,
-                              height: 55.h,
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  // 底部陰影
-                                  Positioned(
-                                    left: 0,
-                                    top: 3.h,
-                                    child: Image.asset(
-                                      'assets/images/icon/add.webp',
-                                      width: 55.w,
-                                      height: 55.h,
-                                      color: Colors.black.withOpacity(0.4),
-                                      colorBlendMode: BlendMode.srcIn,
-                                    ),
-                                  ),
-                                  // 主圖像
-                                  Positioned(
-                                    top: 0,
-                                    left: 0,
-                                    child: Image.asset(
-                                      'assets/images/icon/add.webp',
-                                      width: 55.w,
-                                      height: 55.h,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 10.h),
-
-                      // 改進的地圖連結輸入框
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 15.w),
+            return GestureDetector(
+              onTap: () {
+                // 只有在非處理狀態時才允許點擊外部關閉
+                if (!_isSubmittingLink) {
+                  Navigator.pop(context);
+                }
+              },
+              child: Container(
+                color: Colors.transparent,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () {}, // 阻止點擊事件冒泡到外層
+                    child: Dialog(
+                      backgroundColor: Colors.transparent,
+                      insetPadding: EdgeInsets.symmetric(horizontal: 20.w),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 15.w),
+                          width: 320.w,
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10.r),
-                            border: Border.all(
-                              color: const Color(0xFF23456B),
-                              width: 1.5,
-                            ),
+                            color: Colors.white.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(20.r),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 15,
+                                spreadRadius: 1,
+                                offset: Offset(0, 8.h),
+                              ),
+                            ],
                           ),
-                          child: Row(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              // 具有陰影效果的圖標
-                              SizedBox(
-                                width: 32.w,
-                                height: 32.h,
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  alignment: Alignment.center,
+                              SizedBox(height: 15.h),
+                              // 標題
+                              Container(
+                                width: double.infinity,
+                                margin: EdgeInsets.symmetric(horizontal: 15.w),
+                                padding: EdgeInsets.symmetric(vertical: 10.h),
+                                child: Column(
                                   children: [
-                                    // 底部陰影圖片
-                                    Positioned(
-                                      left: 0,
-                                      top: 4.h,
-                                      child: Image.asset(
-                                        'assets/images/icon/link.webp',
-                                        width: 24.w,
-                                        height: 24.h,
-                                        color: Colors.black.withOpacity(0.4),
-                                        colorBlendMode: BlendMode.srcIn,
-                                      ),
-                                    ),
-                                    // 主圖標
-                                    Positioned(
-                                      left: 0,
-                                      top: 0,
-                                      child: Image.asset(
-                                        'assets/images/icon/link.webp',
-                                        width: 24.w,
-                                        height: 24.h,
+                                    // 圖標
+                                    SizedBox(
+                                      width: 55.w,
+                                      height: 55.h,
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          // 底部陰影
+                                          Positioned(
+                                            left: 0,
+                                            top: 3.h,
+                                            child: Image.asset(
+                                              'assets/images/icon/add.webp',
+                                              width: 55.w,
+                                              height: 55.h,
+                                              color: Colors.black.withOpacity(
+                                                0.4,
+                                              ),
+                                              colorBlendMode: BlendMode.srcIn,
+                                            ),
+                                          ),
+                                          // 主圖像
+                                          Positioned(
+                                            top: 0,
+                                            left: 0,
+                                            child: Image.asset(
+                                              'assets/images/icon/add.webp',
+                                              width: 55.w,
+                                              height: 55.h,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              SizedBox(width: 10.w),
-                              // 輸入框
-                              Expanded(
-                                child: TextField(
-                                  controller: _mapLinkController,
-                                  focusNode: _mapLinkFocusNode,
-                                  style: TextStyle(
-                                    fontFamily: 'OtsutomeFont',
-                                    fontSize: 16.sp,
-                                    color: const Color(0xFF23456B),
+                              SizedBox(height: 10.h),
+
+                              // 改進的地圖連結輸入框
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 15.w),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 15.w,
                                   ),
-                                  decoration: InputDecoration(
-                                    hintText: '輸入Google地圖連結',
-                                    hintStyle: TextStyle(
-                                      fontSize: 16.sp,
-                                      color: Colors.grey,
-                                      fontFamily: 'OtsutomeFont',
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: EdgeInsets.symmetric(
-                                      vertical: 15.h,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10.r),
+                                    border: Border.all(
+                                      color: const Color(0xFF23456B),
+                                      width: 1.5,
                                     ),
                                   ),
-                                  keyboardType: TextInputType.url,
-                                  textInputAction: TextInputAction.done,
-                                  onChanged: (value) {
-                                    final bool isValid = _isGoogleMapLink(
-                                      value,
-                                    );
-                                    if (isValid != _isValidLink) {
-                                      setModalState(() {
-                                        _isValidLink = isValid;
-                                      });
-
-                                      // 如果輸入有效，自動處理連結
-                                      if (isValid && !_isSubmittingLink) {
-                                        _mapLinkFocusNode.unfocus();
-                                        setModalState(() {
-                                          _isSubmittingLink = true;
-                                        });
-
-                                        _processMapLink(value)
-                                            .then((_) {
-                                              Navigator.pop(context);
-                                            })
-                                            .catchError((e) {
+                                  child: Row(
+                                    children: [
+                                      // 具有陰影效果的圖標
+                                      SizedBox(
+                                        width: 32.w,
+                                        height: 32.h,
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          alignment: Alignment.center,
+                                          children: [
+                                            // 底部陰影圖片
+                                            Positioned(
+                                              left: 0,
+                                              top: 4.h,
+                                              child: Image.asset(
+                                                'assets/images/icon/link.webp',
+                                                width: 24.w,
+                                                height: 24.h,
+                                                color: Colors.black.withOpacity(
+                                                  0.4,
+                                                ),
+                                                colorBlendMode: BlendMode.srcIn,
+                                              ),
+                                            ),
+                                            // 主圖標
+                                            Positioned(
+                                              left: 0,
+                                              top: 0,
+                                              child: Image.asset(
+                                                'assets/images/icon/link.webp',
+                                                width: 24.w,
+                                                height: 24.h,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(width: 10.w),
+                                      // 輸入框
+                                      Expanded(
+                                        child: TextField(
+                                          controller: _mapLinkController,
+                                          focusNode: _mapLinkFocusNode,
+                                          style: TextStyle(
+                                            fontFamily: 'OtsutomeFont',
+                                            fontSize: 16.sp,
+                                            color: const Color(0xFF23456B),
+                                          ),
+                                          decoration: InputDecoration(
+                                            hintText: '輸入Google地圖連結',
+                                            hintStyle: TextStyle(
+                                              fontSize: 16.sp,
+                                              color: Colors.grey,
+                                              fontFamily: 'OtsutomeFont',
+                                            ),
+                                            border: InputBorder.none,
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  vertical: 15.h,
+                                                ),
+                                          ),
+                                          keyboardType: TextInputType.url,
+                                          textInputAction: TextInputAction.done,
+                                          onChanged: (value) {
+                                            final bool isValid =
+                                                _isGoogleMapLink(value);
+                                            if (isValid != _isValidLink) {
                                               setModalState(() {
-                                                _isSubmittingLink = false;
+                                                _isValidLink = isValid;
                                               });
-                                              // 錯誤時關閉對話框，以顯示底部的錯誤提示
-                                              Navigator.pop(context);
-                                            });
-                                      }
-                                    }
-                                  },
+
+                                              // 如果輸入有效，自動處理連結
+                                              if (isValid &&
+                                                  !_isSubmittingLink) {
+                                                _mapLinkFocusNode.unfocus();
+                                                setModalState(() {
+                                                  _isSubmittingLink = true;
+                                                });
+                                                // 同時更新主頁面狀態
+                                                setState(() {
+                                                  _isSubmittingLink = true;
+                                                });
+
+                                                _processMapLink(value)
+                                                    .then((_) {
+                                                      setState(() {
+                                                        _isSubmittingLink =
+                                                            false;
+                                                      });
+                                                      Navigator.pop(context);
+                                                    })
+                                                    .catchError((e) {
+                                                      setState(() {
+                                                        _isSubmittingLink =
+                                                            false;
+                                                      });
+                                                      setModalState(() {
+                                                        _isSubmittingLink =
+                                                            false;
+                                                      });
+                                                      // 錯誤時關閉對話框，以顯示底部的錯誤提示
+                                                      Navigator.pop(context);
+                                                    });
+                                              }
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
+
+                              // 提示文字
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 20.w,
+                                  vertical: 10.h,
+                                ),
+                                child: Text(
+                                  '請輸入 Google 地圖上餐廳的分享連結',
+                                  style: TextStyle(
+                                    fontFamily: 'OtsutomeFont',
+                                    fontSize: 14.sp,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ),
+
+                              SizedBox(height: 5.h),
+
+                              // 取消按鈕
+                              Padding(
+                                padding: EdgeInsets.symmetric(vertical: 10.h),
+                                child:
+                                    _isSubmittingLink
+                                        ? const LoadingImage(
+                                          width: 60,
+                                          height: 60,
+                                          color: Color(0xFF23456B),
+                                        )
+                                        : ImageButton(
+                                          text: '取消',
+                                          imagePath:
+                                              'assets/images/ui/button/blue_m.webp',
+                                          width: 120.w,
+                                          height: 60.h,
+                                          textStyle: TextStyle(
+                                            fontFamily: 'OtsutomeFont',
+                                            color: const Color(0xFFD1D1D1),
+                                          ),
+                                          onPressed:
+                                              !_isSubmittingLink
+                                                  ? () {
+                                                    _mapLinkFocusNode.unfocus();
+                                                    Navigator.pop(context);
+                                                  }
+                                                  : () {}, // 處理中時提供空函數
+                                        ),
+                              ),
+
+                              SizedBox(height: 15.h),
                             ],
                           ),
                         ),
                       ),
-
-                      // 提示文字
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 20.w,
-                          vertical: 10.h,
-                        ),
-                        child: Text(
-                          '請輸入 Google 地圖上餐廳的分享連結',
-                          style: TextStyle(
-                            fontFamily: 'OtsutomeFont',
-                            fontSize: 14.sp,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(height: 5.h),
-
-                      // 取消按鈕
-                      Padding(
-                        padding: EdgeInsets.symmetric(vertical: 10.h),
-                        child:
-                            _isSubmittingLink
-                                ? const LoadingImage(
-                                  width: 60,
-                                  height: 60,
-                                  color: Color(0xFF23456B),
-                                )
-                                : ImageButton(
-                                  text: '取消',
-                                  imagePath:
-                                      'assets/images/ui/button/blue_m.webp',
-                                  width: 120.w,
-                                  height: 60.h,
-                                  textStyle: TextStyle(
-                                    fontFamily: 'OtsutomeFont',
-                                    color: const Color(0xFFD1D1D1),
-                                  ),
-                                  onPressed: () {
-                                    _mapLinkFocusNode.unfocus();
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                      ),
-
-                      SizedBox(height: 15.h),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -386,8 +432,12 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
   // 處理Google地圖連結
   Future<void> _processMapLink(String mapLink) async {
     try {
+      debugPrint('開始處理地圖連結: $mapLink');
+      debugPrint('當前平台: ${Platform.isIOS ? "iOS" : "Android"}');
+
       // 使用餐廳服務處理地圖連結
       final restaurantData = await _restaurantService.processMapLink(mapLink);
+      debugPrint('成功獲取餐廳資料: ${restaurantData['name']}');
 
       // 更新推薦餐廳並選中
       setState(() {
