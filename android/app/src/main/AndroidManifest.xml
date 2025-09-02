@@ -38,7 +38,7 @@
             android:resource="@drawable/notification_icon" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@color/ic_launcher_background" />
+            android:resource="@color/notification_color" />
 
         <!-- 添加 Firebase 消息服務 -->
         <service

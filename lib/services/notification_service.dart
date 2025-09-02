@@ -803,45 +803,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint('收到後台消息: ${message.notification?.title}');
 
-  // 只有當應用在後台時才顯示通知
-  // 檢查消息數據中是否有特殊標記，避免重複通知
-  if (message.notification != null &&
-      message.data['showNotification'] != 'false') {
-    // 為後台通知配置小圖標
-    // 創建通知頻道
-    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
-
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'tuckin_notification_channel',
-      'TuckIn 通知',
-      description: '用於接收聚餐相關通知',
-      importance: Importance.high,
-    );
-
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(channel);
-
-    // 如果消息包含通知，則顯示本地通知
-    await flutterLocalNotificationsPlugin.show(
-      message.hashCode,
-      message.notification!.title,
-      message.notification!.body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          'tuckin_notification_channel',
-          'TuckIn 通知',
-          channelDescription: '用於接收聚餐相關通知',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@drawable/notification_icon',
-          color: const Color(0xFFB33D1C),
-        ),
-      ),
-      payload: message.data.toString(),
-    );
-  }
+  // 當應用完全關閉時，Firebase會自動處理通知顯示
+  // 我們不需要在這裡手動創建本地通知，以避免重複通知
+  // Firebase的自動通知會使用我們在Android配置中設定的圖標和顏色
+  debugPrint('後台消息處理完成，讓Firebase自動處理通知顯示');
 }
