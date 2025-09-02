@@ -83,21 +83,21 @@ class _LoadingScreenState extends State<LoadingScreen>
       duration: Duration(milliseconds: widget.animationDuration),
     );
 
-    // 調整動畫流程：從下往上，再從上往下 (縮小比例)
+    // 調整動畫流程：從下往上，再從上往下 (增大比例)
     _moveAnimation = TweenSequence([
-      // 從下往上 (-25 → 2.5)
+      // 從下往上 (-37.5 → 3.75)
       TweenSequenceItem(
         tween: Tween<double>(
-          begin: -25,
-          end: 2.5,
+          begin: -37.5,
+          end: 3.75,
         ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 50,
       ),
-      // 從上往下 (2.5 → -25)
+      // 從上往下 (3.75 → -37.5)
       TweenSequenceItem(
         tween: Tween<double>(
-          begin: 2.5,
-          end: -25,
+          begin: 3.75,
+          end: -37.5,
         ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 50,
       ),
@@ -125,7 +125,7 @@ class _LoadingScreenState extends State<LoadingScreen>
 
   void _onAnimationStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
-      // 當動畫完成時，此時人物處於最底部 (-25)，更換頭像
+      // 當動畫完成時，此時人物處於最底部 (-37.5)，更換頭像
       _pickRandomAvatar();
       _controller.reset();
       _controller.forward();
@@ -170,56 +170,59 @@ class _LoadingScreenState extends State<LoadingScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SizedBox(
-                  width: 90.w,
-                  height: 120.h,
+                  width: 135.w,
+                  height: sizeConfig.isTablet ? 210.h : 180.h,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       // 碗後景陰影
                       Positioned(
-                        bottom: 5.h,
+                        bottom: sizeConfig.isTablet ? 12.h : 7.5.h,
                         child: Image.asset(
                           'assets/images/frame/bowl-back.webp',
-                          width: 80.w,
+                          width: 120.w,
                           color: Colors.black.withOpacity(0.3),
                           colorBlendMode: BlendMode.srcIn,
                         ),
                       ),
                       // 碗後景
                       Positioned(
-                        bottom: 6.5.h,
+                        bottom: sizeConfig.isTablet ? 15.h : 9.75.h,
                         child: Image.asset(
                           'assets/images/frame/bowl-back.webp',
-                          width: 80.w,
+                          width: 120.w,
                         ),
                       ),
                       // 人物動畫
                       AnimatedBuilder(
                         animation: _moveAnimation,
                         builder: (context, child) {
+                          // 針對 iPad 調整人物基礎位置
+                          double basePosition =
+                              sizeConfig.isTablet ? 82.5.h : 53.25.h;
                           return Positioned(
-                            bottom: _moveAnimation.value + 36.5.h,
+                            bottom: _moveAnimation.value + basePosition,
                             child: child!,
                           );
                         },
-                        child: Image.asset(_currentAvatar, width: 45.w),
+                        child: Image.asset(_currentAvatar, width: 67.5.w),
                       ),
                       // 碗前景陰影
                       Positioned(
-                        bottom: 5.h,
+                        bottom: sizeConfig.isTablet ? 12.h : 7.5.h,
                         child: Image.asset(
                           'assets/images/frame/bowl-front.webp',
-                          width: 80.w,
+                          width: 120.w,
                           color: Colors.black.withOpacity(0.3),
                           colorBlendMode: BlendMode.srcIn,
                         ),
                       ),
                       // 碗前景
                       Positioned(
-                        bottom: 6.5.h,
+                        bottom: sizeConfig.isTablet ? 15.h : 9.75.h,
                         child: Image.asset(
                           'assets/images/frame/bowl-front.webp',
-                          width: 80.w,
+                          width: 120.w,
                         ),
                       ),
                     ],
