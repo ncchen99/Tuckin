@@ -521,17 +521,19 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
         final isVotingComplete = response['is_voting_complete'] == true;
 
         if (isVotingComplete) {
-          // 投票已完成，導航到等待其他用戶頁面
-          _navigationService.navigateToDinnerInfoWaiting(context);
+          // 投票已完成，導航到晚餐資訊頁面
+          _navigationService.navigateToDinnerInfo(context);
         } else {
           // 投票未完成，更新用戶狀態為等待其他用戶
+          // 這是等待其他用戶頁面
           await _databaseService.updateUserStatus(
             response['user_id'],
             'waiting_other_users',
           );
-
-          // 然後導航到首頁（系統會自動根據用戶狀態重定向）
-          _navigationService.navigateToHome(context);
+          if (mounted) {
+            // 然後導航到首頁（系統會自動根據用戶狀態重定向）
+            _navigationService.navigateToDinnerInfoWaiting(context);
+          }
         }
       }
     } catch (e) {
