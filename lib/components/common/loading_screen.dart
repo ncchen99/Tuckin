@@ -83,21 +83,21 @@ class _LoadingScreenState extends State<LoadingScreen>
       duration: Duration(milliseconds: widget.animationDuration),
     );
 
-    // 調整動畫流程：從下往上，再從上往下
+    // 調整動畫流程：從下往上，再從上往下 (縮小比例)
     _moveAnimation = TweenSequence([
-      // 從下往上 (-50 → 5)
+      // 從下往上 (-25 → 2.5)
       TweenSequenceItem(
         tween: Tween<double>(
-          begin: -50,
-          end: 5,
+          begin: -25,
+          end: 2.5,
         ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 50,
       ),
-      // 從上往下 (5 → -50)
+      // 從上往下 (2.5 → -25)
       TweenSequenceItem(
         tween: Tween<double>(
-          begin: 5,
-          end: -50,
+          begin: 2.5,
+          end: -25,
         ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 50,
       ),
@@ -125,7 +125,7 @@ class _LoadingScreenState extends State<LoadingScreen>
 
   void _onAnimationStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
-      // 當動畫完成時，此時人物處於最底部 (-50)，更換頭像
+      // 當動畫完成時，此時人物處於最底部 (-25)，更換頭像
       _pickRandomAvatar();
       _controller.reset();
       _controller.forward();
@@ -170,27 +170,27 @@ class _LoadingScreenState extends State<LoadingScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SizedBox(
-                  width: 180.w,
-                  height: 240.h,
+                  width: 90.w,
+                  height: 120.h,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       // 碗後景陰影
                       Positioned(
-                        bottom: 10.h,
+                        bottom: 5.h,
                         child: Image.asset(
                           'assets/images/frame/bowl-back.webp',
-                          width: 160.w,
+                          width: 80.w,
                           color: Colors.black.withOpacity(0.3),
                           colorBlendMode: BlendMode.srcIn,
                         ),
                       ),
                       // 碗後景
                       Positioned(
-                        bottom: 13.h,
+                        bottom: 6.5.h,
                         child: Image.asset(
                           'assets/images/frame/bowl-back.webp',
-                          width: 160.w,
+                          width: 80.w,
                         ),
                       ),
                       // 人物動畫
@@ -198,28 +198,28 @@ class _LoadingScreenState extends State<LoadingScreen>
                         animation: _moveAnimation,
                         builder: (context, child) {
                           return Positioned(
-                            bottom: _moveAnimation.value + 73.h,
+                            bottom: _moveAnimation.value + 36.5.h,
                             child: child!,
                           );
                         },
-                        child: Image.asset(_currentAvatar, width: 90.w),
+                        child: Image.asset(_currentAvatar, width: 45.w),
                       ),
                       // 碗前景陰影
                       Positioned(
-                        bottom: 10.h,
+                        bottom: 5.h,
                         child: Image.asset(
                           'assets/images/frame/bowl-front.webp',
-                          width: 160.w,
+                          width: 80.w,
                           color: Colors.black.withOpacity(0.3),
                           colorBlendMode: BlendMode.srcIn,
                         ),
                       ),
                       // 碗前景
                       Positioned(
-                        bottom: 13.h,
+                        bottom: 6.5.h,
                         child: Image.asset(
                           'assets/images/frame/bowl-front.webp',
-                          width: 160.w,
+                          width: 80.w,
                         ),
                       ),
                     ],
