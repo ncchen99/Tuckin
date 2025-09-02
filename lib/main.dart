@@ -631,6 +631,19 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(
           create: (_) {
             final service = UserStatusService();
+            // 在服務創建後，延遲檢查數據完整性
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              try {
+                // 等待服務初始化完成
+                while (!service.isInitialized) {
+                  await Future.delayed(const Duration(milliseconds: 50));
+                }
+                // 執行數據完整性檢查和修復
+                await service.checkAndRepairDinnerTimeData();
+              } catch (e) {
+                debugPrint('UserStatusService 數據完整性檢查失敗: $e');
+              }
+            });
             return service;
           },
           lazy: false, // 立即創建，不等到第一次訪問時才創建

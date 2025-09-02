@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import 'supabase_service.dart';
 import 'api_service.dart';
@@ -19,7 +20,6 @@ class AuthService {
   // 取得 Supabase 服務的實例
   final SupabaseService _supabaseService = SupabaseService();
   final ErrorHandler _errorHandler = ErrorHandler();
-  final UserStatusService _userStatusService = UserStatusService();
 
   // Google 登入實例
   GoogleSignIn? _googleSignIn;
@@ -38,7 +38,7 @@ class AuthService {
         await _supabaseService.auth.refreshSession();
         debugPrint('AuthService: 用戶令牌有效');
       } catch (e) {
-        // 令牌無效或過期，執行登出操作
+        // 令牌無效或過期，執行登出操作（不包含 UserStatusService 重置）
         debugPrint('AuthService: 用戶令牌無效，執行登出 - $e');
         await signOut();
       }
@@ -48,7 +48,7 @@ class AuthService {
         ApiError(message: '認證服務初始化失敗: $e', isServerError: true),
         () => initialize(),
       );
-      // 發生錯誤時，嘗試登出以避免狀態不一致
+      // 發生錯誤時，嘗試登出以避免狀態不一致（不包含 UserStatusService 重置）
       try {
         await signOut();
       } catch (_) {}
@@ -148,11 +148,21 @@ class AuthService {
   }
 
   // 登出
-  Future<void> signOut() async {
+  Future<void> signOut([BuildContext? context]) async {
     try {
-      // 重置所有聚餐相關資料
-      await _userStatusService.resetDiningData();
-      debugPrint('AuthService: 已重置聚餐相關資料');
+      // 重置所有聚餐相關資料（只有在有context的情況下才執行）
+      if (context != null) {
+        try {
+          final userStatusService = Provider.of<UserStatusService>(
+            context,
+            listen: false,
+          );
+          await userStatusService.resetDiningData();
+          debugPrint('AuthService: 已重置聚餐相關資料');
+        } catch (e) {
+          debugPrint('AuthService: 無法重置聚餐資料 - $e');
+        }
+      }
 
       // 清除用戶的 FCM token（在清除通知之前）
       final notificationService = NotificationService();
@@ -185,7 +195,7 @@ class AuthService {
       debugPrint('AuthService: 登出時發生錯誤 - $e');
       _errorHandler.handleApiError(
         ApiError(message: '登出失敗: $e', isServerError: true),
-        () => signOut(),
+        () => signOut(context),
       );
       rethrow;
     }

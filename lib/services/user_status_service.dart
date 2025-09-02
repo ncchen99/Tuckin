@@ -59,11 +59,46 @@ class UserStatusService with ChangeNotifier {
     debugPrint('UserStatusService 已創建，並開始從持久化存儲載入數據');
     _initializeAsync();
   }
-  
+
   // 添加異步初始化方法
   void _initializeAsync() async {
     await _loadFromPrefs();
     debugPrint('UserStatusService 數據載入完成');
+  }
+
+  // 檢查並修復聚餐時間數據的完整性
+  Future<void> checkAndRepairDinnerTimeData() async {
+    try {
+      // 檢查是否缺少關鍵的聚餐時間數據
+      bool needsRepair =
+          _confirmedDinnerTime == null ||
+          _cancelDeadline == null ||
+          _isDataStale();
+
+      if (needsRepair) {
+        debugPrint('UserStatusService: 檢測到聚餐時間數據缺失或過期，開始修復...');
+
+        // 重新計算聚餐時間
+        await updateDinnerTimeByUserStatus();
+
+        debugPrint('UserStatusService: 聚餐時間數據修復完成');
+      } else {
+        debugPrint('UserStatusService: 聚餐時間數據完整，無需修復');
+      }
+    } catch (e) {
+      debugPrint('UserStatusService: 檢查和修復數據完整性時發生錯誤: $e');
+    }
+  }
+
+  // 檢查數據是否過期
+  bool _isDataStale() {
+    if (_confirmedDinnerTime == null) return true;
+
+    // 如果聚餐時間已經過去超過24小時，認為數據過期
+    final now = TimeService().now();
+    final timeDifference = now.difference(_confirmedDinnerTime!);
+
+    return timeDifference.inHours > 24;
   }
 
   // 初始化完成通知器（確保在使用者狀態載入後再進行時間計算）

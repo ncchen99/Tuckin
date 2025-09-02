@@ -158,7 +158,7 @@ class _ProfilePageState extends State<ProfilePage> {
       content: '確定要登出嗎？\n要用功能需要再登入喔',
       onConfirm: () async {
         try {
-          await _authService.signOut();
+          await _authService.signOut(context);
 
           // 延遲一下以確保操作完成
           await Future.delayed(const Duration(seconds: 1));
@@ -225,7 +225,7 @@ class _ProfilePageState extends State<ProfilePage> {
           }
 
           // 登出用戶
-          await _authService.signOut();
+          await _authService.signOut(context);
           if (mounted) {
             Navigator.of(context).pop(); // 關閉對話框
             final navigationService = NavigationService();
