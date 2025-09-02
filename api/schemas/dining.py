@@ -177,6 +177,8 @@ class GetRatingFormRequest(BaseModel):
 class RatingParticipant(BaseModel):
     index: int
     nickname: str
+    gender: str
+    avatar_index: int
 
 class GetRatingFormResponse(BaseModel):
     success: bool

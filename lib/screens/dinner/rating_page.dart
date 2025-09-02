@@ -206,6 +206,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
         });
 
         debugPrint('成功載入評分表單，參與者數量: ${_participants.length}');
+        debugPrint('參與者資料: $_participants');
       }
     } catch (e) {
       debugPrint('載入評分表單時出錯: $e');
@@ -302,7 +303,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
           _participants
               .map(
                 (participant) => {
-                  'participant_id': participant['id'], // 使用後端返回的ID作為參與者ID
+                  'participant_id': participant['index'], // 使用後端返回的index作為參與者ID
                   'rating': participant['selectedRating'],
                 },
               )
@@ -487,7 +488,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                 // 頭像
                 Container(
                   width: 60.w,
-                  height: 60.h,
+                  height: 60.w, // 使用相同的寬度值確保圓形
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     boxShadow: [
@@ -499,7 +500,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(30.r),
+                    borderRadius: BorderRadius.circular(30.w), // 使用寬度的一半作為圓角
                     child: Image.asset(
                       _getAvatarPath(
                         participant['gender'],

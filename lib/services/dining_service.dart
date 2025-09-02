@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/services/api_service.dart';
 import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/supabase_service.dart';
+
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:math';
 
 /// 聚餐服務 - 處理聚餐事件相關的API請求
 class DiningService {
@@ -16,7 +15,6 @@ class DiningService {
 
   final ApiService _apiService = ApiService();
   final AuthService _authService = AuthService();
-  final SupabaseService _supabaseService = SupabaseService();
 
   /// 開始確認餐廳預訂
   ///
@@ -256,6 +254,7 @@ class DiningService {
         // 成功發送請求
         final responseData = jsonDecode(utf8.decode(response.bodyBytes));
         debugPrint('獲取評分表單成功: $responseData');
+        debugPrint('原始participants資料: ${responseData['participants']}');
 
         // 儲存 session_token 用於後續評分提交
         final sessionToken = responseData['session_token'] ?? '';
@@ -264,15 +263,12 @@ class DiningService {
         final List participants = responseData['participants'] ?? [];
         final List<Map<String, dynamic>> formattedParticipants =
             participants.map((participant) {
-              // 為每個參與者分配隨機的性別和頭像索引（僅用於UI顯示）
-              final bool isMale = Random().nextBool();
-              final int avatarIndex = Random().nextInt(6) + 1; // 假設有 1-8 個頭像選項
-
+              // 使用後端API返回的性別和頭像索引資料
               return {
                 'id': participant['index'].toString(),
                 'nickname': participant['nickname'],
-                'gender': isMale ? 'male' : 'female',
-                'avatar_index': avatarIndex,
+                'gender': participant['gender'] ?? 'male', // 使用後端返回的性別
+                'avatar_index': participant['avatar_index'] ?? 1, // 使用後端返回的頭像索引
                 'selectedRating': null,
                 'index': participant['index'], // 保留原始索引用於提交
               };
@@ -345,7 +341,10 @@ class DiningService {
             }
 
             return {
-              'index': int.parse(rating['participant_id']), // 使用參與者的index
+              'index':
+                  (rating['participant_id'] is int)
+                      ? rating['participant_id']
+                      : int.parse(rating['participant_id'].toString()),
               'rating_type': ratingType,
             };
           }).toList();

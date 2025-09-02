@@ -133,7 +133,7 @@
 - [x] [前端] 評分頁面，Storke 字體偏大
 - [x] [前端] BTN Stroke 字體偏小
 - [x] [前端] 預約聚餐頁面，聚餐當天時間顯示可以預約當天的聚餐 (9/4)
-- [ ] [前端] page indicator 和 rating avator 顯示變扁 iPad
+- [x] [前端] page indicator 和 rating avator 顯示變扁 iPad
 - [ ] [前端] [API] iOS 新增 Apple id 登入
 - [ ] 製作 iOS iPad 圖
 - [x] 二手版文案撰寫

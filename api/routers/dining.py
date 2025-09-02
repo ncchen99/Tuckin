@@ -541,6 +541,7 @@ async def get_rating_form(
             
         # 如果已有現有會話，更新有效期並直接返回
         if existing_session.data:
+            logger.info(f"找到現有會話，返回現有評分表單")
             session_data = existing_session.data[0]
             
             # 設置新的過期時間（24小時後）
@@ -557,7 +558,12 @@ async def get_rating_form(
             # 返回現有會話數據
             user_sequence = session_data.get("user_sequence", [])
             participants_response = [
-                {"index": item["index"], "nickname": item["nickname"]} 
+                {
+                    "index": item["index"], 
+                    "nickname": item["nickname"],
+                    "gender": item.get("gender", "male"),
+                    "avatar_index": item.get("avatar_index", 1)
+                } 
                 for item in user_sequence
             ]
             
@@ -568,6 +574,9 @@ async def get_rating_form(
                 "participants": participants_response
             }
             
+        # 沒有現有會話，創建新的評分表單
+        logger.info(f"沒有找到現有會話，創建新的評分表單")
+        
         # 獲取聚餐群組的所有參與者（排除當前用戶）
         group_info = supabase.table("matching_groups") \
             .select("user_ids") \
