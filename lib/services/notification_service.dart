@@ -62,13 +62,34 @@ class NotificationService {
         saveTokenToSupabase();
       });
 
-      // 設置前台通知選項 - iOS 需要開啟以確保前景通知正常顯示
-      await FirebaseMessaging.instance
-          .setForegroundNotificationPresentationOptions(
-            alert: true, // iOS 需要開啟以接收前景通知
-            badge: true,
-            sound: true, // iOS 需要開啟以播放通知聲音
-          );
+      // 設置前台通知選項 - 根據平台調整
+      // iOS：讓 Firebase 自動處理前台通知顯示
+      // Android：關閉 Firebase 自動顯示，由我們手動處理
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      if (androidPlugin != null) {
+        // Android 平台：關閉 Firebase 自動顯示
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: false, // Android 關閉自動顯示
+              badge: false,
+              sound: false,
+            );
+        debugPrint('Android 平台：已關閉 Firebase 自動前台通知');
+      } else {
+        // iOS 平台：開啟 Firebase 自動顯示
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: true, // iOS 開啟自動顯示
+              badge: true,
+              sound: true,
+            );
+        debugPrint('iOS 平台：已開啟 Firebase 自動前台通知');
+      }
 
       // 處理後台消息
       FirebaseMessaging.onBackgroundMessage(
@@ -300,37 +321,53 @@ class NotificationService {
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('收到前台消息: ${message.notification?.title}');
 
-    // 顯示本地通知
+    // 在 iOS 上，Firebase 已經會自動顯示通知，所以我們不需要再手動顯示
+    // 在 Android 上，我們需要手動顯示通知
     if (message.notification != null) {
-      // 創建一個新的消息數據，添加標記以防止後台處理程序重複顯示
-      final Map<String, dynamic> modifiedData = Map<String, dynamic>.from(
-        message.data,
-      );
-      modifiedData['showNotification'] = 'false';
+      // 檢查平台，只在 Android 上顯示本地通知
+      try {
+        // 檢查是否為 Android 平台（通過檢查是否能創建 Android 特定的通知頻道）
+        final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+            _localNotifications
+                .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin
+                >();
 
-      await _localNotifications.show(
-        message.hashCode,
-        message.notification!.title,
-        message.notification!.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'tuckin_notification_channel',
-            'TuckIn 通知',
-            channelDescription: '用於接收聚餐相關通知',
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@drawable/notification_icon',
-            // 確保小圖示可見
-            color: const Color(0xFFB33D1C),
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        payload: modifiedData.toString(),
-      );
+        if (androidPlugin != null) {
+          // 這是 Android 平台，需要手動顯示通知
+          debugPrint('Android 平台：手動顯示前台通知');
+
+          // 創建一個新的消息數據，添加標記以防止後台處理程序重複顯示
+          final Map<String, dynamic> modifiedData = Map<String, dynamic>.from(
+            message.data,
+          );
+          modifiedData['showNotification'] = 'false';
+
+          await _localNotifications.show(
+            message.hashCode,
+            message.notification!.title,
+            message.notification!.body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                'tuckin_notification_channel',
+                'TuckIn 通知',
+                channelDescription: '用於接收聚餐相關通知',
+                importance: Importance.high,
+                priority: Priority.high,
+                icon: '@drawable/notification_icon',
+                // 確保小圖示可見
+                color: const Color(0xFFB33D1C),
+              ),
+            ),
+            payload: modifiedData.toString(),
+          );
+        } else {
+          // 這是 iOS 平台，Firebase 已經自動顯示通知，不需要手動顯示
+          debugPrint('iOS 平台：Firebase 自動顯示通知，跳過手動顯示');
+        }
+      } catch (e) {
+        debugPrint('處理前台通知時發生錯誤: $e');
+      }
     }
   }
 
@@ -341,12 +378,29 @@ class NotificationService {
       debugPrint('所有本地通知已清除');
 
       // 保持 Firebase 前台通知設定一致
-      await FirebaseMessaging.instance
-          .setForegroundNotificationPresentationOptions(
-            alert: true, // iOS 需要開啟以接收前景通知
-            badge: true, // 保持徽章功能
-            sound: true, // iOS 需要開啟以播放通知聲音
-          );
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      if (androidPlugin != null) {
+        // Android 平台：關閉 Firebase 自動顯示
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: false,
+              badge: false,
+              sound: false,
+            );
+      } else {
+        // iOS 平台：開啟 Firebase 自動顯示
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: true, // iOS 開啟自動顯示
+              badge: true, // 保持徽章功能
+              sound: true, // iOS 開啟聲音
+            );
+      }
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
       debugPrint('清除通知錯誤: $e');
@@ -398,12 +452,29 @@ class NotificationService {
       debugPrint('初始化時所有本地通知已清除');
 
       // 保持 Firebase 前台通知設定一致
-      await FirebaseMessaging.instance
-          .setForegroundNotificationPresentationOptions(
-            alert: true, // iOS 需要開啟以接收前景通知
-            badge: true, // 保持徽章功能
-            sound: true, // iOS 需要開啟以播放通知聲音
-          );
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      if (androidPlugin != null) {
+        // Android 平台：關閉 Firebase 自動顯示
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: false,
+              badge: false,
+              sound: false,
+            );
+      } else {
+        // iOS 平台：開啟 Firebase 自動顯示
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: true, // iOS 開啟自動顯示
+              badge: true, // 保持徽章功能
+              sound: true, // iOS 開啟聲音
+            );
+      }
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
       debugPrint('清除通知錯誤: $e');
@@ -417,12 +488,29 @@ class NotificationService {
       debugPrint('登出時所有本地通知已清除（包括排程通知）');
 
       // 保持 Firebase 前台通知設定一致
-      await FirebaseMessaging.instance
-          .setForegroundNotificationPresentationOptions(
-            alert: true, // iOS 需要開啟以接收前景通知
-            badge: true, // 保持徽章功能
-            sound: true, // iOS 需要開啟以播放通知聲音
-          );
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      if (androidPlugin != null) {
+        // Android 平台：關閉 Firebase 自動顯示
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: false,
+              badge: false,
+              sound: false,
+            );
+      } else {
+        // iOS 平台：開啟 Firebase 自動顯示
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: true, // iOS 開啟自動顯示
+              badge: true, // 保持徽章功能
+              sound: true, // iOS 開啟聲音
+            );
+      }
       debugPrint('Firebase 通知設置已更新');
     } catch (e) {
       debugPrint('清除登出通知錯誤: $e');
