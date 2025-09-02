@@ -1808,7 +1808,10 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                             width: cardWidth * 0.4,
                                             child: InkWell(
                                               onTap: () {
-                                                if (_restaurantPhone != null) {
+                                                if (_restaurantPhone != null &&
+                                                    _restaurantPhone!
+                                                        .isNotEmpty &&
+                                                    _restaurantPhone != "未提供") {
                                                   _makePhoneCall(
                                                     _restaurantPhone!,
                                                   );
@@ -1914,8 +1917,12 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                               onTap: () {
                                                 if (_restaurantWebsite !=
                                                         null &&
+                                                    _restaurantWebsite!
+                                                        .isNotEmpty &&
                                                     _restaurantWebsite !=
-                                                        "未提供") {
+                                                        "未提供" &&
+                                                    _restaurantWebsite !=
+                                                        "https://example.com/restaurant") {
                                                   _openWebsite(
                                                     _restaurantWebsite!,
                                                   );
@@ -1984,8 +1991,12 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                         Text(
                                                           _restaurantWebsite !=
                                                                       null &&
+                                                                  _restaurantWebsite!
+                                                                      .isNotEmpty &&
                                                                   _restaurantWebsite !=
-                                                                      "未提供"
+                                                                      "未提供" &&
+                                                                  _restaurantWebsite !=
+                                                                      "https://example.com/restaurant"
                                                               ? '點擊前往'
                                                               : '未提供',
                                                           style: TextStyle(
