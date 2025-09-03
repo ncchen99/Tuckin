@@ -48,7 +48,7 @@ dependencies:
 <dict>
     <key>CFBundleURLSchemes</key>
     <array>
-        <string>applinks:com.tuckin-coop.tuckin</string>
+        <string>com.tuckin-coop.tuckin</string>
     </array>
 </dict>
 ```
