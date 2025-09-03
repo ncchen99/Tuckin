@@ -2,6 +2,7 @@
 export 'common/image_button.dart';
 export 'common/image_button_with_countdown.dart';
 export 'onboarding/google_sign_in_button.dart';
+export 'onboarding/apple_sign_in_button.dart';
 export 'onboarding/privacy_policy_dialog.dart';
 export 'common/custom_checkbox.dart';
 export 'common/progress_dots_indicator.dart';
