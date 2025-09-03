@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/user_status_service.dart';
 import '../../components/components.dart';
@@ -64,18 +67,13 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // 處理 Google 登入
-  Future<void> _handleGoogleSignIn() async {
+  // 通用登入處理邏輯
+  Future<void> _handleSignIn(
+    Future<AuthResponse?> Function(BuildContext) signInMethod,
+    String providerName,
+  ) async {
     if (!_agreeToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFFB33D1C), // 深橘色背景
-          content: Text(
-            '請先同意隱私條款',
-            style: TextStyle(fontFamily: 'OtsutomeFont', color: Colors.white),
-          ),
-        ),
-      );
+      _showErrorMessage('請先同意隱私條款');
       return;
     }
 
@@ -84,61 +82,13 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final response = await _authService.signInWithGoogle(context);
+      final response = await signInMethod(context);
 
       if (response != null && response.user?.email != null) {
-        // 設置成大標記
-        _isNCKUEmail = _authService.isNCKUEmail(response.user!.email);
-
-        // 設定用戶配對偏好（如果是校內Email則預設為true，否則為false）
-        try {
-          // 檢查用戶是否已設定配對偏好
-          final hasPreference = await _databaseService
-              .getUserMatchingPreference(response.user!.id);
-
-          // 如果用戶尚未設定配對偏好，則根據Email設定預設值
-          if (hasPreference == null) {
-            await _databaseService.updateUserMatchingPreference(
-              response.user!.id,
-              _isNCKUEmail, // 如果是校內Email則為true，否則為false
-            );
-            debugPrint('已為用戶設定初始配對偏好: ${_isNCKUEmail ? "只與校內同學" : "不限制"}');
-          }
-        } catch (prefError) {
-          debugPrint('設定用戶配對偏好出錯: $prefError');
-        }
-
-        // 登入成功，使用NavigationService來處理導航
-        if (mounted) {
-          // 重新計算並持久化用餐時間 - 使用 provider 中的實例
-          final userStatusService = Provider.of<UserStatusService>(
-            context,
-            listen: false,
-          );
-          await userStatusService.updateDinnerTimeByUserStatus();
-
-          final navigationService = NavigationService();
-          // 根據用戶設置狀態導航到適當頁面
-          await navigationService.navigateToUserStatusPage(context);
-        }
-
-        debugPrint('登入成功: ${response.user?.email}');
+        await _handleSuccessfulSignIn(response, providerName);
       }
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
-            content: Text(
-              '登入失敗: $error',
-              style: const TextStyle(
-                fontFamily: 'OtsutomeFont',
-                color: Colors.white,
-              ),
-            ),
-          ),
-        );
-      }
+      _showErrorMessage('$providerName 登入失敗: $error');
     } finally {
       if (mounted) {
         setState(() {
@@ -146,6 +96,78 @@ class _LoginPageState extends State<LoginPage> {
         });
       }
     }
+  }
+
+  // 處理成功登入後的邏輯
+  Future<void> _handleSuccessfulSignIn(
+    AuthResponse response,
+    String providerName,
+  ) async {
+    // 設置成大標記
+    _isNCKUEmail = _authService.isNCKUEmail(response.user!.email);
+
+    // 設定用戶配對偏好（如果是校內Email則預設為true，否則為false）
+    try {
+      // 檢查用戶是否已設定配對偏好
+      final hasPreference = await _databaseService.getUserMatchingPreference(
+        response.user!.id,
+      );
+
+      // 如果用戶尚未設定配對偏好，則根據Email設定預設值
+      if (hasPreference == null) {
+        await _databaseService.updateUserMatchingPreference(
+          response.user!.id,
+          _isNCKUEmail, // 如果是校內Email則為true，否則為false
+        );
+        debugPrint('已為用戶設定初始配對偏好: ${_isNCKUEmail ? "只與校內同學" : "不限制"}');
+      }
+    } catch (prefError) {
+      debugPrint('設定用戶配對偏好出錯: $prefError');
+    }
+
+    // 登入成功，使用NavigationService來處理導航
+    if (mounted) {
+      // 重新計算並持久化用餐時間 - 使用 provider 中的實例
+      final userStatusService = Provider.of<UserStatusService>(
+        context,
+        listen: false,
+      );
+      await userStatusService.updateDinnerTimeByUserStatus();
+
+      final navigationService = NavigationService();
+      // 根據用戶設置狀態導航到適當頁面
+      await navigationService.navigateToUserStatusPage(context);
+    }
+
+    debugPrint('$providerName 登入成功: ${response.user?.email}');
+  }
+
+  // 顯示錯誤訊息的統一方法
+  void _showErrorMessage(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
+          content: Text(
+            message,
+            style: const TextStyle(
+              fontFamily: 'OtsutomeFont',
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  // 處理 Google 登入
+  Future<void> _handleGoogleSignIn() async {
+    await _handleSignIn(_authService.signInWithGoogle, 'Google');
+  }
+
+  // 處理 Apple 登入
+  Future<void> _handleAppleSignIn() async {
+    await _handleSignIn(_authService.signInWithApple, 'Apple');
   }
 
   // 顯示隱私條款並處理同意操作
@@ -313,7 +335,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
 
-                        // Google 登入按鈕 - 後顯示
+                        // 登入按鈕區域 - 後顯示
                         Padding(
                           padding: EdgeInsets.symmetric(vertical: 20.h),
                           child:
@@ -326,11 +348,38 @@ class _LoginPageState extends State<LoginPage> {
                                       color: const Color(0xFFB33D1C),
                                     ),
                                   )
-                                  : GoogleSignInButton(
-                                    onPressed: _handleGoogleSignIn,
-                                    enabled: _agreeToTerms, // 根據條款勾選狀態決定按鈕是否可用
-                                    width: 160.w,
-                                    height: 73.h,
+                                  : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      // Google 登入按鈕
+                                      GoogleSignInButton(
+                                        onPressed: _handleGoogleSignIn,
+                                        enabled:
+                                            _agreeToTerms, // 根據條款勾選狀態決定按鈕是否可用
+                                        width: 110.w,
+                                        height: 75.h,
+                                      ),
+
+                                      // Apple 登入按鈕（僅在 iOS 上顯示）
+                                      if (Platform.isIOS) ...[
+                                        SizedBox(width: 25.w),
+                                        FutureBuilder<bool>(
+                                          future: SignInWithApple.isAvailable(),
+                                          builder: (context, snapshot) {
+                                            if (snapshot.data == true) {
+                                              return AppleSignInButton(
+                                                onPressed: _handleAppleSignIn,
+                                                enabled:
+                                                    _agreeToTerms, // 根據條款勾選狀態決定按鈕是否可用
+                                                width: 110.w,
+                                                height: 75.h,
+                                              );
+                                            }
+                                            return const SizedBox.shrink();
+                                          },
+                                        ),
+                                      ],
+                                    ],
                                   ),
                         ),
 

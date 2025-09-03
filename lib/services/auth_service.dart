@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
@@ -32,7 +33,6 @@ class AuthService {
       debugPrint('AuthService 初始化完成');
 
       // 檢查當前用戶是否有效
-      final currentUser = getCurrentUser();
       try {
         // 驗證令牌是否有效
         await _supabaseService.auth.refreshSession();
@@ -142,6 +142,69 @@ class AuthService {
           isServerError: error is ApiError ? error.isServerError : true,
         ),
         () => signInWithGoogle(context),
+      );
+      rethrow;
+    }
+  }
+
+  // 使用 Apple 登入
+  Future<AuthResponse?> signInWithApple(BuildContext context) async {
+    try {
+      // 檢查設備是否支援 Apple 登入
+      if (!await SignInWithApple.isAvailable()) {
+        throw ApiError(message: '此設備不支援 Apple 登入', isServerError: false);
+      }
+
+      // 啟動 Apple 登入流程
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      debugPrint('Apple 登入憑證: $credential');
+      debugPrint('Identity Token: ${credential.identityToken}');
+      debugPrint('Authorization Code: ${credential.authorizationCode}');
+      debugPrint('User ID: ${credential.userIdentifier}');
+      debugPrint('Email: ${credential.email}');
+      debugPrint('Given Name: ${credential.givenName}');
+      debugPrint('Family Name: ${credential.familyName}');
+
+      // 使用 Apple ID 令牌登入 Supabase
+      // 注意：對於 Apple 登入，accessToken 參數應該使用 authorizationCode
+      final response = await _supabaseService.auth.signInWithIdToken(
+        provider: OAuthProvider.apple,
+        idToken: credential.identityToken!,
+        // Apple 使用 authorizationCode 作為 accessToken
+        accessToken: credential.authorizationCode,
+      );
+
+      // 輸出JWT token以供調試使用
+      final session = response.session;
+      if (session != null) {
+        debugPrint('=== Apple JWT Token 開始 ===');
+        final token = session.accessToken;
+        for (int i = 0; i < token.length; i += 500) {
+          int end = (i + 500 < token.length) ? i + 500 : token.length;
+          debugPrint(token.substring(i, end));
+        }
+        debugPrint('=== Apple JWT Token 結束 ===');
+      }
+
+      // 登入成功後，保存FCM token
+      final notificationService = NotificationService();
+      await notificationService.saveTokenToSupabase();
+
+      return response;
+    } catch (error) {
+      debugPrint('Apple 登入錯誤: $error');
+      _errorHandler.handleApiError(
+        ApiError(
+          message: 'Apple 登入失敗: $error',
+          isServerError: error is ApiError ? error.isServerError : true,
+        ),
+        () => signInWithApple(context),
       );
       rethrow;
     }

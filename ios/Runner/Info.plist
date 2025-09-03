@@ -30,6 +30,12 @@
 				<string>com.googleusercontent.apps.674045878866-uu3ts5sknfght4qvjc7obf0df5j30t5h</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.tuckin-coop.tuckin</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
