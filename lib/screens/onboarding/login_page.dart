@@ -359,12 +359,12 @@ class _LoginPageState extends State<LoginPage> {
                                         width:
                                             Platform.isIOS
                                                 ? 110.w
-                                                : 140
+                                                : 130
                                                     .w, // Android平台上單獨顯示時使用更大寬度
                                         height:
                                             Platform.isIOS
                                                 ? 75.h
-                                                : 85.h, // Android平台上單獨顯示時使用更大高度
+                                                : 78.h, // Android平台上單獨顯示時使用更大高度
                                       ),
 
                                       // Apple 登入按鈕（僅在 iOS 上顯示）
