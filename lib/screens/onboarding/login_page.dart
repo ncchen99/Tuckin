@@ -356,8 +356,15 @@ class _LoginPageState extends State<LoginPage> {
                                         onPressed: _handleGoogleSignIn,
                                         enabled:
                                             _agreeToTerms, // 根據條款勾選狀態決定按鈕是否可用
-                                        width: 110.w,
-                                        height: 75.h,
+                                        width:
+                                            Platform.isIOS
+                                                ? 110.w
+                                                : 130
+                                                    .w, // Android平台上單獨顯示時使用更大寬度
+                                        height:
+                                            Platform.isIOS
+                                                ? 75.h
+                                                : 78.h, // Android平台上單獨顯示時使用更大高度
                                       ),
 
                                       // Apple 登入按鈕（僅在 iOS 上顯示）
