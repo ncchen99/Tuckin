@@ -785,6 +785,9 @@ async def _get_waiting_users_data(supabase: Client, waiting_status: str = "waiti
     for profile in profiles_response.data:
         user_id = profile["user_id"]
         gender = profile["gender"]
+        # 將非二元性別映射為女性以符合現有配對邏輯
+        if gender == "non_binary":
+            gender = "female"
         user_data[user_id] = {
             "gender": gender, 
             "personality_type": None,
