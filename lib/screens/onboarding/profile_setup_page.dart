@@ -336,347 +336,371 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
             ),
           ),
           child: SafeArea(
-            child:
-                _isLoading && !_isDataLoaded
-                    ? Center(
-                      child: LoadingImage(
-                        width: 60.w,
-                        height: 60.h,
-                        color: const Color(0xFFB33D1C),
-                      ),
-                    )
-                    : Column(
-                      children: [
-                        // 頂部標題和返回按鈕
-                        Padding(
-                          padding: EdgeInsets.only(top: 25.h, bottom: 10.h),
-                          child: Row(
-                            children: [
-                              // 左側返回按鈕 - 只在從profile頁面來時顯示
-                              if (widget.isFromProfile)
+            child: GestureDetector(
+              onTap: () {
+                // 點擊空白處收起鍵盤
+                FocusScope.of(context).unfocus();
+              },
+              behavior: HitTestBehavior.opaque,
+              child:
+                  _isLoading && !_isDataLoaded
+                      ? Center(
+                        child: LoadingImage(
+                          width: 60.w,
+                          height: 60.h,
+                          color: const Color(0xFFB33D1C),
+                        ),
+                      )
+                      : Column(
+                        children: [
+                          // 頂部標題和返回按鈕
+                          Padding(
+                            padding: EdgeInsets.only(top: 25.h, bottom: 10.h),
+                            child: Row(
+                              children: [
+                                // 左側返回按鈕 - 只在從profile頁面來時顯示
+                                if (widget.isFromProfile)
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      left: 20.w,
+                                      bottom: 8.h,
+                                    ),
+                                    child: BackIconButton(
+                                      onPressed: _handleBack,
+                                      width: 35.w,
+                                      height: 35.h,
+                                    ),
+                                  ),
+                                // 中央標題
+                                Expanded(
+                                  child: Text(
+                                    '基本資料設定',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 25.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                // 為了平衡布局，添加一個空白區域
+                                if (widget.isFromProfile) SizedBox(width: 55.w),
+                              ],
+                            ),
+                          ),
+
+                          // 暱稱輸入框
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 20.w),
+                            margin: EdgeInsets.symmetric(vertical: 10.h),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.only(left: 8.w),
+                                  child: Text(
+                                    '綽號',
+                                    style: TextStyle(
+                                      fontSize: 18.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    // 點擊暱稱輸入框時防止冒泡到父級GestureDetector
+                                  },
+                                  child: IconTextInput(
+                                    hintText: '請輸入綽號',
+                                    iconPath:
+                                        'assets/images/icon/user_profile.webp',
+                                    controller: _nicknameController,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // 性別選擇
+                          Container(
+                            margin: EdgeInsets.symmetric(vertical: 5.h),
+                            padding: EdgeInsets.symmetric(horizontal: 20.w),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Padding(
                                   padding: EdgeInsets.only(
-                                    left: 20.w,
+                                    left: 8.w,
                                     bottom: 8.h,
                                   ),
-                                  child: BackIconButton(
-                                    onPressed: _handleBack,
-                                    width: 35.w,
-                                    height: 35.h,
-                                  ),
-                                ),
-                              // 中央標題
-                              Expanded(
-                                child: Text(
-                                  '基本資料設定',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 25.sp,
-                                    fontFamily: 'OtsutomeFont',
-                                    color: const Color(0xFF23456B),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              // 為了平衡布局，添加一個空白區域
-                              if (widget.isFromProfile) SizedBox(width: 55.w),
-                            ],
-                          ),
-                        ),
-
-                        // 暱稱輸入框
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 20.w),
-                          margin: EdgeInsets.symmetric(vertical: 10.h),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(left: 8.w),
-                                child: Text(
-                                  '綽號',
-                                  style: TextStyle(
-                                    fontSize: 18.sp,
-                                    fontFamily: 'OtsutomeFont',
-                                    color: const Color(0xFF23456B),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              IconTextInput(
-                                hintText: '請輸入綽號',
-                                iconPath:
-                                    'assets/images/icon/user_profile.webp',
-                                controller: _nicknameController,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // 性別選擇
-                        Container(
-                          margin: EdgeInsets.symmetric(vertical: 5.h),
-                          padding: EdgeInsets.symmetric(horizontal: 20.w),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  left: 8.w,
-                                  bottom: 8.h,
-                                ),
-                                child: Text(
-                                  '性別',
-                                  style: TextStyle(
-                                    fontSize: 18.sp,
-                                    fontFamily: 'OtsutomeFont',
-                                    color: const Color(0xFF23456B),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  // 男性選項
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedGender = 1;
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 50.h,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          border: Border.all(
-                                            color:
-                                                _selectedGender == 1
-                                                    ? const Color(0xFF23456B)
-                                                    : Colors.white,
-                                            width: 2,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            12.r,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            '男生',
-                                            style: TextStyle(
-                                              fontSize: 16.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
-                                              height: 1.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-
-                                  SizedBox(width: 15.w),
-
-                                  // 女性選項
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedGender = 2;
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 50.h,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          border: Border.all(
-                                            color:
-                                                _selectedGender == 2
-                                                    ? const Color(0xFF23456B)
-                                                    : Colors.white,
-                                            width: 2,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            12.r,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            '女生',
-                                            style: TextStyle(
-                                              fontSize: 16.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
-                                              height: 1.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-
-                                  SizedBox(width: 15.w),
-
-                                  // 非二元選項
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedGender = 3;
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 50.h,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          border: Border.all(
-                                            color:
-                                                _selectedGender == 3
-                                                    ? const Color(0xFF23456B)
-                                                    : Colors.white,
-                                            width: 2,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            12.r,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            '非二元',
-                                            style: TextStyle(
-                                              fontSize: 16.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
-                                              height: 1.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // 個人亮點描述輸入框
-                        Container(
-                          margin: EdgeInsets.symmetric(vertical: 20.h),
-                          padding: EdgeInsets.symmetric(horizontal: 20.w),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  left: 8.w,
-                                  bottom: 8.h,
-                                ),
-                                child: Text(
-                                  '關於我，想讓人知道的一件事！',
-                                  style: TextStyle(
-                                    fontSize: 18.sp,
-                                    fontFamily: 'OtsutomeFont',
-                                    color: const Color(0xFF23456B),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 15.w,
-                                  vertical: 10.h,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12.r),
-                                  border: Border.all(
-                                    color: const Color(0xFF23456B),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: SizedBox(
-                                  height: 100.h,
-                                  child: TextField(
-                                    controller: _personalDescController,
-                                    maxLines: 4,
-                                    decoration: InputDecoration(
-                                      hintText: '例：我喜歡嘗試新的食物！',
-                                      border: InputBorder.none,
-                                      hintStyle: TextStyle(
-                                        color: Colors.grey,
-                                        fontFamily: 'OtsutomeFont',
-                                        fontSize: 16.sp,
-                                      ),
-                                      contentPadding: EdgeInsets.zero,
-                                    ),
+                                  child: Text(
+                                    '性別',
                                     style: TextStyle(
+                                      fontSize: 18.sp,
                                       fontFamily: 'OtsutomeFont',
-                                      fontSize: 16.sp,
                                       color: const Color(0xFF23456B),
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // 彈性空間
-                        Expanded(child: Container()),
-
-                        // 底部按鈕區域
-                        Container(
-                          margin: EdgeInsets.only(bottom: 20.h),
-                          child: Column(
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.symmetric(vertical: 20.h),
-                                child:
-                                    // 下一步或完成按鈕
-                                    _isLoading
-                                        ? Container(
-                                          alignment: Alignment.center,
-                                          child: LoadingImage(
-                                            width: 60.w,
-                                            height: 60.h,
-                                            color: const Color(0xFFB33D1C),
+                                Row(
+                                  children: [
+                                    // 男性選項
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _selectedGender = 1;
+                                          });
+                                        },
+                                        child: Container(
+                                          height: 50.h,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            border: Border.all(
+                                              color:
+                                                  _selectedGender == 1
+                                                      ? const Color(0xFF23456B)
+                                                      : Colors.white,
+                                              width: 2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12.r,
+                                            ),
                                           ),
-                                        )
-                                        : ImageButton(
-                                          text:
-                                              widget.isFromProfile
-                                                  ? '完成'
-                                                  : '下一步',
-                                          imagePath:
-                                              'assets/images/ui/button/red_l.webp',
-                                          width: 150.w,
-                                          height: 70.h,
-                                          onPressed: _handleNextStep,
-                                          isEnabled:
-                                              _isFormValid(), // 根據表單有效性決定按鈕是否啟用
+                                          child: Center(
+                                            child: Text(
+                                              '男生',
+                                              style: TextStyle(
+                                                fontSize: 16.sp,
+                                                fontFamily: 'OtsutomeFont',
+                                                color: const Color(0xFF23456B),
+                                                fontWeight: FontWeight.bold,
+                                                height: 1.5,
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                              ),
-                              // 進度指示器 - 只在非profile來源時顯示
-                              if (!widget.isFromProfile)
+                                      ),
+                                    ),
+
+                                    SizedBox(width: 15.w),
+
+                                    // 女性選項
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _selectedGender = 2;
+                                          });
+                                        },
+                                        child: Container(
+                                          height: 50.h,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            border: Border.all(
+                                              color:
+                                                  _selectedGender == 2
+                                                      ? const Color(0xFF23456B)
+                                                      : Colors.white,
+                                              width: 2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12.r,
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '女生',
+                                              style: TextStyle(
+                                                fontSize: 16.sp,
+                                                fontFamily: 'OtsutomeFont',
+                                                color: const Color(0xFF23456B),
+                                                fontWeight: FontWeight.bold,
+                                                height: 1.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                    SizedBox(width: 15.w),
+
+                                    // 非二元選項
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _selectedGender = 3;
+                                          });
+                                        },
+                                        child: Container(
+                                          height: 50.h,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            border: Border.all(
+                                              color:
+                                                  _selectedGender == 3
+                                                      ? const Color(0xFF23456B)
+                                                      : Colors.white,
+                                              width: 2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12.r,
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '非二元',
+                                              style: TextStyle(
+                                                fontSize: 16.sp,
+                                                fontFamily: 'OtsutomeFont',
+                                                color: const Color(0xFF23456B),
+                                                fontWeight: FontWeight.bold,
+                                                height: 1.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // 個人亮點描述輸入框
+                          Container(
+                            margin: EdgeInsets.symmetric(vertical: 20.h),
+                            padding: EdgeInsets.symmetric(horizontal: 20.w),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Padding(
                                   padding: EdgeInsets.only(
-                                    top: 15.h,
-                                    bottom: 10.h,
+                                    left: 8.w,
+                                    bottom: 8.h,
                                   ),
-                                  child: const ProgressDotsIndicator(
-                                    totalSteps: 5,
-                                    currentStep: 2,
+                                  child: Text(
+                                    '關於我，想讓人知道的一件事！',
+                                    style: TextStyle(
+                                      fontSize: 18.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: const Color(0xFF23456B),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                            ],
+                                GestureDetector(
+                                  onTap: () {
+                                    // 點擊文字框時防止冒泡到父級GestureDetector
+                                  },
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 15.w,
+                                      vertical: 10.h,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      border: Border.all(
+                                        color: const Color(0xFF23456B),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: SizedBox(
+                                      height: 100.h,
+                                      child: TextField(
+                                        controller: _personalDescController,
+                                        maxLines: null,
+                                        minLines: 3,
+                                        keyboardType: TextInputType.text,
+                                        textInputAction: TextInputAction.done,
+                                        onSubmitted: (value) {
+                                          // 按下完成按鈕時收起鍵盤
+                                          FocusScope.of(context).unfocus();
+                                        },
+                                        decoration: InputDecoration(
+                                          hintText: '例：我喜歡嘗試新的食物！',
+                                          border: InputBorder.none,
+                                          hintStyle: TextStyle(
+                                            color: Colors.grey,
+                                            fontFamily: 'OtsutomeFont',
+                                            fontSize: 16.sp,
+                                          ),
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                        style: TextStyle(
+                                          fontFamily: 'OtsutomeFont',
+                                          fontSize: 16.sp,
+                                          color: const Color(0xFF23456B),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+
+                          // 彈性空間
+                          Expanded(child: Container()),
+
+                          // 底部按鈕區域
+                          Container(
+                            margin: EdgeInsets.only(bottom: 20.h),
+                            child: Column(
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 20.h),
+                                  child:
+                                      // 下一步或完成按鈕
+                                      _isLoading
+                                          ? Container(
+                                            alignment: Alignment.center,
+                                            child: LoadingImage(
+                                              width: 60.w,
+                                              height: 60.h,
+                                              color: const Color(0xFFB33D1C),
+                                            ),
+                                          )
+                                          : ImageButton(
+                                            text:
+                                                widget.isFromProfile
+                                                    ? '完成'
+                                                    : '下一步',
+                                            imagePath:
+                                                'assets/images/ui/button/red_l.webp',
+                                            width: 150.w,
+                                            height: 70.h,
+                                            onPressed: _handleNextStep,
+                                            isEnabled:
+                                                _isFormValid(), // 根據表單有效性決定按鈕是否啟用
+                                          ),
+                                ),
+                                // 進度指示器 - 只在非profile來源時顯示
+                                if (!widget.isFromProfile)
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      top: 15.h,
+                                      bottom: 10.h,
+                                    ),
+                                    child: const ProgressDotsIndicator(
+                                      totalSteps: 5,
+                                      currentStep: 2,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+            ),
           ),
         ),
       ),

@@ -655,7 +655,7 @@ class _MyAppState extends State<MyApp> {
           navigatorKey: navigatorKey,
           title: 'Tuckin',
           theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+            colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF23456B)),
             scaffoldBackgroundColor: Colors.transparent,
           ),
           builder: (context, child) {
