@@ -94,9 +94,9 @@
 - [x] [API] 優化後端推薦
 - [x] [前端] 選擇餐廳頁面我想推薦餐廳的卡片opencity不對
 - [x] [前端] 留言版（尋人功能，或尋友密語：你也是來認識新朋友的嘛？
-- [ ] 開發 ios 版本
-  - [ ] GCP 設定 Oauth2.0
-  - [ ] Firebase 設定 cloud messaging
+- [x] 開發 ios 版本
+  - [x] GCP 設定 Oauth2.0
+  - [x] Firebase 設定 cloud messaging
 - [x] [API] 大量用戶測試 (應該沒有問題)
 - [x] [前端] 音樂會暫停的問題，葉面完全窄入時暫停
 - [x] [API] 聚餐出席的頁面日騎有誤
@@ -113,7 +113,7 @@
 - [x] [前端] 修正real time 有時候會取得錯誤的訊號重新再使用Database一次
 - [x] [前端] 登入之後根據用戶狀態計算聚餐的時間
 - [x] [前端] 聚餐預約頁面不要計算時間而是從 user status取得
-- [ ] [前端] realtime 與 user status去配合 (目前看起來不需要)
+- [x] [前端] realtime 與 user status去配合 (目前看起來不需要)
 - [x] 設定 Cloud scheduler 定時任務
 - [x] 整理需求文件、API端點、SQL表格v、邏輯流程v(deepwiki)
 - [x] 完成 QA 至 Github
@@ -134,8 +134,9 @@
 - [x] [前端] BTN Stroke 字體偏小
 - [x] [前端] 預約聚餐頁面，聚餐當天時間顯示可以預約當天的聚餐 (9/4)
 - [x] [前端] page indicator 和 rating avator 顯示變扁 iPad
-- [ ] [前端] [API] iOS 新增 Apple id 登入
-- [ ] 製作 iOS iPad 圖
+- [x] [前端] [API] iOS 新增 Apple id 登入
+- [ ] [前端] 收到通知後根據用戶狀態導航如果在前景或是點擊通知之後根據用戶狀態導航
+- [x] 製作 iOS iPad 圖
 - [x] 二手版文案撰寫
 - [x] 二手版宣傳
 - [x] 勝後擺攤宣傳

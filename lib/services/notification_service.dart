@@ -2,7 +2,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/supabase_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -18,7 +17,6 @@ class NotificationService {
   // 服務實例
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   late FlutterLocalNotificationsPlugin _localNotifications;
-  final DatabaseService _databaseService = DatabaseService();
   final SupabaseService _supabaseService = SupabaseService();
   final NavigationService _navigationService = NavigationService();
 
@@ -260,34 +258,38 @@ class NotificationService {
   void _handleNotificationClick(RemoteMessage message) {
     debugPrint('點擊了通知: ${message.data}');
 
-    // 檢查是否是確認出席通知
-    if (message.data['type'] == 'attendance_confirmation' ||
-        message.data['status'] == 'waiting_restaurant') {
-      // 導航到餐廳選擇頁面
-      _navigateToRestaurantSelection();
-    }
+    // 點擊通知後，根據使用者狀態進行導航
+    _handleNotificationNavigation();
   }
 
-  // 處理點擊本地通知
-  void _handleLocalNotificationClick(String? payload) {
-    if (payload != null) {
-      debugPrint('點擊了本地通知: $payload');
-
-      // 解析 payload
-      if (payload.contains('attendance_confirmation') ||
-          payload.contains('waiting_restaurant')) {
-        // 導航到餐廳選擇頁面
-        _navigateToRestaurantSelection();
+  // 處理通知導航 - 根據使用者狀態進行導航
+  Future<void> _handleNotificationNavigation() async {
+    try {
+      // 檢查是否有有效的導航鍵和上下文
+      if (_navigatorKey?.currentState == null ||
+          _navigatorKey!.currentContext == null) {
+        debugPrint('NotificationService: 無有效的導航上下文，跳過導航');
+        return;
       }
-    }
-  }
 
-  // 導航到餐廳選擇頁面
-  void _navigateToRestaurantSelection() {
-    if (_navigatorKey?.currentState != null) {
-      _navigationService.navigateToRestaurantSelection(
-        _navigatorKey!.currentContext!,
-      );
+      final context = _navigatorKey!.currentContext!;
+
+      // 檢查上下文是否仍然掛載
+      if (!context.mounted) {
+        debugPrint('NotificationService: 上下文已不再掛載，跳過導航');
+        return;
+      }
+
+      debugPrint('NotificationService: 開始根據使用者狀態進行導航');
+
+      // 使用 NavigationService 的 navigateToUserStatusPage 方法
+      await _navigationService.navigateToUserStatusPage(context);
+
+      debugPrint('NotificationService: 通知導航完成');
+    } catch (e) {
+      debugPrint('NotificationService: 處理通知導航時發生錯誤: $e');
+      // 記錄錯誤但不阻止程式運行
+      debugPrintStack(label: '通知導航錯誤堆疊');
     }
   }
 
@@ -308,12 +310,8 @@ class NotificationService {
     debugPrint('點擊了通知，payload: $payload');
 
     if (payload != null) {
-      // 解析 payload 並處理相應的導航邏輯
-      if (payload.contains('attendance_confirmation') ||
-          payload.contains('waiting_restaurant')) {
-        // 這裡可以添加導航邏輯，但需要通過 NavigationService 處理
-        debugPrint('需要導航到餐廳選擇頁面');
-      }
+      // 透過單例實例處理導航
+      NotificationService()._handleNotificationNavigation();
     }
   }
 
@@ -369,6 +367,9 @@ class NotificationService {
         debugPrint('處理前台通知時發生錯誤: $e');
       }
     }
+
+    // 收到前台通知後，根據使用者狀態進行導航
+    await _handleNotificationNavigation();
   }
 
   // 清除所有通知
