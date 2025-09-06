@@ -360,7 +360,8 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
 
   // 獲取頭像路徑
   String _getAvatarPath(String gender, int index) {
-    return 'assets/images/avatar/profile/${gender}_$index.webp';
+    final normalizedGender = (gender == 'non_binary') ? 'male' : gender;
+    return 'assets/images/avatar/profile/${normalizedGender}_$index.webp';
   }
 
   // 開啟郵件應用

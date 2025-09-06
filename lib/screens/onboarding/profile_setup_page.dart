@@ -90,6 +90,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 _selectedGender = 1;
               } else if (profile['gender'] == 'female') {
                 _selectedGender = 2;
+              } else if (profile['gender'] == 'non_binary') {
+                _selectedGender = 3;
               }
             }
 
@@ -219,10 +221,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     if (_selectedGender == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            '請選擇生理性別',
-            style: TextStyle(fontFamily: 'OtsutomeFont'),
-          ),
+          content: Text('請選擇性別', style: TextStyle(fontFamily: 'OtsutomeFont')),
         ),
       );
       return;
@@ -265,7 +264,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       final userData = {
         'user_id': currentUser.id,
         'nickname': _nicknameController.text.trim(),
-        'gender': _selectedGender == 1 ? 'male' : 'female',
+        'gender':
+            _selectedGender == 1
+                ? 'male'
+                : _selectedGender == 2
+                ? 'female'
+                : 'non_binary',
         'personal_desc':
             _personalDescController.text.trim().isEmpty
                 ? '' // 如果個人亮點描述為空，則設為空字串
@@ -409,7 +413,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                           ),
                         ),
 
-                        // 生理性別選擇
+                        // 性別選擇
                         Container(
                           margin: EdgeInsets.symmetric(vertical: 5.h),
                           padding: EdgeInsets.symmetric(horizontal: 20.w),
@@ -422,7 +426,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                   bottom: 8.h,
                                 ),
                                 child: Text(
-                                  '生理性別',
+                                  '性別',
                                   style: TextStyle(
                                     fontSize: 18.sp,
                                     fontFamily: 'OtsutomeFont',
@@ -526,6 +530,60 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                               SizedBox(width: 2.w),
                                               Text(
                                                 '女生',
+                                                style: TextStyle(
+                                                  fontSize: 16.sp,
+                                                  fontFamily: 'OtsutomeFont',
+                                                  color: const Color(
+                                                    0xFF23456B,
+                                                  ),
+                                                  fontWeight: FontWeight.bold,
+                                                  height: 1.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // 非二元選項
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedGender = 3;
+                                        });
+                                      },
+                                      child: Container(
+                                        margin: EdgeInsets.only(left: 10.w),
+                                        height: 50.h,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          border: Border.all(
+                                            color:
+                                                _selectedGender == 3
+                                                    ? const Color(0xFF23456B)
+                                                    : Colors.white,
+                                            width: 2,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            12.r,
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.transgender,
+                                                color: const Color(0xFF23456B),
+                                                size: 24.h,
+                                              ),
+                                              SizedBox(width: 2.w),
+                                              Text(
+                                                '非二元',
                                                 style: TextStyle(
                                                   fontSize: 16.sp,
                                                   fontFamily: 'OtsutomeFont',
