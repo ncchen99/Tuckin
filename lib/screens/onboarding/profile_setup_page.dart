@@ -436,8 +436,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                 ),
                               ),
                               Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   // 男性選項
                                   Expanded(
@@ -448,7 +446,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                         });
                                       },
                                       child: Container(
-                                        margin: EdgeInsets.only(right: 10.w),
                                         height: 50.h,
                                         decoration: BoxDecoration(
                                           color: Colors.white,
@@ -464,34 +461,22 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                           ),
                                         ),
                                         child: Center(
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.male,
-                                                color: const Color(0xFF23456B),
-                                                size: 24.h,
-                                              ),
-                                              SizedBox(width: 2.w),
-                                              Text(
-                                                '男生',
-                                                style: TextStyle(
-                                                  fontSize: 16.sp,
-                                                  fontFamily: 'OtsutomeFont',
-                                                  color: const Color(
-                                                    0xFF23456B,
-                                                  ),
-                                                  fontWeight: FontWeight.bold,
-                                                  height: 1.5,
-                                                ),
-                                              ),
-                                            ],
+                                          child: Text(
+                                            '男生',
+                                            style: TextStyle(
+                                              fontSize: 16.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                              fontWeight: FontWeight.bold,
+                                              height: 1.5,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
+
+                                  SizedBox(width: 15.w),
 
                                   // 女性選項
                                   Expanded(
@@ -502,7 +487,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                         });
                                       },
                                       child: Container(
-                                        margin: EdgeInsets.only(left: 10.w),
                                         height: 50.h,
                                         decoration: BoxDecoration(
                                           color: Colors.white,
@@ -518,34 +502,22 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                           ),
                                         ),
                                         child: Center(
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.female,
-                                                color: const Color(0xFF23456B),
-                                                size: 24.h,
-                                              ),
-                                              SizedBox(width: 2.w),
-                                              Text(
-                                                '女生',
-                                                style: TextStyle(
-                                                  fontSize: 16.sp,
-                                                  fontFamily: 'OtsutomeFont',
-                                                  color: const Color(
-                                                    0xFF23456B,
-                                                  ),
-                                                  fontWeight: FontWeight.bold,
-                                                  height: 1.5,
-                                                ),
-                                              ),
-                                            ],
+                                          child: Text(
+                                            '女生',
+                                            style: TextStyle(
+                                              fontSize: 16.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                              fontWeight: FontWeight.bold,
+                                              height: 1.5,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
+
+                                  SizedBox(width: 15.w),
 
                                   // 非二元選項
                                   Expanded(
@@ -556,7 +528,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                         });
                                       },
                                       child: Container(
-                                        margin: EdgeInsets.only(left: 10.w),
                                         height: 50.h,
                                         decoration: BoxDecoration(
                                           color: Colors.white,
@@ -572,29 +543,15 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                           ),
                                         ),
                                         child: Center(
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.transgender,
-                                                color: const Color(0xFF23456B),
-                                                size: 24.h,
-                                              ),
-                                              SizedBox(width: 2.w),
-                                              Text(
-                                                '非二元',
-                                                style: TextStyle(
-                                                  fontSize: 16.sp,
-                                                  fontFamily: 'OtsutomeFont',
-                                                  color: const Color(
-                                                    0xFF23456B,
-                                                  ),
-                                                  fontWeight: FontWeight.bold,
-                                                  height: 1.5,
-                                                ),
-                                              ),
-                                            ],
+                                          child: Text(
+                                            '非二元',
+                                            style: TextStyle(
+                                              fontSize: 16.sp,
+                                              fontFamily: 'OtsutomeFont',
+                                              color: const Color(0xFF23456B),
+                                              fontWeight: FontWeight.bold,
+                                              height: 1.5,
+                                            ),
                                           ),
                                         ),
                                       ),
