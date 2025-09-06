@@ -85,7 +85,7 @@ class MatchingGroup(BaseModel):
 class MatchingUser(BaseModel):
     id: UUID
     user_id: UUID
-    gender: str  # male, female, non-binary 
+    gender: str  # male, female, non_binary 
     personality_type: str  # 分析型, 功能型, 直覺型, 個人型
     status: str = "waiting_matching"  # waiting_matching, matched, cancelled
     created_at: datetime = Field(default_factory=datetime.now)
