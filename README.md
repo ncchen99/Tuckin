@@ -23,7 +23,14 @@
 | ---------------------- | ---------------------- | ---------------------- | ---------------------- |
 
 
-
+<p align="center">
+  <a href="https://apps.apple.com/tw/app/tuckin/id6751713165?platform=iphone">
+    <img src="https://img.shields.io/badge/Download_on_the-App_Store-black?style=for-the-badge&logo=apple&logoColor=white" alt="Download on the App Store">
+  </a>
+  <a href="https://play.google.com/store/apps/details?id=com.tuckin.app">
+    <img src="https://img.shields.io/badge/Get_it_on-Google_Play-green?style=for-the-badge&logo=google-play&logoColor=white" alt="Get it on Google Play">
+  </a>
+</p>
 
 ## 📱 安裝與使用
 
