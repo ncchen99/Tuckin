@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/components/onboarding/privacy_policy_dialog.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
