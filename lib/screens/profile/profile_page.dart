@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/components/components.dart';
+import 'package:tuckin/components/onboarding/privacy_policy_dialog.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
@@ -262,6 +263,16 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  // 顯示隱私權政策對話框
+  void _showPrivacyPolicyDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return const PrivacyPolicyDialog();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -401,21 +412,28 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       SizedBox(height: 15.h),
 
+                      // 隱私權政策
+                      _buildSettingItem(
+                        iconPath: 'assets/images/icon/shield.webp',
+                        title: '隱私權政策',
+                        onTap: _showPrivacyPolicyDialog,
+                      ),
+                      SizedBox(height: 15.h),
+
                       // 關於我們
                       _buildSettingItem(
                         iconPath: 'assets/images/icon/info.webp',
                         title: '關於我們',
                         onTap: _openAboutUsWebpage,
                       ),
-                      SizedBox(height: 15.h),
-
-                      // 支持塔金
-                      _buildSettingItem(
-                        iconPath: 'assets/images/icon/coffee_cup.webp',
-                        title: '支持塔金',
-                        onTap: _openSupportWebpage,
-                      ),
                       SizedBox(height: 35.h),
+
+                      // 支持塔金 (保留)
+                      // _buildSettingItem(
+                      //   iconPath: 'assets/images/icon/coffee_cup.webp',
+                      //   title: '支持塔金',
+                      //   onTap: _openSupportWebpage,
+                      // ),
 
                       // 登出
                       _buildSettingItem(
