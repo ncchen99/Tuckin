@@ -104,7 +104,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           _isVideoInitialized = true;
         });
         _videoController.play();
-        _videoController.setLooping(false);
+        _videoController.setLooping(true);
 
         // 影片開始播放時預載入後續分頁的素材
         _preloadAssets();
