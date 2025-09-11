@@ -20,11 +20,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   final TextEditingController _nicknameController = TextEditingController();
   final TextEditingController _personalDescController = TextEditingController();
 
-  // 性別選擇，0-未選擇，1-男，2-女
+  // 性別選擇，0-未選擇，1-男，2-女，3-不設定（儲存為non_binary）
   int _selectedGender = 0;
 
   bool _isLoading = false;
   bool _isDataLoaded = false;
+  bool _showGenderTip = false; // 控制性別提示框顯示
 
   @override
   void initState() {
@@ -342,7 +343,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 FocusScope.of(context).unfocus();
               },
               behavior: HitTestBehavior.opaque,
-              child:
+              child: Stack(
+                children: [
                   _isLoading && !_isDataLoaded
                       ? Center(
                         child: LoadingImage(
@@ -530,13 +532,26 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
                                     SizedBox(width: 15.w),
 
-                                    // 非二元選項
+                                    // 不設定選項
                                     Expanded(
                                       child: GestureDetector(
                                         onTap: () {
                                           setState(() {
                                             _selectedGender = 3;
+                                            _showGenderTip = true; // 顯示提示框
                                           });
+
+                                          // 3秒後自動隱藏提示框
+                                          Future.delayed(
+                                            const Duration(seconds: 4),
+                                            () {
+                                              if (mounted) {
+                                                setState(() {
+                                                  _showGenderTip = false;
+                                                });
+                                              }
+                                            },
+                                          );
                                         },
                                         child: Container(
                                           height: 50.h,
@@ -555,7 +570,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                           ),
                                           child: Center(
                                             child: Text(
-                                              '非二元',
+                                              '不設定',
                                               style: TextStyle(
                                                 fontSize: 16.sp,
                                                 fontFamily: 'OtsutomeFont',
@@ -700,6 +715,24 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                           ),
                         ],
                       ),
+
+                  // 右上角性別提示框
+                  if (_showGenderTip)
+                    Positioned(
+                      top: 20.h,
+                      right: 20.w,
+                      child: InfoTipBox(
+                        message: '建議設定性別，聚餐體驗更好歐！',
+                        show: _showGenderTip,
+                        onHide: () {
+                          setState(() {
+                            _showGenderTip = false;
+                          });
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
