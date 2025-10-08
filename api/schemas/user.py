@@ -15,12 +15,24 @@ class UserProfileUpdate(UserProfileBase):
 
 class UserProfileResponse(UserProfileBase):
     user_id: str
+    avatar_path: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime]
 
     class Config:
         from_attributes = True
         orm_mode = True
+
+class AvatarUploadResponse(BaseModel):
+    """頭像上傳響應，包含 Presigned PUT URL"""
+    upload_url: str
+    avatar_path: str
+    expires_in: int = 3600
+    
+class AvatarUrlResponse(BaseModel):
+    """頭像讀取響應，包含 Presigned GET URL"""
+    url: str
+    expires_in: int = 3600
 
 class UserDeviceToken(BaseModel):
     user_id: str

@@ -27,3 +27,6 @@ R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
 R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL")
 R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME") 
 R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "https://pub-5dc9d25894314a5cbfa4a5aab3c6cd6b.r2.dev")
+
+# Cloudflare R2 私有 Bucket 配置（用於用戶頭像）
+R2_PRIVATE_BUCKET_NAME = os.getenv("R2_PRIVATE_BUCKET_NAME")

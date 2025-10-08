@@ -3,6 +3,26 @@
 
 -- 首先建立基礎表格
 
+-- 使用者個人資料表
+create table public.user_profiles (
+  id serial not null,
+  user_id uuid not null,
+  nickname text not null,
+  gender text not null,
+  personal_desc text null,
+  avatar_path text null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint user_profiles_pkey primary key (id),
+  constraint user_profiles_user_id_fkey foreign KEY (user_id) references auth.users (id)
+) TABLESPACE pg_default;
+
+create index IF not exists idx_user_profiles_user_id on public.user_profiles using btree (user_id) TABLESPACE pg_default;
+
+create trigger update_user_profiles_updated_at BEFORE
+update on user_profiles for EACH row
+execute FUNCTION update_timestamp_column ();
+
 -- 食物偏好基礎表 (先建立此表，避免外鍵參考錯誤)
 CREATE TABLE IF NOT EXISTS food_preferences (
     id SERIAL PRIMARY KEY,
@@ -314,7 +334,8 @@ CREATE OR REPLACE VIEW users_profiles_view AS
 SELECT
     user_id,
     nickname,
-    personal_desc
+    personal_desc,
+    avatar_path
 FROM user_profiles;
 
 -- 創建必要的索引來優化查詢性能

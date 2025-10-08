@@ -3,7 +3,8 @@ CREATE OR REPLACE VIEW users_profiles_view AS
 SELECT
     user_id,
     nickname,
-    personal_desc
+    personal_desc,
+    avatar_path
 FROM user_profiles;
 
 
