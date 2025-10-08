@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from routers import restaurant, matching, dining, schedule
+from routers import restaurant, matching, dining, schedule, user
 
 
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +29,7 @@ app.include_router(restaurant.router, prefix="/api/restaurant", tags=["餐廳管
 app.include_router(matching.router, prefix="/api/matching", tags=["配對系統"])
 app.include_router(dining.router, prefix="/api/dining", tags=["聚餐管理"])
 app.include_router(schedule.router, prefix="/api/schedule", tags=["排程管理"])
+app.include_router(user.router, prefix="/api/user", tags=["用戶管理"])
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
