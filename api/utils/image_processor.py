@@ -3,31 +3,12 @@ import httpx
 import logging
 import hashlib
 from typing import Optional
-import boto3
 from PIL import Image
 
-from config import GOOGLE_PLACES_API_KEY, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL, R2_ENDPOINT_URL
+from config import GOOGLE_PLACES_API_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL
+from .cloudflare import get_r2_client
 
 logger = logging.getLogger(__name__)
-
-def get_r2_client():
-    """
-    獲取Cloudflare R2客戶端
-    """
-    # 先檢查必要的環境變數是否存在
-    if not R2_ENDPOINT_URL or not R2_ACCESS_KEY_ID or not R2_SECRET_ACCESS_KEY:
-        logger.error("缺少必要的R2環境變數，無法初始化客戶端")
-        raise ValueError("R2配置不完整，請檢查環境變數")
-        
-    logger.info(f"初始化R2客戶端: {R2_ENDPOINT_URL}")
-    
-    return boto3.client(
-        's3',
-        endpoint_url=R2_ENDPOINT_URL,
-        aws_access_key_id=R2_ACCESS_KEY_ID,
-        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
-        region_name='auto'
-    )
 
 async def download_and_upload_photo(photo_reference: str) -> Optional[str]:
     """
@@ -45,7 +26,7 @@ async def download_and_upload_photo(photo_reference: str) -> Optional[str]:
         
     try:
         # 檢查R2環境變數
-        if not all([R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL, R2_ENDPOINT_URL]):
+        if not R2_BUCKET_NAME or not R2_PUBLIC_URL:
             logger.error("缺少必要的R2環境變數，無法進行圖片上傳")
             return None
             
