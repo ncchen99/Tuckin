@@ -27,5 +27,5 @@ SELECT
 FROM user_profiles;
 
 -- 添加註釋說明
-COMMENT ON COLUMN user_profiles.avatar_path IS '用戶頭像在私有 R2 bucket 中的路徑（格式：avatars/user_id_uniqueid.ext）';
+COMMENT ON COLUMN user_profiles.avatar_path IS '用戶頭像在私有 R2 bucket 中的路徑（格式：avatars/user_id.webp）';
 
