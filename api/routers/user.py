@@ -90,23 +90,14 @@ async def get_avatar_upload_url(
     - 完全避免孤立檔案問題
     
     流程：
-    1. 驗證用戶存在
-    2. 生成固定的頭像路徑（統一使用 .webp）
-    3. 生成 Presigned PUT URL
-    4. 更新數據庫中的 avatar_path
-    5. 返回 URL 供前端上傳
+    1. 生成固定的頭像路徑（統一使用 .webp）
+    2. 生成 Presigned PUT URL
+    3. 返回 URL 和 avatar_path 供前端上傳
+    
+    注意：不在此處更新資料庫，由前端在提交表單時統一保存所有資料
     """
     try:
-        user_id = current_user.id
-        
-        # 查詢用戶資料以確保用戶存在
-        result = supabase.table('user_profiles').select('user_id').eq('user_id', user_id).execute()
-        
-        if not result.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="找不到用戶資料"
-            )
+        user_id = current_user.user.id
         
         # 統一使用固定的頭像路徑（WebP 格式）
         # 前端負責將任何格式轉換為 WebP
@@ -126,17 +117,6 @@ async def get_avatar_upload_url(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="無法生成上傳 URL"
-            )
-        
-        # 更新數據庫中的 avatar_path
-        update_result = supabase.table('user_profiles').update({
-            'avatar_path': avatar_path
-        }).eq('user_id', user_id).execute()
-        
-        if not update_result.data:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="更新頭像路徑失敗"
             )
         
         logger.info(f"已為用戶 {user_id} 生成頭像上傳 URL（統一 WebP 格式）")
@@ -170,7 +150,7 @@ async def delete_avatar(
     3. 更新數據庫將 avatar_path 設為 NULL
     """
     try:
-        user_id = current_user.id
+        user_id = current_user.user.id
         
         # 查詢用戶當前的頭像路徑
         result = supabase.table('user_profiles').select('avatar_path').eq('user_id', user_id).execute()
@@ -233,7 +213,7 @@ async def get_avatar_url(
     3. 返回 URL 供前端顯示
     """
     try:
-        user_id = current_user.id
+        user_id = current_user.user.id
         
         # 查詢用戶的頭像路徑
         result = supabase.table('user_profiles').select('avatar_path').eq('user_id', user_id).execute()

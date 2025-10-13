@@ -1,13 +1,20 @@
 from fastapi import Depends, HTTPException, status, Header, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from gotrue import User
+from gotrue.types import UserResponse
 from postgrest import PostgrestClient
 from supabase import create_client, Client
 import logging
-import os
 from typing import Optional
 
-from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
+from config import (
+    SUPABASE_URL, 
+    SUPABASE_KEY, 
+    SUPABASE_SERVICE_KEY,
+    DEV_MODE,
+    DEV_USER_ID,
+    CRON_API_KEY
+)
 
 # 設置日誌記錄器
 logger = logging.getLogger(__name__)
@@ -85,7 +92,22 @@ security = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     supabase: Client = Depends(get_supabase_service)
-) -> User:
+) -> UserResponse:
+    # 開發模式下跳過驗證
+    if DEV_MODE:
+        logger.info(f"開發模式：跳過用戶驗證，使用測試用戶 ID: {DEV_USER_ID}")
+        # 創建一個模擬的 UserResponse 對象
+        mock_user = User(
+            id=DEV_USER_ID,
+            email="dev@test.com",
+            app_metadata={},
+            user_metadata={},
+            aud="authenticated",
+            created_at="",
+        )
+        mock_response = UserResponse(user=mock_user)
+        return mock_response
+    
     try:
         # 從請求頭獲取令牌
         token = credentials.credentials
@@ -119,9 +141,6 @@ async def get_current_user(
             detail="未提供有效的認證信息",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-# 獲取環境變數中的API密鑰，如果沒有設定則使用默認值
-CRON_API_KEY = os.environ.get("CRON_API_KEY", "")
 
 # 依賴函數，用於驗證 cron job 調用
 async def verify_cron_api_key(x_api_key: Optional[str] = Header(None)):

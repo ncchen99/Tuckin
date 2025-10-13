@@ -30,3 +30,10 @@ R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "https://pub-5dc9d25894314a5cbfa4a5aa
 
 # Cloudflare R2 私有 Bucket 配置（用於用戶頭像）
 R2_PRIVATE_BUCKET_NAME = os.getenv("R2_PRIVATE_BUCKET_NAME")
+
+# 開發模式配置
+DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+DEV_USER_ID = os.getenv("DEV_USER_ID", "test-user-id")
+
+# Cron Job API 密鑰
+CRON_API_KEY = os.getenv("CRON_API_KEY", "")

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/user_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math';
+import 'dart:typed_data';
 
 class ProfileSetupPage extends StatefulWidget {
   final bool isFromProfile;
@@ -17,15 +20,25 @@ class ProfileSetupPage extends StatefulWidget {
 class _ProfileSetupPageState extends State<ProfileSetupPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final UserService _userService = UserService();
   final TextEditingController _nicknameController = TextEditingController();
   final TextEditingController _personalDescController = TextEditingController();
 
   // 性別選擇，0-未選擇，1-男，2-女，3-不設定（儲存為non_binary）
   int _selectedGender = 0;
+  int _previousGender = 0; // 用於追蹤性別變化
 
   bool _isLoading = false;
   bool _isDataLoaded = false;
   bool _showGenderTip = false; // 控制性別提示框顯示
+
+  // 頭像相關
+  String? _avatarUrl; // 自訂頭像的 URL（從網路載入的 presigned URL）
+  String? _defaultAvatarPath; // 預設頭像的本地路徑
+  String? _uploadedAvatarPath; // 已上傳的頭像路徑（用於儲存到資料庫）
+  Uint8List? _localAvatarBytes; // 本地壓縮的頭像數據（用於直接顯示）
+  bool _hasCustomAvatar = false; // 是否已上傳自訂頭像
+  bool _isLoadingAvatar = false; // 頭像是否正在載入中
 
   @override
   void initState() {
@@ -33,6 +46,236 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     _loadUserProfile();
     // 添加監聽器，當暱稱輸入框變更時重新渲染頁面
     _nicknameController.addListener(_updateButtonState);
+    // 初始化預設頭像
+    _updateDefaultAvatar();
+  }
+
+  /// 獲取隨機預設頭像路徑
+  String _getRandomDefaultAvatar(int gender) {
+    final random = Random();
+    if (gender == 1) {
+      // 男性：male_1.webp ~ male_6.webp
+      final index = random.nextInt(6) + 1;
+      return 'assets/images/avatar/profile/male_$index.webp';
+    } else if (gender == 2) {
+      // 女性：female_1.webp ~ female_6.webp
+      final index = random.nextInt(6) + 1;
+      return 'assets/images/avatar/profile/female_$index.webp';
+    } else {
+      // 性別未設定或不設定：隨機選擇任一張
+      final isMale = random.nextBool();
+      if (isMale) {
+        final index = random.nextInt(6) + 1;
+        return 'assets/images/avatar/profile/male_$index.webp';
+      } else {
+        final index = random.nextInt(7) + 1;
+        return 'assets/images/avatar/profile/female_$index.webp';
+      }
+    }
+  }
+
+  /// 更新預設頭像
+  void _updateDefaultAvatar() {
+    if (!_hasCustomAvatar) {
+      final newDefaultPath = _getRandomDefaultAvatar(_selectedGender);
+      setState(() {
+        _defaultAvatarPath = newDefaultPath;
+        _uploadedAvatarPath = newDefaultPath; // 同時更新 uploadedAvatarPath 以便保存
+      });
+    }
+  }
+
+  /// 載入用戶頭像
+  Future<void> _loadUserAvatar() async {
+    setState(() {
+      _isLoadingAvatar = true;
+    });
+
+    try {
+      // 檢查 _uploadedAvatarPath 的類型
+      if (_uploadedAvatarPath == null || _uploadedAvatarPath!.isEmpty) {
+        // 沒有頭像路徑，生成隨機預設頭像
+        debugPrint('沒有頭像路徑，生成隨機預設頭像');
+        setState(() {
+          _hasCustomAvatar = false;
+          _updateDefaultAvatar();
+          _isLoadingAvatar = false;
+        });
+      } else if (_uploadedAvatarPath!.startsWith('assets/')) {
+        // 是預設頭像路徑，直接使用
+        debugPrint('使用預設頭像: $_uploadedAvatarPath');
+        setState(() {
+          _defaultAvatarPath = _uploadedAvatarPath;
+          _hasCustomAvatar = false;
+          _isLoadingAvatar = false;
+        });
+      } else if (_uploadedAvatarPath!.startsWith('avatars/')) {
+        // 是 R2 上的自訂頭像，需要取得 presigned URL
+        debugPrint('載入自訂頭像: $_uploadedAvatarPath');
+        final avatarUrl = await _userService.getAvatarUrl();
+        if (avatarUrl != null) {
+          setState(() {
+            _avatarUrl = avatarUrl;
+            _hasCustomAvatar = true;
+            _isLoadingAvatar = false;
+          });
+        } else {
+          // 取得 URL 失敗，使用預設頭像
+          debugPrint('取得頭像 URL 失敗，使用預設頭像');
+          setState(() {
+            _hasCustomAvatar = false;
+            _updateDefaultAvatar();
+            _isLoadingAvatar = false;
+          });
+        }
+      } else {
+        // 未知格式，使用預設頭像
+        debugPrint('未知頭像路徑格式: $_uploadedAvatarPath，使用預設頭像');
+        setState(() {
+          _hasCustomAvatar = false;
+          _updateDefaultAvatar();
+          _isLoadingAvatar = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('載入頭像失敗: $e');
+      setState(() {
+        _hasCustomAvatar = false;
+        _updateDefaultAvatar();
+        _isLoadingAvatar = false;
+      });
+    }
+  }
+
+  /// 處理頭像上傳
+  Future<void> _handleAvatarUpload() async {
+    // 保存先前的狀態，以便錯誤時恢復
+    final previousAvatarPath = _uploadedAvatarPath;
+    final previousAvatarBytes = _localAvatarBytes;
+    final previousHasCustomAvatar = _hasCustomAvatar;
+
+    // 選擇圖片後立即顯示 loading
+    setState(() {
+      _isLoadingAvatar = true;
+    });
+
+    try {
+      final result = await _userService.uploadAvatar();
+
+      if (result != null) {
+        final avatarPath = result['avatar_path'] as String;
+        final imageBytes = result['image_bytes'] as Uint8List;
+
+        // 上傳成功，暫存資料（不更新資料庫）
+        // 資料庫更新會在點擊「下一步」時統一處理
+        setState(() {
+          _uploadedAvatarPath = avatarPath;
+          _localAvatarBytes = imageBytes;
+          _hasCustomAvatar = true;
+          _isLoadingAvatar = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '頭像上傳成功',
+                style: TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+            ),
+          );
+        }
+      } else {
+        // 上傳失敗或用戶取消，恢復先前狀態
+        setState(() {
+          _uploadedAvatarPath = previousAvatarPath;
+          _localAvatarBytes = previousAvatarBytes;
+          _hasCustomAvatar = previousHasCustomAvatar;
+          _isLoadingAvatar = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('上傳頭像時發生錯誤: $e');
+      // 發生錯誤，恢復先前狀態
+      setState(() {
+        _uploadedAvatarPath = previousAvatarPath;
+        _localAvatarBytes = previousAvatarBytes;
+        _hasCustomAvatar = previousHasCustomAvatar;
+        _isLoadingAvatar = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '頭像上傳失敗',
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  /// 處理頭像刪除
+  Future<void> _handleAvatarDelete() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final success = await _userService.deleteAvatar();
+
+      if (success) {
+        setState(() {
+          _avatarUrl = null;
+          _hasCustomAvatar = false;
+          _uploadedAvatarPath = null; // 清除已上傳的頭像路徑
+          _localAvatarBytes = null; // 清除本地圖片數據
+          _updateDefaultAvatar();
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '頭像已刪除',
+                style: TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '刪除頭像失敗，請稍後再試',
+                style: TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('刪除頭像時發生錯誤: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '刪除頭像失敗',
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   // 載入用戶資料
@@ -95,15 +338,24 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 _selectedGender = 3;
               }
             }
+            _previousGender = _selectedGender;
 
             // 設置個人描述
             if (profile['personal_desc'] != null) {
               _personalDescController.text = profile['personal_desc'];
             }
 
+            // 設置頭像路徑
+            if (profile['avatar_path'] != null) {
+              _uploadedAvatarPath = profile['avatar_path'];
+            }
+
             setState(() {
               _isDataLoaded = true;
             });
+
+            // 載入頭像
+            await _loadUserAvatar();
           }
         } catch (e) {
           debugPrint('載入用戶資料出錯: $e');
@@ -277,6 +529,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 : _personalDescController.text.trim(),
       };
 
+      // 如果有上傳頭像，加入 avatar_path
+      if (_uploadedAvatarPath != null) {
+        userData['avatar_path'] = _uploadedAvatarPath!;
+      }
+
       // 儲存用戶資料到 Supabase
       await _databaseService.updateUserProfile(userData);
 
@@ -392,6 +649,125 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                             ),
                           ),
 
+                          // 頭像顯示區域
+                          Container(
+                            margin: EdgeInsets.symmetric(vertical: 20.h),
+                            child: Center(
+                              child: GestureDetector(
+                                onTap:
+                                    _hasCustomAvatar
+                                        ? null // 如果有自訂頭像，不響應整個頭像的點擊
+                                        : _handleAvatarUpload, // 如果是預設頭像，點擊可上傳
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    // 圓形頭像容器
+                                    Container(
+                                      width: 120.w,
+                                      height: 120.w,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: const Color(0xFF23456B),
+                                          width: 2.5,
+                                        ),
+                                      ),
+                                      child: ClipOval(
+                                        child:
+                                            _isLoadingAvatar
+                                                ? Center(
+                                                  child: LoadingImage(
+                                                    width: 40.w,
+                                                    height: 40.h,
+                                                    color: const Color(
+                                                      0xFFB33D1C,
+                                                    ),
+                                                  ),
+                                                )
+                                                : _hasCustomAvatar &&
+                                                    _localAvatarBytes != null
+                                                ? Image.memory(
+                                                  _localAvatarBytes!,
+                                                  fit: BoxFit.cover,
+                                                )
+                                                : _hasCustomAvatar &&
+                                                    _avatarUrl != null
+                                                ? Image.network(
+                                                  _avatarUrl!,
+                                                  fit: BoxFit.cover,
+                                                  loadingBuilder: (
+                                                    context,
+                                                    child,
+                                                    loadingProgress,
+                                                  ) {
+                                                    if (loadingProgress ==
+                                                        null) {
+                                                      return child;
+                                                    }
+                                                    // 顯示 loading placeholder
+                                                    return Center(
+                                                      child: LoadingImage(
+                                                        width: 40.w,
+                                                        height: 40.h,
+                                                        color: const Color(
+                                                          0xFFB33D1C,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                  errorBuilder: (
+                                                    context,
+                                                    error,
+                                                    stackTrace,
+                                                  ) {
+                                                    // 如果載入失敗，顯示預設頭像
+                                                    return Image.asset(
+                                                      _defaultAvatarPath ??
+                                                          'assets/images/avatar/profile/male_1.webp',
+                                                      fit: BoxFit.cover,
+                                                    );
+                                                  },
+                                                )
+                                                : Image.asset(
+                                                  _defaultAvatarPath ??
+                                                      'assets/images/avatar/profile/male_1.webp',
+                                                  fit: BoxFit.cover,
+                                                ),
+                                      ),
+                                    ),
+                                    // 右下角功能圖示
+                                    Positioned(
+                                      right: 0,
+                                      bottom: 0,
+                                      child: GestureDetector(
+                                        onTap:
+                                            _hasCustomAvatar
+                                                ? _handleAvatarDelete // 有自訂頭像時，點擊刪除
+                                                : _handleAvatarUpload, // 無自訂頭像時，點擊上傳
+                                        child: Container(
+                                          width: 36.w,
+                                          height: 36.w,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Colors.white,
+                                          ),
+                                          child: ClipOval(
+                                            child: Image.asset(
+                                              _hasCustomAvatar
+                                                  ? 'assets/images/icon/cross.webp'
+                                                  : 'assets/images/icon/camera.webp',
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
                           // 暱稱輸入框
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 20.w),
@@ -456,6 +832,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                         onTap: () {
                                           setState(() {
                                             _selectedGender = 1;
+                                            // 如果沒有自訂頭像且性別變更，更新預設頭像
+                                            if (!_hasCustomAvatar &&
+                                                _previousGender != 1) {
+                                              _updateDefaultAvatar();
+                                              _previousGender = 1;
+                                            }
                                           });
                                         },
                                         child: Container(
@@ -497,6 +879,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                         onTap: () {
                                           setState(() {
                                             _selectedGender = 2;
+                                            // 如果沒有自訂頭像且性別變更，更新預設頭像
+                                            if (!_hasCustomAvatar &&
+                                                _previousGender != 2) {
+                                              _updateDefaultAvatar();
+                                              _previousGender = 2;
+                                            }
                                           });
                                         },
                                         child: Container(
@@ -539,6 +927,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                           setState(() {
                                             _selectedGender = 3;
                                             _showGenderTip = true; // 顯示提示框
+                                            // 如果沒有自訂頭像且性別變更，更新預設頭像
+                                            if (!_hasCustomAvatar &&
+                                                _previousGender != 3) {
+                                              _updateDefaultAvatar();
+                                              _previousGender = 3;
+                                            }
                                           });
 
                                           // 3秒後自動隱藏提示框

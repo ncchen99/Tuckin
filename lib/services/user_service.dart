@@ -1,0 +1,271 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'api_service.dart';
+
+class UserService {
+  static final UserService _instance = UserService._internal();
+  factory UserService() => _instance;
+  UserService._internal();
+
+  final ApiService _apiService = ApiService();
+  final ImagePicker _picker = ImagePicker();
+
+  /// 選擇圖片並轉換為 WebP 格式（512x512）
+  Future<Uint8List?> pickAndConvertImageToWebP() async {
+    try {
+      // 開啟圖片選擇器
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512, // 限制最大寬度為 512
+        maxHeight: 512, // 限制最大高度為 512
+        imageQuality: 85, // 圖片品質
+      );
+
+      if (pickedFile == null) {
+        debugPrint('用戶取消選擇圖片');
+        return null;
+      }
+
+      debugPrint('原始圖片路徑: ${pickedFile.path}');
+
+      // 使用 flutter_image_compress 壓縮為 512x512 的 WebP
+      final result = await FlutterImageCompress.compressWithFile(
+        pickedFile.path,
+        format: CompressFormat.webp,
+        quality: 85,
+        minWidth: 512,
+        minHeight: 512,
+      );
+
+      if (result == null) {
+        debugPrint('圖片壓縮失敗');
+        return null;
+      }
+
+      debugPrint('圖片已轉換為 WebP 格式（512x512），大小: ${result.length} bytes');
+
+      return result;
+    } catch (e) {
+      debugPrint('選擇或轉換圖片時發生錯誤: $e');
+      return null;
+    }
+  }
+
+  /// 獲取頭像上傳 URL
+  Future<Map<String, dynamic>?> getAvatarUploadUrl() async {
+    try {
+      debugPrint('正在獲取頭像上傳 URL...');
+
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+
+      if (token == null) {
+        debugPrint('未找到用戶 token');
+        return null;
+      }
+
+      final url = Uri.parse('${_apiService.baseUrl}/user/avatar/upload-url');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      debugPrint('獲取上傳 URL 響應狀態碼: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        debugPrint('成功獲取上傳 URL');
+        return data;
+      } else {
+        debugPrint('獲取上傳 URL 失敗: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('獲取上傳 URL 時發生錯誤: $e');
+      return null;
+    }
+  }
+
+  /// 上傳圖片到 R2
+  Future<bool> uploadImageToR2(String uploadUrl, Uint8List imageBytes) async {
+    try {
+      debugPrint('正在上傳圖片到 R2...');
+      debugPrint('圖片大小: ${imageBytes.length} bytes');
+
+      final response = await http.put(
+        Uri.parse(uploadUrl),
+        headers: {'Content-Type': 'image/webp'},
+        body: imageBytes,
+      );
+
+      debugPrint('上傳響應狀態碼: ${response.statusCode}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        debugPrint('圖片上傳成功');
+        return true;
+      } else {
+        debugPrint('圖片上傳失敗: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('上傳圖片時發生錯誤: $e');
+      return false;
+    }
+  }
+
+  /// 完整的頭像上傳流程（優化版：並行處理）
+  /// 返回 Map，包含 avatar_path 和 imageBytes（成功時）或 null（失敗時）
+  Future<Map<String, dynamic>?> uploadAvatar() async {
+    try {
+      // 並行處理：同時進行圖片壓縮和獲取上傳 URL
+      final results = await Future.wait([
+        pickAndConvertImageToWebP(),
+        getAvatarUploadUrl(),
+      ]);
+
+      final imageBytes = results[0] as Uint8List?;
+      final uploadData = results[1] as Map<String, dynamic>?;
+
+      if (imageBytes == null) {
+        debugPrint('未選擇圖片或轉換失敗');
+        return null;
+      }
+
+      if (uploadData == null) {
+        debugPrint('獲取上傳 URL 失敗');
+        return null;
+      }
+
+      final uploadUrl = uploadData['upload_url'] as String;
+      final avatarPath = uploadData['avatar_path'] as String;
+
+      // 上傳圖片到 R2
+      final uploadSuccess = await uploadImageToR2(uploadUrl, imageBytes);
+
+      if (uploadSuccess) {
+        debugPrint('頭像上傳成功，路徑: $avatarPath');
+        return {'avatar_path': avatarPath, 'image_bytes': imageBytes};
+      } else {
+        return null;
+      }
+    } catch (e) {
+      debugPrint('上傳頭像流程發生錯誤: $e');
+      return null;
+    }
+  }
+
+  /// 獲取頭像顯示 URL
+  Future<String?> getAvatarUrl() async {
+    try {
+      debugPrint('正在獲取頭像 URL...');
+
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+
+      if (token == null) {
+        debugPrint('未找到用戶 token');
+        return null;
+      }
+
+      final url = Uri.parse('${_apiService.baseUrl}/user/avatar/url');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      debugPrint('獲取頭像 URL 響應狀態碼: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final avatarUrl = data['url'] as String?;
+        debugPrint('成功獲取頭像 URL');
+        return avatarUrl;
+      } else if (response.statusCode == 404) {
+        // 用戶尚未設置頭像
+        debugPrint('用戶尚未設置頭像');
+        return null;
+      } else {
+        debugPrint('獲取頭像 URL 失敗: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('獲取頭像 URL 時發生錯誤: $e');
+      return null;
+    }
+  }
+
+  /// 刪除頭像
+  Future<bool> deleteAvatar() async {
+    try {
+      debugPrint('正在刪除頭像...');
+
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+
+      if (token == null) {
+        debugPrint('未找到用戶 token');
+        return false;
+      }
+
+      final url = Uri.parse('${_apiService.baseUrl}/user/avatar');
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      debugPrint('刪除頭像響應狀態碼: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        debugPrint('頭像刪除成功');
+        return true;
+      } else {
+        debugPrint('刪除頭像失敗: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('刪除頭像時發生錯誤: $e');
+      return false;
+    }
+  }
+
+  /// 直接更新資料庫中的 avatar_path
+  /// 使用 upsert 以處理首次設定時記錄不存在的情況
+  Future<bool> updateAvatarPathInDatabase(String avatarPath) async {
+    try {
+      debugPrint('正在更新資料庫中的 avatar_path: $avatarPath');
+
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        debugPrint('未找到用戶 ID');
+        return false;
+      }
+
+      // 使用 upsert 來處理記錄不存在的情況
+      // 如果記錄存在則更新，不存在則創建
+      await Supabase.instance.client.from('user_profiles').upsert({
+        'user_id': userId,
+        'avatar_path': avatarPath,
+      });
+
+      debugPrint('avatar_path 已成功更新到資料庫');
+      return true;
+    } catch (e) {
+      debugPrint('更新 avatar_path 到資料庫時發生錯誤: $e');
+      return false;
+    }
+  }
+}
