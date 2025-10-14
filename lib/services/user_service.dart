@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'api_service.dart';
 
 class UserService {
@@ -18,12 +19,10 @@ class UserService {
   /// 選擇圖片並轉換為 WebP 格式（512x512）
   Future<Uint8List?> pickAndConvertImageToWebP() async {
     try {
-      // 開啟圖片選擇器
+      // 步驟 1: 開啟圖片選擇器
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 512, // 限制最大寬度為 512
-        maxHeight: 512, // 限制最大高度為 512
-        imageQuality: 85, // 圖片品質
+        imageQuality: 100, // 先保持高品質，後續裁剪後再壓縮
       );
 
       if (pickedFile == null) {
@@ -33,9 +32,47 @@ class UserService {
 
       debugPrint('原始圖片路徑: ${pickedFile.path}');
 
-      // 使用 flutter_image_compress 壓縮為 512x512 的 WebP
+      // 步驟 2: 裁剪圖片為方形
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: pickedFile.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1), // 1:1 方形比例
+        compressQuality: 100, // 裁剪時保持高品質
+        maxWidth: 1024, // 裁剪後的最大寬度
+        maxHeight: 1024, // 裁剪後的最大高度
+        compressFormat: ImageCompressFormat.png, // 裁剪時使用 PNG 格式
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: '裁剪頭像',
+            toolbarColor: const Color(0xFF23456B),
+            toolbarWidgetColor: Colors.white,
+            backgroundColor: Colors.white,
+            activeControlsWidgetColor: const Color(0xFFB33D1C),
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true, // 鎖定方形比例
+            hideBottomControls: false,
+            cropStyle: CropStyle.circle, // 使用圓形裁剪框
+          ),
+          IOSUiSettings(
+            title: '裁剪頭像',
+            aspectRatioLockEnabled: true, // 鎖定方形比例
+            resetAspectRatioEnabled: false,
+            aspectRatioPickerButtonHidden: true,
+            rotateButtonsHidden: false,
+            cropStyle: CropStyle.circle, // 使用圓形裁剪框
+          ),
+        ],
+      );
+
+      if (croppedFile == null) {
+        debugPrint('用戶取消裁剪圖片');
+        return null;
+      }
+
+      debugPrint('裁剪後圖片路徑: ${croppedFile.path}');
+
+      // 步驟 3: 使用 flutter_image_compress 壓縮為 512x512 的 WebP
       final result = await FlutterImageCompress.compressWithFile(
-        pickedFile.path,
+        croppedFile.path,
         format: CompressFormat.webp,
         quality: 85,
         minWidth: 512,
