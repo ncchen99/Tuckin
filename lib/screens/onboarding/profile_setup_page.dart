@@ -57,20 +57,20 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     if (gender == 1) {
       // 男性：male_1.webp ~ male_6.webp
       final index = random.nextInt(6) + 1;
-      return 'assets/images/avatar/profile/male_$index.webp';
+      return 'assets/images/avatar/no_bg/male_$index.webp';
     } else if (gender == 2) {
       // 女性：female_1.webp ~ female_6.webp
       final index = random.nextInt(6) + 1;
-      return 'assets/images/avatar/profile/female_$index.webp';
+      return 'assets/images/avatar/no_bg/female_$index.webp';
     } else {
       // 性別未設定或不設定：隨機選擇任一張
       final isMale = random.nextBool();
       if (isMale) {
         final index = random.nextInt(6) + 1;
-        return 'assets/images/avatar/profile/male_$index.webp';
+        return 'assets/images/avatar/no_bg/male_$index.webp';
       } else {
         final index = random.nextInt(6) + 1;
-        return 'assets/images/avatar/profile/female_$index.webp';
+        return 'assets/images/avatar/no_bg/female_$index.webp';
       }
     }
   }
@@ -125,11 +125,30 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         final avatarUrl = await _userService.getAvatarUrl();
         if (avatarUrl != null) {
           debugPrint('成功取得 R2 頭像 URL');
-          setState(() {
-            _avatarUrl = avatarUrl;
-            _hasCustomAvatar = true;
-            _isLoadingAvatar = false;
-          });
+          try {
+            // 預緩存網路圖片，確保完全載入後再顯示
+            final networkImage = NetworkImage(avatarUrl);
+            await precacheImage(networkImage, context);
+
+            // 圖片完全載入後才更新狀態並關閉 loading
+            if (mounted) {
+              setState(() {
+                _avatarUrl = avatarUrl;
+                _hasCustomAvatar = true;
+                _isLoadingAvatar = false;
+              });
+            }
+          } catch (e) {
+            // 預緩存失敗，使用預設頭像
+            debugPrint('預緩存網路圖片失敗: $e，使用預設頭像');
+            if (mounted) {
+              setState(() {
+                _hasCustomAvatar = false;
+                _updateDefaultAvatar();
+                _isLoadingAvatar = false;
+              });
+            }
+          }
         } else {
           // 取得 URL 失敗，使用預設頭像
           debugPrint('取得頭像 URL 失敗（404 或錯誤），使用預設頭像');
@@ -181,21 +200,23 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       }
 
       // 步驟 2: 用戶已選擇圖片，開始顯示 loading 並標記處理中
-      setState(() {
-        _isLoadingAvatar = true;
-        _isProcessingAvatar = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingAvatar = true;
+          _isProcessingAvatar = true;
+        });
+      }
 
       // 步驟 3: 獲取上傳 URL
       final uploadData = await _userService.getAvatarUploadUrl();
 
       if (uploadData == null) {
         debugPrint('獲取上傳 URL 失敗');
-        setState(() {
-          _isLoadingAvatar = false;
-          _isProcessingAvatar = false;
-        });
         if (mounted) {
+          setState(() {
+            _isLoadingAvatar = false;
+            _isProcessingAvatar = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
@@ -219,11 +240,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
       if (!uploadSuccess) {
         debugPrint('上傳圖片失敗');
-        setState(() {
-          _isLoadingAvatar = false;
-          _isProcessingAvatar = false;
-        });
         if (mounted) {
+          setState(() {
+            _isLoadingAvatar = false;
+            _isProcessingAvatar = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
@@ -236,20 +257,16 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         return;
       }
 
-      // 步驟 5: 設置資料
-      setState(() {
-        _uploadedAvatarPath = avatarPath;
-        _localAvatarBytes = imageBytes;
-        _hasCustomAvatar = true;
-      });
-
-      // 步驟 6: 預緩存圖片，確保圖片完全載入後再隱藏 loading
+      // 步驟 5: 預緩存圖片，確保圖片完全載入後再更新狀態
       if (mounted) {
         final image = MemoryImage(imageBytes);
         await precacheImage(image, context);
 
-        // 圖片完全載入後才隱藏 loading
+        // 圖片完全載入後才更新所有狀態並隱藏 loading
         setState(() {
+          _uploadedAvatarPath = avatarPath;
+          _localAvatarBytes = imageBytes;
+          _hasCustomAvatar = true;
           _isLoadingAvatar = false;
           _isProcessingAvatar = false;
         });
@@ -266,15 +283,15 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     } catch (e) {
       debugPrint('上傳頭像時發生錯誤: $e');
       // 發生錯誤，恢復先前狀態
-      setState(() {
-        _uploadedAvatarPath = previousAvatarPath;
-        _localAvatarBytes = previousAvatarBytes;
-        _hasCustomAvatar = previousHasCustomAvatar;
-        _isLoadingAvatar = false;
-        _isProcessingAvatar = false;
-      });
-
       if (mounted) {
+        setState(() {
+          _uploadedAvatarPath = previousAvatarPath;
+          _localAvatarBytes = previousAvatarBytes;
+          _hasCustomAvatar = previousHasCustomAvatar;
+          _isLoadingAvatar = false;
+          _isProcessingAvatar = false;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -775,17 +792,23 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                                     stackTrace,
                                                   ) {
                                                     // 如果載入失敗，顯示預設頭像
-                                                    return Image.asset(
-                                                      _defaultAvatarPath ??
-                                                          'assets/images/avatar/profile/male_1.webp',
-                                                      fit: BoxFit.cover,
+                                                    return Container(
+                                                      color: Colors.white,
+                                                      child: Image.asset(
+                                                        _defaultAvatarPath ??
+                                                            'assets/images/avatar/no_bg/male_1.webp',
+                                                        fit: BoxFit.cover,
+                                                      ),
                                                     );
                                                   },
                                                 )
-                                                : Image.asset(
-                                                  _defaultAvatarPath ??
-                                                      'assets/images/avatar/profile/male_1.webp',
-                                                  fit: BoxFit.cover,
+                                                : Container(
+                                                  color: Colors.white,
+                                                  child: Image.asset(
+                                                    _defaultAvatarPath ??
+                                                        'assets/images/avatar/no_bg/male_1.webp',
+                                                    fit: BoxFit.cover,
+                                                  ),
                                                 ),
                                       ),
                                     ),
@@ -793,27 +816,16 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                     Positioned(
                                       right: 0,
                                       bottom: 0,
-                                      child: GestureDetector(
+                                      child: _AvatarIconButton(
+                                        iconPath:
+                                            _hasCustomAvatar
+                                                ? 'assets/images/icon/cross.webp'
+                                                : 'assets/images/icon/camera.webp',
+                                        size: 36.w,
                                         onTap:
                                             _hasCustomAvatar
-                                                ? _handleAvatarDelete // 有自訂頭像時，點擊刪除
-                                                : _handleAvatarUpload, // 無自訂頭像時，點擊上傳
-                                        child: Container(
-                                          width: 36.w,
-                                          height: 36.w,
-                                          decoration: const BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.white,
-                                          ),
-                                          child: ClipOval(
-                                            child: Image.asset(
-                                              _hasCustomAvatar
-                                                  ? 'assets/images/icon/cross.webp'
-                                                  : 'assets/images/icon/camera.webp',
-                                              fit: BoxFit.cover,
-                                            ),
-                                          ),
-                                        ),
+                                                ? _handleAvatarDelete
+                                                : _handleAvatarUpload,
                                       ),
                                     ),
                                   ],
@@ -1183,6 +1195,75 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// 頭像圖標按鈕（帶陰影和按壓效果）
+class _AvatarIconButton extends StatefulWidget {
+  final String iconPath;
+  final double size;
+  final VoidCallback onTap;
+
+  const _AvatarIconButton({
+    required this.iconPath,
+    required this.size,
+    required this.onTap,
+  });
+
+  @override
+  State<_AvatarIconButton> createState() => _AvatarIconButtonState();
+}
+
+class _AvatarIconButtonState extends State<_AvatarIconButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // 陰影偏移量
+    final shadowOffset = 3.h;
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size + shadowOffset,
+        child: Stack(
+          children: [
+            // 底部陰影圖片
+            if (!_isPressed)
+              Positioned(
+                left: 0,
+                top: shadowOffset,
+                child: Image.asset(
+                  widget.iconPath,
+                  width: widget.size,
+                  height: widget.size,
+                  fit: BoxFit.contain,
+                  color: Colors.black.withOpacity(0.4),
+                  colorBlendMode: BlendMode.srcIn,
+                ),
+              ),
+
+            // 主圖標
+            Positioned(
+              top: _isPressed ? shadowOffset : 0,
+              left: 0,
+              child: Image.asset(
+                widget.iconPath,
+                width: widget.size,
+                height: widget.size,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
         ),
       ),
     );
