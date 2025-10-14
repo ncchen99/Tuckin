@@ -716,7 +716,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
                           // 頭像顯示區域
                           Container(
-                            margin: EdgeInsets.symmetric(vertical: 20.h),
+                            margin: EdgeInsets.only(top: 15.h),
                             child: Center(
                               child: GestureDetector(
                                 onTap:
@@ -837,7 +837,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                           // 暱稱輸入框
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 20.w),
-                            margin: EdgeInsets.symmetric(vertical: 10.h),
+                            margin: EdgeInsets.only(top: 10.h, bottom: 5.h),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -870,7 +870,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
                           // 性別選擇
                           Container(
-                            margin: EdgeInsets.symmetric(vertical: 5.h),
+                            margin: EdgeInsets.only(top: 2.5.h, bottom: 5.h),
                             padding: EdgeInsets.symmetric(horizontal: 20.w),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1051,7 +1051,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
                           // 個人亮點描述輸入框
                           Container(
-                            margin: EdgeInsets.symmetric(vertical: 20.h),
+                            margin: EdgeInsets.only(top: 12.5.h),
                             padding: EdgeInsets.symmetric(horizontal: 20.w),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1062,7 +1062,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                     bottom: 8.h,
                                   ),
                                   child: Text(
-                                    '關於我，想讓人知道的一件事！',
+                                    '一句話介紹自己',
                                     style: TextStyle(
                                       fontSize: 18.sp,
                                       fontFamily: 'OtsutomeFont',
@@ -1089,7 +1089,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                       ),
                                     ),
                                     child: SizedBox(
-                                      height: 100.h,
+                                      height: 70.h,
                                       child: TextField(
                                         controller: _personalDescController,
                                         maxLines: null,
