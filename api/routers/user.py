@@ -10,7 +10,7 @@ from schemas.user import (
     AvatarUploadResponse,
     AvatarUrlResponse
 )
-from dependencies import get_supabase, get_current_user
+from dependencies import get_supabase_service, get_current_user
 from utils.cloudflare import (
     generate_presigned_put_url,
     generate_presigned_get_url,
@@ -77,7 +77,7 @@ router = APIRouter()
 
 @router.post("/avatar/upload-url", response_model=AvatarUploadResponse)
 async def get_avatar_upload_url(
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
@@ -137,17 +137,23 @@ async def get_avatar_upload_url(
         )
 
 @router.delete("/avatar")
-async def delete_avatar(
-    supabase: Client = Depends(get_supabase),
+async def delete_avatar_from_r2(
+    supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
-    刪除用戶的頭像
+    從 R2 刪除用戶的頭像檔案
     
     流程：
     1. 查詢用戶當前的頭像路徑
-    2. 從 R2 刪除檔案
-    3. 更新數據庫將 avatar_path 設為 NULL
+    2. 檢查是否為 R2 上的檔案（avatars/ 開頭）
+    3. 從 R2 刪除檔案
+    4. 返回刪除結果
+    
+    注意：
+    - 用戶只能刪除自己的頭像
+    - 只負責 R2 的檔案刪除操作
+    - 資料庫更新由前端處理
     """
     try:
         user_id = current_user.user.id
@@ -169,39 +175,40 @@ async def delete_avatar(
                 detail="用戶尚未設置頭像"
             )
         
+        # 檢查是否為 R2 上的檔案
+        if not avatar_path.startswith('avatars/'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="該頭像不在 R2 上，無需刪除"
+            )
+        
+        logger.info(f"用戶 {user_id} 請求刪除 R2 檔案: {avatar_path}")
+        
         # 從 R2 刪除檔案
         delete_success = await delete_file_from_private_r2(avatar_path)
         
         if not delete_success:
-            logger.warning(f"刪除 R2 檔案失敗，但仍會清除數據庫記錄: {avatar_path}")
-        
-        # 更新數據庫將 avatar_path 設為 NULL
-        update_result = supabase.table('user_profiles').update({
-            'avatar_path': None
-        }).eq('user_id', user_id).execute()
-        
-        if not update_result.data:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="更新數據庫失敗"
+                detail="從 R2 刪除檔案失敗"
             )
         
-        logger.info(f"已刪除用戶 {user_id} 的頭像: {avatar_path}")
+        logger.info(f"已從 R2 刪除用戶 {user_id} 的頭像檔案: {avatar_path}")
         
-        return {"message": "頭像已成功刪除"}
+        return {"message": "頭像檔案已從 R2 成功刪除"}
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"刪除頭像時發生錯誤: {str(e)}")
+        logger.error(f"刪除 R2 檔案時發生錯誤: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="刪除頭像時發生錯誤"
+            detail="刪除 R2 檔案時發生錯誤"
         )
 
 @router.get("/avatar/url", response_model=AvatarUrlResponse)
 async def get_avatar_url(
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_service),
     current_user = Depends(get_current_user)
 ):
     """
@@ -209,27 +216,56 @@ async def get_avatar_url(
     
     流程：
     1. 查詢用戶的頭像路徑
-    2. 生成 Presigned GET URL（有效期 1 小時）
-    3. 返回 URL 供前端顯示
+    2. 檢查是否為 R2 上的自訂頭像（avatars/ 開頭）
+    3. 生成 Presigned GET URL（有效期 1 小時）
+    4. 返回 URL 供前端顯示
+    
+    注意：
+    - 如果用戶記錄不存在、沒有頭像、或使用預設頭像，返回 404
+    - 只有 R2 上的自訂頭像（avatars/ 開頭）才生成 presigned URL
     """
     try:
         user_id = current_user.user.id
+        logger.info(f"用戶 {user_id} 請求獲取頭像 URL")
         
         # 查詢用戶的頭像路徑
         result = supabase.table('user_profiles').select('avatar_path').eq('user_id', user_id).execute()
         
+        logger.info(f"查詢結果: result.data={result.data}, len={len(result.data) if result.data else 0}")
+        
         if not result.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="找不到用戶資料"
-            )
-        
-        avatar_path = result.data[0].get('avatar_path')
-        
-        if not avatar_path:
+            # 用戶記錄不存在（首次使用）
+            logger.warning(f"用戶 {user_id} 記錄不存在")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="用戶尚未設置頭像"
+            )
+        
+        avatar_path = result.data[0].get('avatar_path')
+        logger.info(f"用戶 {user_id} 的頭像路徑: {avatar_path}")
+        
+        if not avatar_path:
+            # 沒有設置頭像
+            logger.warning(f"用戶 {user_id} 的 avatar_path 為空")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用戶尚未設置頭像"
+            )
+        
+        # 檢查是否為預設頭像（assets/ 開頭）
+        if avatar_path.startswith('assets/'):
+            # 使用預設頭像，不需要生成 presigned URL
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用戶使用預設頭像"
+            )
+        
+        # 檢查是否為 R2 上的自訂頭像
+        if not avatar_path.startswith('avatars/'):
+            logger.warning(f"未知的頭像路徑格式: {avatar_path}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="未知的頭像路徑格式"
             )
         
         # 生成 Presigned GET URL（有效期 1 小時）

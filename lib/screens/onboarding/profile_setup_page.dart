@@ -39,6 +39,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   Uint8List? _localAvatarBytes; // 本地壓縮的頭像數據（用於直接顯示）
   bool _hasCustomAvatar = false; // 是否已上傳自訂頭像
   bool _isLoadingAvatar = false; // 頭像是否正在載入中
+  bool _isProcessingAvatar = false; // 是否正在處理頭像（上傳或刪除中）
 
   @override
   void initState() {
@@ -68,7 +69,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         final index = random.nextInt(6) + 1;
         return 'assets/images/avatar/profile/male_$index.webp';
       } else {
-        final index = random.nextInt(7) + 1;
+        final index = random.nextInt(6) + 1;
         return 'assets/images/avatar/profile/female_$index.webp';
       }
     }
@@ -92,6 +93,15 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     });
 
     try {
+      // 優先使用本地已壓縮的圖片（剛上傳但還沒保存到資料庫的情況）
+      if (_hasCustomAvatar && _localAvatarBytes != null) {
+        debugPrint('使用本地已上傳的頭像');
+        setState(() {
+          _isLoadingAvatar = false;
+        });
+        return;
+      }
+
       // 檢查 _uploadedAvatarPath 的類型
       if (_uploadedAvatarPath == null || _uploadedAvatarPath!.isEmpty) {
         // 沒有頭像路徑，生成隨機預設頭像
@@ -111,9 +121,10 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         });
       } else if (_uploadedAvatarPath!.startsWith('avatars/')) {
         // 是 R2 上的自訂頭像，需要取得 presigned URL
-        debugPrint('載入自訂頭像: $_uploadedAvatarPath');
+        debugPrint('載入 R2 自訂頭像: $_uploadedAvatarPath');
         final avatarUrl = await _userService.getAvatarUrl();
         if (avatarUrl != null) {
+          debugPrint('成功取得 R2 頭像 URL');
           setState(() {
             _avatarUrl = avatarUrl;
             _hasCustomAvatar = true;
@@ -121,7 +132,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           });
         } else {
           // 取得 URL 失敗，使用預設頭像
-          debugPrint('取得頭像 URL 失敗，使用預設頭像');
+          debugPrint('取得頭像 URL 失敗（404 或錯誤），使用預設頭像');
           setState(() {
             _hasCustomAvatar = false;
             _updateDefaultAvatar();
@@ -149,50 +160,108 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   /// 處理頭像上傳
   Future<void> _handleAvatarUpload() async {
+    // 防止重複操作
+    if (_isProcessingAvatar) {
+      return;
+    }
+
     // 保存先前的狀態，以便錯誤時恢復
     final previousAvatarPath = _uploadedAvatarPath;
     final previousAvatarBytes = _localAvatarBytes;
     final previousHasCustomAvatar = _hasCustomAvatar;
 
-    // 選擇圖片後立即顯示 loading
-    setState(() {
-      _isLoadingAvatar = true;
-    });
-
     try {
-      final result = await _userService.uploadAvatar();
+      // 步驟 1: 先讓用戶選擇並壓縮圖片（此時不顯示 loading）
+      final imageBytes = await _userService.pickAndConvertImageToWebP();
 
-      if (result != null) {
-        final avatarPath = result['avatar_path'] as String;
-        final imageBytes = result['image_bytes'] as Uint8List;
+      // 如果用戶取消選擇，直接返回
+      if (imageBytes == null) {
+        debugPrint('用戶取消選擇圖片');
+        return;
+      }
 
-        // 上傳成功，暫存資料（不更新資料庫）
-        // 資料庫更新會在點擊「下一步」時統一處理
+      // 步驟 2: 用戶已選擇圖片，開始顯示 loading 並標記處理中
+      setState(() {
+        _isLoadingAvatar = true;
+        _isProcessingAvatar = true;
+      });
+
+      // 步驟 3: 獲取上傳 URL
+      final uploadData = await _userService.getAvatarUploadUrl();
+
+      if (uploadData == null) {
+        debugPrint('獲取上傳 URL 失敗');
         setState(() {
-          _uploadedAvatarPath = avatarPath;
-          _localAvatarBytes = imageBytes;
-          _hasCustomAvatar = true;
           _isLoadingAvatar = false;
+          _isProcessingAvatar = false;
         });
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                '頭像上傳成功',
+                '獲取上傳連結失敗',
                 style: TextStyle(fontFamily: 'OtsutomeFont'),
               ),
             ),
           );
         }
-      } else {
-        // 上傳失敗或用戶取消，恢復先前狀態
+        return;
+      }
+
+      final uploadUrl = uploadData['upload_url'] as String;
+      final avatarPath = uploadData['avatar_path'] as String;
+
+      // 步驟 4: 上傳圖片到 R2
+      final uploadSuccess = await _userService.uploadImageToR2(
+        uploadUrl,
+        imageBytes,
+      );
+
+      if (!uploadSuccess) {
+        debugPrint('上傳圖片失敗');
         setState(() {
-          _uploadedAvatarPath = previousAvatarPath;
-          _localAvatarBytes = previousAvatarBytes;
-          _hasCustomAvatar = previousHasCustomAvatar;
           _isLoadingAvatar = false;
+          _isProcessingAvatar = false;
         });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '上傳圖片失敗',
+                style: TextStyle(fontFamily: 'OtsutomeFont'),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 步驟 5: 設置資料
+      setState(() {
+        _uploadedAvatarPath = avatarPath;
+        _localAvatarBytes = imageBytes;
+        _hasCustomAvatar = true;
+      });
+
+      // 步驟 6: 預緩存圖片，確保圖片完全載入後再隱藏 loading
+      if (mounted) {
+        final image = MemoryImage(imageBytes);
+        await precacheImage(image, context);
+
+        // 圖片完全載入後才隱藏 loading
+        setState(() {
+          _isLoadingAvatar = false;
+          _isProcessingAvatar = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '頭像上傳成功',
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
       }
     } catch (e) {
       debugPrint('上傳頭像時發生錯誤: $e');
@@ -202,6 +271,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         _localAvatarBytes = previousAvatarBytes;
         _hasCustomAvatar = previousHasCustomAvatar;
         _isLoadingAvatar = false;
+        _isProcessingAvatar = false;
       });
 
       if (mounted) {
@@ -219,62 +289,33 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   /// 處理頭像刪除
   Future<void> _handleAvatarDelete() async {
+    // 防止重複操作
+    if (_isProcessingAvatar) {
+      return;
+    }
+
+    // 標記開始處理
     setState(() {
-      _isLoading = true;
+      _isProcessingAvatar = true;
     });
 
-    try {
-      final success = await _userService.deleteAvatar();
+    // 只清除本地狀態，不調用後端刪除
+    // 實際的資料庫刪除會在按下「完成」或「下一步」時處理
+    setState(() {
+      _avatarUrl = null;
+      _hasCustomAvatar = false;
+      _uploadedAvatarPath = null; // 清除已上傳的頭像路徑
+      _localAvatarBytes = null; // 清除本地圖片數據
+      _updateDefaultAvatar();
+      _isProcessingAvatar = false;
+    });
 
-      if (success) {
-        setState(() {
-          _avatarUrl = null;
-          _hasCustomAvatar = false;
-          _uploadedAvatarPath = null; // 清除已上傳的頭像路徑
-          _localAvatarBytes = null; // 清除本地圖片數據
-          _updateDefaultAvatar();
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                '頭像已刪除',
-                style: TextStyle(fontFamily: 'OtsutomeFont'),
-              ),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                '刪除頭像失敗，請稍後再試',
-                style: TextStyle(fontFamily: 'OtsutomeFont'),
-              ),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('刪除頭像時發生錯誤: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              '刪除頭像失敗',
-              style: TextStyle(fontFamily: 'OtsutomeFont'),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('頭像已移除', style: TextStyle(fontFamily: 'OtsutomeFont')),
+        ),
+      );
     }
   }
 
@@ -316,12 +357,14 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       if (widget.isFromProfile) {
         // 如果是從profile頁面導航過來的，載入用戶資料
         try {
+          debugPrint('正在載入用戶資料，用戶 ID: ${currentUser.id}');
           final userProfile = await _databaseService.getUserCompleteProfile(
             currentUser.id,
           );
 
           if (userProfile['profile'] != null) {
             final profile = userProfile['profile'];
+            debugPrint('用戶資料: $profile');
 
             // 設置暱稱
             if (profile['nickname'] != null) {
@@ -348,6 +391,9 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
             // 設置頭像路徑
             if (profile['avatar_path'] != null) {
               _uploadedAvatarPath = profile['avatar_path'];
+              debugPrint('從資料庫載入的頭像路徑: $_uploadedAvatarPath');
+            } else {
+              debugPrint('資料庫中沒有頭像路徑');
             }
 
             setState(() {
@@ -410,7 +456,9 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   // 檢查表單是否有效
   bool _isFormValid() {
-    return _nicknameController.text.trim().isNotEmpty && _selectedGender != 0;
+    return _nicknameController.text.trim().isNotEmpty &&
+        _selectedGender != 0 &&
+        !_isProcessingAvatar; // 處理頭像時不能提交
   }
 
   // 處理返回按鈕
@@ -675,12 +723,15 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                       child: ClipOval(
                                         child:
                                             _isLoadingAvatar
-                                                ? Center(
-                                                  child: LoadingImage(
-                                                    width: 40.w,
-                                                    height: 40.h,
-                                                    color: const Color(
-                                                      0xFFB33D1C,
+                                                ? Container(
+                                                  color: Colors.white,
+                                                  child: Center(
+                                                    child: LoadingImage(
+                                                      width: 40.w,
+                                                      height: 40.h,
+                                                      color: const Color(
+                                                        0xFFB33D1C,
+                                                      ),
                                                     ),
                                                   ),
                                                 )
@@ -705,12 +756,15 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                                       return child;
                                                     }
                                                     // 顯示 loading placeholder
-                                                    return Center(
-                                                      child: LoadingImage(
-                                                        width: 40.w,
-                                                        height: 40.h,
-                                                        color: const Color(
-                                                          0xFFB33D1C,
+                                                    return Container(
+                                                      color: Colors.white,
+                                                      child: Center(
+                                                        child: LoadingImage(
+                                                          width: 40.w,
+                                                          height: 40.h,
+                                                          color: const Color(
+                                                            0xFFB33D1C,
+                                                          ),
                                                         ),
                                                       ),
                                                     );

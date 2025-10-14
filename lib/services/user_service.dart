@@ -165,7 +165,8 @@ class UserService {
   /// 獲取頭像顯示 URL
   Future<String?> getAvatarUrl() async {
     try {
-      debugPrint('正在獲取頭像 URL...');
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      debugPrint('正在獲取頭像 URL... 用戶 ID: $userId');
 
       final session = Supabase.instance.client.auth.currentSession;
       final token = session?.accessToken;
@@ -185,6 +186,9 @@ class UserService {
       );
 
       debugPrint('獲取頭像 URL 響應狀態碼: ${response.statusCode}');
+      if (response.statusCode != 200) {
+        debugPrint('獲取頭像 URL 失敗: ${response.body}');
+      }
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -205,37 +209,86 @@ class UserService {
     }
   }
 
-  /// 刪除頭像
+  /// 刪除頭像（前端統一處理）
+  /// 返回 true（成功）或 false（失敗）
   Future<bool> deleteAvatar() async {
     try {
       debugPrint('正在刪除頭像...');
 
-      final session = Supabase.instance.client.auth.currentSession;
-      final token = session?.accessToken;
-
-      if (token == null) {
-        debugPrint('未找到用戶 token');
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        debugPrint('未找到用戶 ID');
         return false;
       }
 
-      final url = Uri.parse('${_apiService.baseUrl}/user/avatar');
-      final response = await http.delete(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      // 1. 查詢用戶當前的頭像路徑
+      final result =
+          await Supabase.instance.client
+              .from('user_profiles')
+              .select('avatar_path')
+              .eq('user_id', userId)
+              .maybeSingle();
 
-      debugPrint('刪除頭像響應狀態碼: ${response.statusCode}');
+      if (result == null) {
+        debugPrint('找不到用戶資料');
+        return false;
+      }
 
-      if (response.statusCode == 200) {
-        debugPrint('頭像刪除成功');
-        return true;
+      final avatarPath = result['avatar_path'] as String?;
+
+      if (avatarPath == null || avatarPath.isEmpty) {
+        debugPrint('用戶尚未設置頭像');
+        return false;
+      }
+
+      // 2. 檢查頭像路徑類型並處理
+      if (avatarPath.startsWith('assets/')) {
+        // 預設頭像，不需要從 R2 刪除，只更新資料庫
+        debugPrint('用戶使用預設頭像，只清空資料庫記錄');
+      } else if (avatarPath.startsWith('avatars/')) {
+        // R2 上的自訂頭像，需要從 R2 刪除
+        final session = Supabase.instance.client.auth.currentSession;
+        final token = session?.accessToken;
+
+        if (token == null) {
+          debugPrint('未找到用戶 token');
+          return false;
+        }
+
+        // 調用後端 API 從 R2 刪除檔案（不需要傳入路徑）
+        final url = Uri.parse('${_apiService.baseUrl}/user/avatar');
+        final response = await http.delete(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        debugPrint('刪除 R2 檔案響應狀態碼: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          debugPrint('從 R2 刪除檔案成功');
+        } else if (response.statusCode == 400) {
+          debugPrint('該頭像不在 R2 上，無需刪除');
+        } else if (response.statusCode == 404) {
+          debugPrint('用戶資料或頭像不存在');
+        } else {
+          debugPrint('從 R2 刪除檔案失敗: ${response.body}');
+          // 即使 R2 刪除失敗，仍然繼續清空資料庫記錄
+        }
       } else {
-        debugPrint('刪除頭像失敗: ${response.body}');
-        return false;
+        debugPrint('未知的頭像路徑格式: $avatarPath');
       }
+
+      // 3. 更新資料庫，將 avatar_path 設為 NULL
+      await Supabase.instance.client
+          .from('user_profiles')
+          .update({'avatar_path': null})
+          .eq('user_id', userId);
+
+      debugPrint('頭像刪除成功');
+      return true;
     } catch (e) {
       debugPrint('刪除頭像時發生錯誤: $e');
       return false;
