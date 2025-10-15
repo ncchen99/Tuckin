@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/utils/index.dart';
+import 'package:tuckin/services/image_cache_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class RestaurantCard extends StatefulWidget {
@@ -309,30 +311,23 @@ class _RestaurantCardState extends State<RestaurantCard>
     }
     // 如果是網路圖片
     else {
-      return Image.network(
-        widget.imageUrl,
+      return CachedNetworkImage(
+        imageUrl: widget.imageUrl,
+        cacheManager: ImageCacheService().restaurantCacheManager,
         width: 100.w,
         height: 100.h,
         fit: BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
+        placeholder: (context, url) {
           return Container(
             width: 100.w,
             height: 100.h,
             color: Colors.grey[200],
-            child: Center(
-              child: CircularProgressIndicator(
-                value:
-                    loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                        : null,
-                color: const Color(0xFF23456B),
-              ),
+            child: const Center(
+              child: CircularProgressIndicator(color: Color(0xFF23456B)),
             ),
           );
         },
-        errorBuilder: (context, error, stackTrace) {
+        errorWidget: (context, url, error) {
           debugPrint('網路圖片載入錯誤 (${widget.imageUrl}): $error');
           return _buildFallbackImage();
         },

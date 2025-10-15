@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/image_cache_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/services/user_status_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:tuckin/services/dining_service.dart';
 import 'package:tuckin/services/realtime_service.dart';
@@ -1123,12 +1125,27 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                         },
                         child:
                             _restaurantImageUrl != null
-                                ? Image.network(
-                                  _restaurantImageUrl!,
+                                ? CachedNetworkImage(
+                                  imageUrl: _restaurantImageUrl!,
+                                  cacheManager:
+                                      ImageCacheService()
+                                          .restaurantCacheManager,
                                   width: double.infinity,
                                   height: 150.h,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
+                                  placeholder: (context, url) {
+                                    return Container(
+                                      width: double.infinity,
+                                      height: 150.h,
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          color: Color(0xFF23456B),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  errorWidget: (context, url, error) {
                                     return Container(
                                       width: double.infinity,
                                       height: 150.h,

@@ -12,3 +12,5 @@ export 'supabase_service.dart';
 export 'realtime_service.dart';
 export 'matching_service.dart';
 export 'user_status_service.dart';
+export 'image_cache_service.dart';
+export 'user_service.dart';

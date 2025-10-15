@@ -3,8 +3,10 @@ import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/user_service.dart';
+import 'package:tuckin/services/image_cache_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -760,19 +762,13 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                                 )
                                                 : _hasCustomAvatar &&
                                                     _avatarUrl != null
-                                                ? Image.network(
-                                                  _avatarUrl!,
+                                                ? CachedNetworkImage(
+                                                  imageUrl: _avatarUrl!,
+                                                  cacheManager:
+                                                      ImageCacheService()
+                                                          .avatarCacheManager,
                                                   fit: BoxFit.cover,
-                                                  loadingBuilder: (
-                                                    context,
-                                                    child,
-                                                    loadingProgress,
-                                                  ) {
-                                                    if (loadingProgress ==
-                                                        null) {
-                                                      return child;
-                                                    }
-                                                    // 顯示 loading placeholder
+                                                  placeholder: (context, url) {
                                                     return Container(
                                                       color: Colors.white,
                                                       child: Center(
@@ -786,10 +782,10 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                                       ),
                                                     );
                                                   },
-                                                  errorBuilder: (
+                                                  errorWidget: (
                                                     context,
+                                                    url,
                                                     error,
-                                                    stackTrace,
                                                   ) {
                                                     // 如果載入失敗，顯示預設頭像
                                                     return Container(

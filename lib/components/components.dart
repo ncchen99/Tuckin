@@ -14,4 +14,5 @@ export 'common/splash_screen.dart';
 export 'common/info_tip_box.dart';
 export 'common/header_bar.dart';
 export 'common/custom_confirmation_dialog.dart';
+export 'common/cached_image.dart';
 export 'dinner/restaurant_card.dart';
