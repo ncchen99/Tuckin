@@ -17,14 +17,6 @@ BEGIN
     END IF;
 END $$;
 
--- 更新 users_profiles_view 視圖以包含 avatar_path
-CREATE OR REPLACE VIEW users_profiles_view AS
-SELECT
-    user_id,
-    nickname,
-    personal_desc,
-    avatar_path
-FROM user_profiles;
 
 -- 添加註釋說明
 COMMENT ON COLUMN user_profiles.avatar_path IS '用戶頭像在私有 R2 bucket 中的路徑（格式：avatars/user_id.webp）';

@@ -329,14 +329,6 @@ FROM
 LEFT JOIN 
     user_matching_info umi ON us.user_id = umi.user_id;
 
--- 創建 users_profiles_view 視圖
-CREATE OR REPLACE VIEW users_profiles_view AS
-SELECT
-    user_id,
-    nickname,
-    personal_desc,
-    avatar_path
-FROM user_profiles;
 
 -- 創建必要的索引來優化查詢性能
 CREATE INDEX IF NOT EXISTS idx_dining_events_group_id ON dining_events(matching_group_id);

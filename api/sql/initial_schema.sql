@@ -1,11 +1,3 @@
--- 創建 users_profiles_view 視圖
-CREATE OR REPLACE VIEW users_profiles_view AS
-SELECT
-    user_id,
-    nickname,
-    personal_desc,
-    avatar_path
-FROM user_profiles;
 
 
 -- 創建 dining_events 表
