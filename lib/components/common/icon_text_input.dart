@@ -21,7 +21,7 @@ class IconTextInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 10.h),
+      margin: EdgeInsets.symmetric(vertical: 8.h),
       padding: EdgeInsets.only(left: 15.w, right: 10.w),
       height: 60.h,
       decoration: BoxDecoration(

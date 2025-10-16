@@ -1054,7 +1054,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                   // 性別選擇
                                   Container(
                                     margin: EdgeInsets.only(
-                                      top: 2.5.h,
+                                      top: 2.h,
                                       bottom: 5.h,
                                     ),
                                     padding: EdgeInsets.symmetric(
@@ -1270,7 +1270,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
                                   // 個人亮點描述輸入框
                                   Container(
-                                    margin: EdgeInsets.only(top: 12.5.h),
+                                    margin: EdgeInsets.only(top: 10.h),
                                     padding: EdgeInsets.symmetric(
                                       horizontal: 20.w,
                                     ),
@@ -1363,7 +1363,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                   // 底部按鈕區域
                                   Container(
                                     margin: EdgeInsets.only(
-                                      top: 40.h,
+                                      top: widget.isFromProfile ? 47.h : 20.h,
                                       bottom: 20.h,
                                     ),
                                     alignment: Alignment.center,
