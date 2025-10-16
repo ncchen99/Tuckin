@@ -262,16 +262,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         }
 
         // 立即快取新上傳的頭像（使用 UserService 的方法）
-        final cacheSuccess = await _userService.cacheUploadedAvatar(
-          avatarPath,
-          imageBytes,
-        );
-
-        if (cacheSuccess) {
-          debugPrint('新頭像已成功快取，下次開啟將瞬間載入');
-        } else {
-          debugPrint('新頭像快取失敗，但不影響顯示');
-        }
+        await _userService.cacheUploadedAvatar(avatarPath, imageBytes);
 
         // 同時使用 Flutter 的預緩存確保當前顯示正常
         final image = MemoryImage(imageBytes);
