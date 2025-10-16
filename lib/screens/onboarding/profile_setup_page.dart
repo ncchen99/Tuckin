@@ -7,6 +7,7 @@ import 'package:tuckin/services/image_cache_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -122,43 +123,33 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           _isLoadingAvatar = false;
         });
       } else if (_uploadedAvatarPath!.startsWith('avatars/')) {
-        // 是 R2 上的自訂頭像，需要取得 presigned URL
+        // 是 R2 上的自訂頭像，使用智能載入
         debugPrint('載入 R2 自訂頭像: $_uploadedAvatarPath');
-        final avatarUrl = await _userService.getAvatarUrl();
-        if (avatarUrl != null) {
-          debugPrint('成功取得 R2 頭像 URL');
-          try {
-            // 預緩存網路圖片，確保完全載入後再顯示
-            final networkImage = NetworkImage(avatarUrl);
-            await precacheImage(networkImage, context);
 
-            // 圖片完全載入後才更新狀態並關閉 loading
-            if (mounted) {
-              setState(() {
-                _avatarUrl = avatarUrl;
-                _hasCustomAvatar = true;
-                _isLoadingAvatar = false;
-              });
-            }
-          } catch (e) {
-            // 預緩存失敗，使用預設頭像
-            debugPrint('預緩存網路圖片失敗: $e，使用預設頭像');
-            if (mounted) {
-              setState(() {
-                _hasCustomAvatar = false;
-                _updateDefaultAvatar();
-                _isLoadingAvatar = false;
-              });
-            }
+        final result = await _userService.loadAvatarSmart(_uploadedAvatarPath!);
+
+        if (result['success'] == true) {
+          if (mounted) {
+            setState(() {
+              _avatarUrl =
+                  result['isFromCache'] == true
+                      ? result['filePath'] // 使用本地快取文件路徑
+                      : result['url']; // 使用網路 URL
+              _hasCustomAvatar = true;
+              _isLoadingAvatar = false;
+            });
           }
+          debugPrint('頭像載入成功，來源: ${result['isFromCache'] ? '本地快取' : '網路下載'}');
         } else {
-          // 取得 URL 失敗，使用預設頭像
-          debugPrint('取得頭像 URL 失敗（404 或錯誤），使用預設頭像');
-          setState(() {
-            _hasCustomAvatar = false;
-            _updateDefaultAvatar();
-            _isLoadingAvatar = false;
-          });
+          // 載入失敗，使用預設頭像
+          debugPrint('頭像載入失敗，使用預設頭像');
+          if (mounted) {
+            setState(() {
+              _hasCustomAvatar = false;
+              _updateDefaultAvatar();
+              _isLoadingAvatar = false;
+            });
+          }
         }
       } else {
         // 未知格式，使用預設頭像
@@ -259,12 +250,34 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         return;
       }
 
-      // 步驟 5: 預緩存圖片，確保圖片完全載入後再更新狀態
+      // 步驟 5: 立即快取新頭像並更新狀態
       if (mounted) {
+        // 清除舊的自訂頭像快取（若存在）
+        if (previousAvatarPath != null &&
+            previousAvatarPath.startsWith('avatars/')) {
+          await ImageCacheService().clearCacheByKey(
+            previousAvatarPath,
+            CacheType.avatar,
+          );
+        }
+
+        // 立即快取新上傳的頭像（使用 UserService 的方法）
+        final cacheSuccess = await _userService.cacheUploadedAvatar(
+          avatarPath,
+          imageBytes,
+        );
+
+        if (cacheSuccess) {
+          debugPrint('新頭像已成功快取，下次開啟將瞬間載入');
+        } else {
+          debugPrint('新頭像快取失敗，但不影響顯示');
+        }
+
+        // 同時使用 Flutter 的預緩存確保當前顯示正常
         final image = MemoryImage(imageBytes);
         await precacheImage(image, context);
 
-        // 圖片完全載入後才更新所有狀態並隱藏 loading
+        // 更新狀態並隱藏 loading
         setState(() {
           _uploadedAvatarPath = avatarPath;
           _localAvatarBytes = imageBytes;
@@ -762,42 +775,86 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                                 )
                                                 : _hasCustomAvatar &&
                                                     _avatarUrl != null
-                                                ? CachedNetworkImage(
-                                                  imageUrl: _avatarUrl!,
-                                                  cacheManager:
-                                                      ImageCacheService()
-                                                          .avatarCacheManager,
-                                                  fit: BoxFit.cover,
-                                                  placeholder: (context, url) {
-                                                    return Container(
-                                                      color: Colors.white,
-                                                      child: Center(
-                                                        child: LoadingImage(
-                                                          width: 40.w,
-                                                          height: 40.h,
-                                                          color: const Color(
-                                                            0xFFB33D1C,
+                                                ? _avatarUrl!.startsWith('/')
+                                                    ? // 本地快取文件，使用 Image.file
+                                                    Image.file(
+                                                      File(_avatarUrl!),
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (
+                                                        context,
+                                                        error,
+                                                        stackTrace,
+                                                      ) {
+                                                        debugPrint(
+                                                          '本地快取文件損壞，觸發重新載入: $_uploadedAvatarPath',
+                                                        );
+                                                        // 本地文件損壞，觸發重新載入
+                                                        Future.microtask(
+                                                          () =>
+                                                              _loadUserAvatar(),
+                                                        );
+                                                        // 暫時顯示預設頭像
+                                                        return Container(
+                                                          color: Colors.white,
+                                                          child: Image.asset(
+                                                            _defaultAvatarPath ??
+                                                                'assets/images/avatar/no_bg/male_1.webp',
+                                                            fit: BoxFit.cover,
                                                           ),
-                                                        ),
-                                                      ),
-                                                    );
-                                                  },
-                                                  errorWidget: (
-                                                    context,
-                                                    url,
-                                                    error,
-                                                  ) {
-                                                    // 如果載入失敗，顯示預設頭像
-                                                    return Container(
-                                                      color: Colors.white,
-                                                      child: Image.asset(
-                                                        _defaultAvatarPath ??
-                                                            'assets/images/avatar/no_bg/male_1.webp',
-                                                        fit: BoxFit.cover,
-                                                      ),
-                                                    );
-                                                  },
-                                                )
+                                                        );
+                                                      },
+                                                    )
+                                                    : // 網路 URL，使用 CachedNetworkImage
+                                                    CachedNetworkImage(
+                                                      imageUrl: _avatarUrl!,
+                                                      cacheKey:
+                                                          _uploadedAvatarPath, // 使用穩定的快取 key
+                                                      cacheManager:
+                                                          ImageCacheService()
+                                                              .avatarCacheManager,
+                                                      fit: BoxFit.cover,
+                                                      placeholder: (
+                                                        context,
+                                                        url,
+                                                      ) {
+                                                        return Container(
+                                                          color: Colors.white,
+                                                          child: Center(
+                                                            child: LoadingImage(
+                                                              width: 40.w,
+                                                              height: 40.h,
+                                                              color:
+                                                                  const Color(
+                                                                    0xFFB33D1C,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                      errorWidget: (
+                                                        context,
+                                                        url,
+                                                        error,
+                                                      ) {
+                                                        debugPrint(
+                                                          '網路圖片載入失敗，觸發重新載入: $_uploadedAvatarPath',
+                                                        );
+                                                        // 網路圖片載入失敗，觸發重新載入
+                                                        Future.microtask(
+                                                          () =>
+                                                              _loadUserAvatar(),
+                                                        );
+                                                        // 暫時顯示預設頭像
+                                                        return Container(
+                                                          color: Colors.white,
+                                                          child: Image.asset(
+                                                            _defaultAvatarPath ??
+                                                                'assets/images/avatar/no_bg/male_1.webp',
+                                                            fit: BoxFit.cover,
+                                                          ),
+                                                        );
+                                                      },
+                                                    )
                                                 : Container(
                                                   color: Colors.white,
                                                   child: Image.asset(

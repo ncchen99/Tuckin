@@ -112,6 +112,51 @@ class ImageCacheService {
     debugPrint('已清除所有圖片緩存');
   }
 
+  /// 使用自定義 key 預緩存圖片
+  ///
+  /// [url] 圖片的網路 URL
+  /// [key] 自定義的緩存 key（例如使用 avatar_path）
+  /// [type] 緩存類型
+  Future<void> precacheImageWithKey(
+    String url,
+    String key,
+    CacheType type,
+  ) async {
+    try {
+      final cacheManager = getCacheManager(type);
+      await cacheManager.downloadFile(url, key: key);
+      debugPrint('預緩存圖片成功 (key: $key): $url');
+    } catch (e) {
+      debugPrint('預緩存圖片失敗: $e');
+    }
+  }
+
+  /// 使用自定義 key 獲取緩存的圖片文件
+  ///
+  /// [key] 自定義的緩存 key
+  /// [type] 緩存類型
+  Future<File?> getCachedImageByKey(String key, CacheType type) async {
+    try {
+      final cacheManager = getCacheManager(type);
+      final fileInfo = await cacheManager.getFileFromCache(key);
+      return fileInfo?.file;
+    } catch (e) {
+      debugPrint('獲取緩存圖片失敗: $e');
+      return null;
+    }
+  }
+
+  /// 清除特定 key 的緩存
+  Future<void> clearCacheByKey(String key, CacheType type) async {
+    try {
+      final cacheManager = getCacheManager(type);
+      await cacheManager.removeFile(key);
+      debugPrint('已清除快取 (key: $key)');
+    } catch (e) {
+      debugPrint('清除快取失敗: $e');
+    }
+  }
+
   // 注意：flutter_cache_manager 會自動管理緩存大小和過期時間
   // 根據配置，頭像和餐廳圖片都會在 7 天後自動刪除
   // 當文件數量超過上限時，會使用 LRU 策略自動清理最舊的文件

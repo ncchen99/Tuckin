@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'api_service.dart';
+import 'image_cache_service.dart';
 
 class UserService {
   static final UserService _instance = UserService._internal();
@@ -356,6 +357,108 @@ class UserService {
     } catch (e) {
       debugPrint('更新 avatar_path 到資料庫時發生錯誤: $e');
       return false;
+    }
+  }
+
+  /// 上傳後立即快取新頭像（用於提升用戶體驗）
+  ///
+  /// [avatarPath] R2 上的頭像路徑（例如：avatars/xxx.webp）
+  /// [imageBytes] 已壓縮的圖片數據
+  ///
+  /// 返回 true（成功）或 false（失敗）
+  Future<bool> cacheUploadedAvatar(
+    String avatarPath,
+    Uint8List imageBytes,
+  ) async {
+    try {
+      debugPrint('開始快取新上傳的頭像: $avatarPath');
+
+      // 先清除舊的快取（如果存在）
+      await ImageCacheService().clearCacheByKey(avatarPath, CacheType.avatar);
+
+      // 將新圖片數據直接快取到本地（不需要網路請求）
+      final cacheManager = ImageCacheService().getCacheManager(
+        CacheType.avatar,
+      );
+      await cacheManager.putFile(
+        avatarPath, // 使用 avatar_path 作為穩定的 key
+        imageBytes,
+        key: avatarPath,
+      );
+
+      debugPrint('新頭像快取成功: $avatarPath');
+      return true;
+    } catch (e) {
+      debugPrint('快取新頭像失敗: $e');
+      return false;
+    }
+  }
+
+  /// 智能載入頭像（優先使用快取，失敗時重新下載）
+  ///
+  /// [avatarPath] R2 上的頭像路徑
+  ///
+  /// 返回 Map:
+  /// - 'success': bool - 是否成功
+  /// - 'isFromCache': bool - 是否來自快取
+  /// - 'filePath': String? - 本地文件路徑（成功時）
+  /// - 'url': String? - 網路 URL（從網路載入時）
+  Future<Map<String, dynamic>> loadAvatarSmart(String avatarPath) async {
+    try {
+      debugPrint('智能載入頭像: $avatarPath');
+
+      // 步驟 1: 檢查本地快取
+      final cachedFile = await ImageCacheService().getCachedImageByKey(
+        avatarPath,
+        CacheType.avatar,
+      );
+
+      if (cachedFile != null && await cachedFile.exists()) {
+        debugPrint('找到有效的本地快取: $avatarPath');
+        return {
+          'success': true,
+          'isFromCache': true,
+          'filePath': cachedFile.path,
+          'url': null,
+        };
+      }
+
+      // 步驟 2: 快取不存在或損壞，從網路重新載入
+      debugPrint('本地快取不存在或損壞，從網路重新載入: $avatarPath');
+      final avatarUrl = await getAvatarUrl();
+
+      if (avatarUrl == null) {
+        debugPrint('無法獲取頭像 URL: $avatarPath');
+        return {
+          'success': false,
+          'isFromCache': false,
+          'filePath': null,
+          'url': null,
+        };
+      }
+
+      // 步驟 3: 下載並快取
+      await ImageCacheService().precacheImageWithKey(
+        avatarUrl,
+        avatarPath,
+        CacheType.avatar,
+      );
+
+      debugPrint('頭像重新下載並快取成功: $avatarPath');
+      return {
+        'success': true,
+        'isFromCache': false,
+        'filePath': null,
+        'url': avatarUrl,
+      };
+    } catch (e) {
+      debugPrint('智能載入頭像失敗: $e');
+      return {
+        'success': false,
+        'isFromCache': false,
+        'filePath': null,
+        'url': null,
+      };
     }
   }
 }
