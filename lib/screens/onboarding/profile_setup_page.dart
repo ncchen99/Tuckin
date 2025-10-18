@@ -583,6 +583,122 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         !_isProcessingAvatar; // 處理頭像時不能提交
   }
 
+  // 動態計算頂部間距，確保在不同螢幕尺寸下底部距離一致
+  double _calculateTopSpacing(BuildContext context) {
+    // 獲取螢幕可用高度
+    final screenHeight = MediaQuery.of(context).size.height;
+    final safeAreaTop = MediaQuery.of(context).padding.top;
+    final safeAreaBottom = MediaQuery.of(context).padding.bottom;
+    final availableHeight = screenHeight - safeAreaTop - safeAreaBottom;
+
+    // 精確計算每個區域的高度（使用實際 UI 中的數值）
+    // 1. 頂部標題區域
+    final topArea =
+        25.h + // top padding
+        10.h + // bottom padding
+        25.sp + // 標題 fontSize: 25.sp
+        8.h; // 額外空間（BackIconButton bottom: 8.h）
+
+    // 2. 頭像區域
+    final avatarArea =
+        15.h + // margin top
+        120.h; // 頭像 width: 120.h, height: 120.h
+
+    // 3. 暱稱區域
+    final nicknameArea =
+        10.h + // margin top
+        5.h + // margin bottom
+        18.sp + // 標籤「綽號」fontSize: 18.sp
+        60.h + // IconTextInput height: 60.h
+        16.h; // IconTextInput margin (8.h * 2)
+
+    // 4. 性別區域
+    final genderArea =
+        2.h + // margin top
+        5.h + // margin bottom
+        18.sp + // 標籤「性別」fontSize: 18.sp
+        8.h + // 標籤 padding bottom
+        50.h; // 選項按鈕 height: 50.h
+
+    // 5. 個人描述區域
+    final descArea =
+        10.h + // margin top
+        18.sp + // 標籤「一句話介紹自己」fontSize: 18.sp
+        8.h + // 標籤 padding bottom
+        70.h + // TextField SizedBox height: 70.h
+        20.h; // Container padding (10.h * 2)
+
+    // 6. 按鈕區域
+    final buttonArea =
+        20.h + // margin bottom
+        40.h + // Padding vertical (20.h * 2)
+        70.h; // ImageButton height: 70.h
+
+    // 7. 進度指示器
+    final indicatorArea =
+        widget.isFromProfile
+            ? 0.0
+            : (31.w); // padding top + bottom + dot size: 12.h
+
+    final contentHeight =
+        topArea +
+        avatarArea +
+        nicknameArea +
+        genderArea +
+        descArea +
+        buttonArea +
+        indicatorArea +
+        37.h;
+
+    // 計算剩餘空間
+    final remainingSpace = availableHeight - contentHeight;
+
+    // DEBUG: 打印詳細信息，方便比較不同設備
+    debugPrint(
+      '==================== Profile Setup Spacing Debug ====================',
+    );
+    debugPrint('設備螢幕高度: $screenHeight px');
+    debugPrint('安全區域 Top: $safeAreaTop px');
+    debugPrint('安全區域 Bottom: $safeAreaBottom px');
+    debugPrint('可用高度: $availableHeight px');
+    debugPrint(
+      '------------------------------------------------------------------',
+    );
+    debugPrint('頂部區域: $topArea px (25.h + 10.h + 25.sp + 8.h)');
+    debugPrint('頭像區域: $avatarArea px (15.h + 120.h)');
+    debugPrint('暱稱區域: $nicknameArea px (10.h + 5.h + 18.sp + 60.h + 16.h)');
+    debugPrint('性別區域: $genderArea px (2.h + 5.h + 18.sp + 8.h + 50.h)');
+    debugPrint('個人描述: $descArea px (10.h + 18.sp + 8.h + 70.h + 20.h)');
+    debugPrint('按鈕區域: $buttonArea px (20.h + 40.h + 70.h)');
+    debugPrint(
+      '進度指示器: $indicatorArea px (15.h + 10.h + 12.h, isFromProfile=${widget.isFromProfile})',
+    );
+    debugPrint(
+      '------------------------------------------------------------------',
+    );
+    debugPrint('內容總高度: $contentHeight px');
+    debugPrint('剩餘空間: $remainingSpace px');
+
+    // 策略：使用較小的安全邊距（因為現在估算更準確了）
+    final safeMargin = 10.0; // 減小安全邊距到 10px
+    final calculatedSpacing = remainingSpace - safeMargin;
+    final minSpacing = widget.isFromProfile ? 10.h : 5.h; // 降低最小間距
+
+    // 取計算值和最小間距中的較大值
+    final finalSpacing =
+        calculatedSpacing > minSpacing ? calculatedSpacing : minSpacing;
+
+    debugPrint('安全邊距: $safeMargin px');
+    debugPrint('計算後間距: $calculatedSpacing px');
+    debugPrint('最小間距: $minSpacing px');
+    debugPrint('最終使用間距: $finalSpacing px');
+    debugPrint(
+      '======================================================================',
+    );
+
+    return finalSpacing;
+  }
+
   // 處理返回按鈕
   void _handleBack() {
     if (widget.isFromProfile) {
@@ -850,8 +966,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                           children: [
                                             // 圓形頭像容器
                                             Container(
-                                              width: 120.w,
-                                              height: 120.w,
+                                              width: 120.h,
+                                              height: 120.h,
                                               decoration: BoxDecoration(
                                                 shape: BoxShape.circle,
                                                 border: Border.all(
@@ -1362,13 +1478,14 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
                                   // 底部按鈕區域
                                   Container(
-                                    margin: EdgeInsets.only(
-                                      top: widget.isFromProfile ? 47.h : 20.h,
-                                      bottom: 20.h,
-                                    ),
+                                    margin: EdgeInsets.only(bottom: 20.h),
                                     alignment: Alignment.center,
                                     child: Column(
                                       children: [
+                                        // 動態間距區域，確保不同螢幕尺寸下底部距離一致
+                                        SizedBox(
+                                          height: _calculateTopSpacing(context),
+                                        ),
                                         Padding(
                                           padding: EdgeInsets.symmetric(
                                             vertical: 20.h,

@@ -14,7 +14,7 @@ class ProgressDotsIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double dotSize = 12.r; // 使用統一縮放，確保寬高一致為正方形
+    final double dotSize = 12.h; // 使用統一縮放，確保寬高一致為正方形
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(totalSteps, (index) {

@@ -19,7 +19,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.tuckin.app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
+    // 手動更改的可以改回 flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
     // 手動更改的可以改回 flutter.ndkVersion
 
