@@ -200,7 +200,7 @@ class UserService {
     }
   }
 
-  /// 獲取頭像顯示 URL
+  /// 獲取頭像顯示 URL（自己的）
   Future<String?> getAvatarUrl() async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -243,6 +243,59 @@ class UserService {
       }
     } catch (e) {
       debugPrint('獲取頭像 URL 時發生錯誤: $e');
+      return null;
+    }
+  }
+
+  /// 獲取其他用戶的頭像顯示 URL
+  ///
+  /// [userId] 目標用戶的 ID
+  ///
+  /// 返回 presigned URL 或 null（如果失敗）
+  ///
+  /// 權限控制：只能查看同一配對組成員的頭像
+  Future<String?> getOtherUserAvatarUrl(String userId) async {
+    try {
+      debugPrint('正在獲取其他用戶頭像 URL... 目標用戶 ID: $userId');
+
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+
+      if (token == null) {
+        debugPrint('未找到用戶 token');
+        return null;
+      }
+
+      final url = Uri.parse('${_apiService.baseUrl}/user/$userId/avatar/url');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      debugPrint('獲取其他用戶頭像 URL 響應狀態碼: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final avatarUrl = data['url'] as String?;
+        debugPrint('成功獲取其他用戶頭像 URL');
+        return avatarUrl;
+      } else if (response.statusCode == 404) {
+        // 用戶尚未設置頭像或使用預設頭像
+        debugPrint('目標用戶尚未設置頭像或使用預設頭像');
+        return null;
+      } else if (response.statusCode == 403) {
+        // 沒有權限查看該用戶頭像
+        debugPrint('沒有權限查看該用戶頭像');
+        return null;
+      } else {
+        debugPrint('獲取其他用戶頭像 URL 失敗: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('獲取其他用戶頭像 URL 時發生錯誤: $e');
       return null;
     }
   }

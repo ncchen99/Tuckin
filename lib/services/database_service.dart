@@ -593,7 +593,7 @@ class DatabaseService {
         // 使用 inFilter 查詢多個用戶
         final userProfiles = await _supabaseService.client
             .from(_userProfilesTable)
-            .select('user_id, nickname, personal_desc, avatar_path')
+            .select('user_id, nickname, personal_desc, avatar_path, gender')
             .inFilter('user_id', userIds);
 
         if (userProfiles.isEmpty) {

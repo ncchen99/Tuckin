@@ -10,6 +10,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:tuckin/services/dining_service.dart';
 import 'package:tuckin/services/realtime_service.dart';
+import 'package:tuckin/services/user_service.dart';
 import 'dart:math';
 import 'dart:io';
 import 'dart:ui';
@@ -1971,8 +1972,8 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
               ImageButton(
                 text: '關閉',
                 imagePath: 'assets/images/ui/button/blue_m.webp',
-                width: 130.w,
-                height: 65.h,
+                width: 115.w,
+                height: 58.h,
                 textStyle: const TextStyle(
                   color: Color(0xFFD1D1D1),
                   fontFamily: 'OtsutomeFont',
@@ -1996,11 +1997,36 @@ class _MemberListItem extends StatelessWidget {
 
   const _MemberListItem({required this.member});
 
+  /// 根據性別隨機選擇預設頭像
+  String _getRandomDefaultAvatar(String? gender) {
+    final random = Random();
+
+    // 根據性別選擇對應的頭像列表
+    if (gender == 'male') {
+      // 男性頭像：male_1 到 male_12
+      final avatarNumber = random.nextInt(6) + 1;
+      return 'assets/images/avatar/no_bg/male_$avatarNumber.webp';
+    } else if (gender == 'female') {
+      // 女性頭像：female_1 到 female_12
+      final avatarNumber = random.nextInt(6) + 1;
+      return 'assets/images/avatar/no_bg/female_$avatarNumber.webp';
+    } else {
+      // 非二元或未知性別，隨機選擇任一性別
+      final isMale = random.nextBool();
+      final avatarNumber = random.nextInt(6) + 1;
+      return isMale
+          ? 'assets/images/avatar/no_bg/male_$avatarNumber.webp'
+          : 'assets/images/avatar/no_bg/female_$avatarNumber.webp';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final avatarPath = member['avatar_path'] as String?;
     final nickname = member['nickname'] as String? ?? '未命名';
     final personalDesc = member['personal_desc'] as String? ?? '';
+    final userId = member['user_id'] as String?;
+    final gender = member['gender'] as String?;
 
     return Container(
       margin: EdgeInsets.only(bottom: 12.h),
@@ -2034,7 +2060,7 @@ class _MemberListItem extends StatelessWidget {
                 ),
               ],
             ),
-            child: ClipOval(child: _buildAvatar(avatarPath)),
+            child: ClipOval(child: _buildAvatar(avatarPath, userId, gender)),
           ),
 
           SizedBox(width: 12.w),
@@ -2080,15 +2106,13 @@ class _MemberListItem extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar(String? avatarPath) {
-    // 如果沒有頭像路徑或是空字串，使用預設頭像
+  Widget _buildAvatar(String? avatarPath, String? userId, String? gender) {
+    // 如果沒有頭像路徑或是空字串，根據性別隨機選擇預設頭像
     if (avatarPath == null || avatarPath.isEmpty) {
+      final defaultAvatar = _getRandomDefaultAvatar(gender);
       return Container(
         color: Colors.white,
-        child: Image.asset(
-          'assets/images/avatar/no_bg/male_1.webp',
-          fit: BoxFit.cover,
-        ),
+        child: Image.asset(defaultAvatar, fit: BoxFit.cover),
       );
     }
 
@@ -2101,7 +2125,6 @@ class _MemberListItem extends StatelessWidget {
     }
 
     // 如果是 R2 上的自訂頭像（avatars/）
-    // 參考 profile_setup_page.dart 的做法
     if (avatarPath.startsWith('avatars/')) {
       return FutureBuilder<File?>(
         future: ImageCacheService().getCachedImageByKey(
@@ -2117,27 +2140,85 @@ class _MemberListItem extends StatelessWidget {
                 snapshot.data!,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
-                  // 本地檔案損壞，顯示預設頭像
+                  // 本地檔案損壞，根據性別顯示預設頭像
                   debugPrint('本地快取檔案損壞: $avatarPath, 錯誤: $error');
+                  final defaultAvatar = _getRandomDefaultAvatar(gender);
                   return Container(
                     color: Colors.white,
-                    child: Image.asset(
-                      'assets/images/avatar/no_bg/male_1.webp',
-                      fit: BoxFit.cover,
-                    ),
+                    child: Image.asset(defaultAvatar, fit: BoxFit.cover),
                   );
                 },
               );
             } else {
-              // 快取不存在，顯示預設頭像
-              // 注意：由於無法獲取其他用戶的 presigned URL，暫時無法從網路載入
-              debugPrint('快取不存在，使用預設頭像: $avatarPath');
-              return Container(
-                color: Colors.white,
-                child: Image.asset(
-                  'assets/images/avatar/no_bg/male_1.webp',
-                  fit: BoxFit.cover,
-                ),
+              // 快取不存在，嘗試從網路載入其他用戶的頭像
+              debugPrint('快取不存在，嘗試從網路載入其他用戶頭像: $avatarPath');
+
+              if (userId == null) {
+                // 沒有 userId，無法獲取頭像，顯示預設頭像
+                final defaultAvatar = _getRandomDefaultAvatar(gender);
+                return Container(
+                  color: Colors.white,
+                  child: Image.asset(defaultAvatar, fit: BoxFit.cover),
+                );
+              }
+
+              // 嘗試從 API 獲取其他用戶的頭像 URL
+              return FutureBuilder<String?>(
+                future: UserService().getOtherUserAvatarUrl(userId),
+                builder: (context, urlSnapshot) {
+                  if (urlSnapshot.connectionState == ConnectionState.waiting) {
+                    // 載入中
+                    return Container(
+                      color: Colors.white,
+                      child: Center(
+                        child: LoadingImage(
+                          width: 15.w,
+                          height: 15.h,
+                          color: const Color(0xFF23456B),
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (urlSnapshot.hasData && urlSnapshot.data != null) {
+                    // 成功獲取 URL，使用 CachedNetworkImage 載入並快取
+                    return CachedNetworkImage(
+                      imageUrl: urlSnapshot.data!,
+                      cacheManager: ImageCacheService().getCacheManager(
+                        CacheType.avatar,
+                      ),
+                      cacheKey: avatarPath, // 使用 avatar_path 作為快取 key
+                      fit: BoxFit.cover,
+                      placeholder:
+                          (context, url) => Container(
+                            color: Colors.white,
+                            child: Center(
+                              child: LoadingImage(
+                                width: 15.w,
+                                height: 15.h,
+                                color: const Color(0xFF23456B),
+                              ),
+                            ),
+                          ),
+                      errorWidget: (context, url, error) {
+                        // 載入失敗，根據性別顯示預設頭像
+                        debugPrint('載入其他用戶頭像失敗: $error');
+                        final defaultAvatar = _getRandomDefaultAvatar(gender);
+                        return Container(
+                          color: Colors.white,
+                          child: Image.asset(defaultAvatar, fit: BoxFit.cover),
+                        );
+                      },
+                    );
+                  } else {
+                    // 獲取 URL 失敗，根據性別顯示預設頭像
+                    final defaultAvatar = _getRandomDefaultAvatar(gender);
+                    return Container(
+                      color: Colors.white,
+                      child: Image.asset(defaultAvatar, fit: BoxFit.cover),
+                    );
+                  }
+                },
               );
             }
           }
@@ -2157,13 +2238,11 @@ class _MemberListItem extends StatelessWidget {
       );
     }
 
-    // 未知格式，使用預設頭像
+    // 未知格式，根據性別顯示預設頭像
+    final defaultAvatar = _getRandomDefaultAvatar(gender);
     return Container(
       color: Colors.white,
-      child: Image.asset(
-        'assets/images/avatar/no_bg/male_1.webp',
-        fit: BoxFit.cover,
-      ),
+      child: Image.asset(defaultAvatar, fit: BoxFit.cover),
     );
   }
 }
