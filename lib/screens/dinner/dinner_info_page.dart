@@ -1908,11 +1908,11 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
                 child: Text(
                   '參加名單',
                   style: TextStyle(
-                    fontSize: 24.sp,
+                    fontSize: 20.sp,
                     color: const Color(0xFF23456B),
                     fontFamily: 'OtsutomeFont',
                     fontWeight: FontWeight.bold,
-                    height: 1.4,
+                    height: 1.3,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -2049,7 +2049,7 @@ class _MemberListItem extends StatelessWidget {
                 Text(
                   nickname,
                   style: TextStyle(
-                    fontSize: 17.sp,
+                    fontSize: 16.sp,
                     fontFamily: 'OtsutomeFont',
                     color: const Color(0xFF23456B),
                     fontWeight: FontWeight.bold,
