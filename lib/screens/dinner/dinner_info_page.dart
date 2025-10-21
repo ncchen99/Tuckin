@@ -11,6 +11,8 @@ import 'package:provider/provider.dart';
 import 'package:tuckin/services/dining_service.dart';
 import 'package:tuckin/services/realtime_service.dart';
 import 'dart:math';
+import 'dart:io';
+import 'dart:ui';
 // import 'package:tuckin/services/time_service.dart';
 
 class DinnerInfoPage extends StatefulWidget {
@@ -1015,6 +1017,41 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     return passphrases[_random.nextInt(passphrases.length)];
   }
 
+  /// 顯示參加名單對話框
+  void _showAttendeeListDialog() async {
+    // 獲取配對組ID和參加人數
+    final userStatusService = Provider.of<UserStatusService>(
+      context,
+      listen: false,
+    );
+    final matchingGroupId = userStatusService.matchingGroupId;
+    final attendeeCount = userStatusService.attendees ?? 4; // 預設4人
+
+    if (matchingGroupId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '無法獲取參加名單',
+              style: TextStyle(fontFamily: 'OtsutomeFont'),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    // 顯示對話框
+    showDialog(
+      context: context,
+      builder:
+          (context) => _AttendeeListDialog(
+            matchingGroupId: matchingGroupId,
+            expectedAttendeeCount: attendeeCount,
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<UserStatusService>(
@@ -1517,87 +1554,96 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                             children: [
                               // 左側參加名單
                               Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.only(left: 5.w),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      // 名單圖標 - 固定在左側
-                                      SizedBox(
-                                        width: 35.w,
-                                        height: 35.h,
-                                        child: Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            // 底部陰影
-                                            Positioned(
-                                              left: 0,
-                                              top: 2.h,
-                                              child: Image.asset(
+                                child: InkWell(
+                                  onTap: () {
+                                    debugPrint('點擊了參加名單按鈕');
+                                    _showAttendeeListDialog();
+                                  },
+                                  child: Padding(
+                                    padding: EdgeInsets.only(left: 5.w),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        // 名單圖標 - 固定在左側
+                                        SizedBox(
+                                          width: 35.w,
+                                          height: 35.h,
+                                          child: Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              // 底部陰影
+                                              Positioned(
+                                                left: 0,
+                                                top: 2.h,
+                                                child: Image.asset(
+                                                  'assets/images/icon/list.webp',
+                                                  width: 35.w,
+                                                  height: 35.h,
+                                                  color: Colors.black
+                                                      .withOpacity(0.4),
+                                                  colorBlendMode:
+                                                      BlendMode.srcIn,
+                                                ),
+                                              ),
+                                              // 主圖標
+                                              Image.asset(
                                                 'assets/images/icon/list.webp',
                                                 width: 35.w,
                                                 height: 35.h,
-                                                color: Colors.black.withOpacity(
-                                                  0.4,
-                                                ),
-                                                colorBlendMode: BlendMode.srcIn,
                                               ),
-                                            ),
-                                            // 主圖標
-                                            Image.asset(
-                                              'assets/images/icon/list.webp',
-                                              width: 35.w,
-                                              height: 35.h,
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
-                                      ),
 
-                                      SizedBox(width: 15.w),
+                                        SizedBox(width: 15.w),
 
-                                      // 名單信息文字 - 固定在圖標右側
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '參加名單',
-                                              style: TextStyle(
-                                                fontSize: 16.sp,
-                                                fontFamily: 'OtsutomeFont',
-                                                color: const Color(0xFF23456B),
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            SizedBox(height: 2.h),
-                                            Consumer<UserStatusService>(
-                                              builder: (
-                                                context,
-                                                userStatusService,
-                                                child,
-                                              ) {
-                                                final attendees =
-                                                    userStatusService
-                                                        .attendees ??
-                                                    0;
-                                                return Text(
-                                                  '${NumberFormatter.toChinese(attendees)}個人',
-                                                  style: TextStyle(
-                                                    fontSize: 14.sp,
-                                                    fontFamily: 'OtsutomeFont',
-                                                    color: const Color(
-                                                      0xFF666666,
-                                                    ),
+                                        // 名單信息文字 - 固定在圖標右側
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '參加名單',
+                                                style: TextStyle(
+                                                  fontSize: 16.sp,
+                                                  fontFamily: 'OtsutomeFont',
+                                                  color: const Color(
+                                                    0xFF23456B,
                                                   ),
-                                                );
-                                              },
-                                            ),
-                                          ],
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              SizedBox(height: 2.h),
+                                              Consumer<UserStatusService>(
+                                                builder: (
+                                                  context,
+                                                  userStatusService,
+                                                  child,
+                                                ) {
+                                                  final attendees =
+                                                      userStatusService
+                                                          .attendees ??
+                                                      0;
+                                                  return Text(
+                                                    '${NumberFormatter.toChinese(attendees)}個人',
+                                                    style: TextStyle(
+                                                      fontSize: 14.sp,
+                                                      fontFamily:
+                                                          'OtsutomeFont',
+                                                      color: const Color(
+                                                        0xFF666666,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1766,6 +1812,358 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// 參加名單對話框
+class _AttendeeListDialog extends StatefulWidget {
+  final String matchingGroupId;
+  final int expectedAttendeeCount;
+
+  const _AttendeeListDialog({
+    required this.matchingGroupId,
+    required this.expectedAttendeeCount,
+  });
+
+  @override
+  State<_AttendeeListDialog> createState() => _AttendeeListDialogState();
+}
+
+class _AttendeeListDialogState extends State<_AttendeeListDialog> {
+  final DatabaseService _databaseService = DatabaseService();
+  List<Map<String, dynamic>>? _members;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMembers();
+  }
+
+  Future<void> _loadMembers() async {
+    try {
+      final members = await _databaseService.getGroupMembersInfo(
+        widget.matchingGroupId,
+      );
+
+      if (mounted) {
+        setState(() {
+          _members = members;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('載入群組成員資料失敗: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// 根據參加人數計算對話框內容區域高度
+  double _calculateDialogContentHeight() {
+    // 每個成員卡片高度：margin(12) + padding-top(12) + content(55) + padding-bottom(12) = 91h
+    const double itemHeight = 91.0;
+
+    // 使用預期的參加人數來計算，最多顯示5個避免對話框太高
+    final displayCount =
+        widget.expectedAttendeeCount > 5 ? 5 : widget.expectedAttendeeCount;
+
+    return (itemHeight * displayCount).h;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(horizontal: 30.w),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: Container(
+          padding: EdgeInsets.all(20.r),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.95),
+            borderRadius: BorderRadius.circular(20.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 15,
+                spreadRadius: 1,
+                offset: Offset(0, 8.h),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 標題
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 10.h),
+                alignment: Alignment.center,
+                child: Text(
+                  '參加名單',
+                  style: TextStyle(
+                    fontSize: 24.sp,
+                    color: const Color(0xFF23456B),
+                    fontFamily: 'OtsutomeFont',
+                    fontWeight: FontWeight.bold,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              SizedBox(height: 15.h),
+
+              // 內容區域（可滑動）- 根據實際參加人數動態計算高度
+              Container(
+                // 計算高度：每個成員卡片 = 12h (margin) + 12h (padding top) + 55h (content) + 12h (padding bottom) = 91h
+                // 最多顯示5個，超過則可滾動
+                height: _calculateDialogContentHeight(),
+                child:
+                    _isLoading
+                        ? Container(
+                          padding: EdgeInsets.symmetric(vertical: 50.h),
+                          child: Center(
+                            child: LoadingImage(
+                              width: 50.w,
+                              height: 50.h,
+                              color: const Color(0xFF23456B),
+                            ),
+                          ),
+                        )
+                        : _members == null || _members!.isEmpty
+                        ? Container(
+                          padding: EdgeInsets.symmetric(vertical: 40.h),
+                          child: Center(
+                            child: Text(
+                              '暫無參加者',
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                fontFamily: 'OtsutomeFont',
+                                color: const Color(0xFF666666),
+                              ),
+                            ),
+                          ),
+                        )
+                        : SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _members!.length,
+                            itemBuilder: (context, index) {
+                              final member = _members![index];
+                              return _MemberListItem(member: member);
+                            },
+                          ),
+                        ),
+              ),
+
+              SizedBox(height: 15.h),
+
+              // 關閉按鈕
+              ImageButton(
+                text: '關閉',
+                imagePath: 'assets/images/ui/button/blue_m.webp',
+                width: 130.w,
+                height: 65.h,
+                textStyle: const TextStyle(
+                  color: Color(0xFFD1D1D1),
+                  fontFamily: 'OtsutomeFont',
+                  fontWeight: FontWeight.bold,
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 成員列表項目
+class _MemberListItem extends StatelessWidget {
+  final Map<String, dynamic> member;
+
+  const _MemberListItem({required this.member});
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarPath = member['avatar_path'] as String?;
+    final nickname = member['nickname'] as String? ?? '未命名';
+    final personalDesc = member['personal_desc'] as String? ?? '';
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 5,
+            offset: Offset(0, 2.h),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 頭像
+          Container(
+            width: 55.w,
+            height: 55.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF23456B), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: Offset(0, 2.h),
+                ),
+              ],
+            ),
+            child: ClipOval(child: _buildAvatar(avatarPath)),
+          ),
+
+          SizedBox(width: 12.w),
+
+          // 右側資訊
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 暱稱
+                Text(
+                  nickname,
+                  style: TextStyle(
+                    fontSize: 17.sp,
+                    fontFamily: 'OtsutomeFont',
+                    color: const Color(0xFF23456B),
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
+                ),
+
+                // 個人描述
+                if (personalDesc.isNotEmpty) ...[
+                  SizedBox(height: 3.h),
+                  Text(
+                    personalDesc,
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontFamily: 'OtsutomeFont',
+                      color: const Color(0xFF666666),
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar(String? avatarPath) {
+    // 如果沒有頭像路徑或是空字串，使用預設頭像
+    if (avatarPath == null || avatarPath.isEmpty) {
+      return Container(
+        color: Colors.white,
+        child: Image.asset(
+          'assets/images/avatar/no_bg/male_1.webp',
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    // 如果是本地資源頭像（assets/）
+    if (avatarPath.startsWith('assets/')) {
+      return Container(
+        color: Colors.white,
+        child: Image.asset(avatarPath, fit: BoxFit.cover),
+      );
+    }
+
+    // 如果是 R2 上的自訂頭像（avatars/）
+    // 參考 profile_setup_page.dart 的做法
+    if (avatarPath.startsWith('avatars/')) {
+      return FutureBuilder<File?>(
+        future: ImageCacheService().getCachedImageByKey(
+          avatarPath,
+          CacheType.avatar,
+        ),
+        builder: (context, snapshot) {
+          // 檢查快取是否存在且有效
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.data != null && snapshot.data!.existsSync()) {
+              // 使用本地快取
+              return Image.file(
+                snapshot.data!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  // 本地檔案損壞，顯示預設頭像
+                  debugPrint('本地快取檔案損壞: $avatarPath, 錯誤: $error');
+                  return Container(
+                    color: Colors.white,
+                    child: Image.asset(
+                      'assets/images/avatar/no_bg/male_1.webp',
+                      fit: BoxFit.cover,
+                    ),
+                  );
+                },
+              );
+            } else {
+              // 快取不存在，顯示預設頭像
+              // 注意：由於無法獲取其他用戶的 presigned URL，暫時無法從網路載入
+              debugPrint('快取不存在，使用預設頭像: $avatarPath');
+              return Container(
+                color: Colors.white,
+                child: Image.asset(
+                  'assets/images/avatar/no_bg/male_1.webp',
+                  fit: BoxFit.cover,
+                ),
+              );
+            }
+          }
+
+          // 載入中，顯示 loading
+          return Container(
+            color: Colors.white,
+            child: Center(
+              child: LoadingImage(
+                width: 15.w,
+                height: 15.h,
+                color: const Color(0xFF23456B),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // 未知格式，使用預設頭像
+    return Container(
+      color: Colors.white,
+      child: Image.asset(
+        'assets/images/avatar/no_bg/male_1.webp',
+        fit: BoxFit.cover,
+      ),
     );
   }
 }

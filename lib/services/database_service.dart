@@ -561,4 +561,49 @@ class DatabaseService {
       },
     );
   }
+
+  /// 根據配對組ID獲取所有群組成員資訊
+  ///
+  /// [matchingGroupId] 配對組ID
+  Future<List<Map<String, dynamic>>> getGroupMembersInfo(
+    String matchingGroupId,
+  ) async {
+    return _apiService.handleRequest(
+      request: () async {
+        // 1. 從 user_matching_info 獲取所有該組的 user_id
+        final matchingInfoList = await _supabaseService.client
+            .from('user_matching_info')
+            .select('user_id')
+            .eq('matching_group_id', matchingGroupId);
+
+        if (matchingInfoList.isEmpty) {
+          debugPrint('未找到配對組成員: $matchingGroupId');
+          return [];
+        }
+
+        // 提取所有 user_id
+        final userIds =
+            matchingInfoList
+                .map<String>((item) => item['user_id'] as String)
+                .toList();
+
+        debugPrint('配對組 $matchingGroupId 的成員數量: ${userIds.length}');
+
+        // 2. 從 user_profiles 獲取所有成員的資訊
+        // 使用 inFilter 查詢多個用戶
+        final userProfiles = await _supabaseService.client
+            .from(_userProfilesTable)
+            .select('user_id, nickname, personal_desc, avatar_path')
+            .inFilter('user_id', userIds);
+
+        if (userProfiles.isEmpty) {
+          debugPrint('未找到任何用戶資料');
+          return [];
+        }
+
+        debugPrint('成功獲取 ${userProfiles.length} 位群組成員資料');
+        return List<Map<String, dynamic>>.from(userProfiles);
+      },
+    );
+  }
 }

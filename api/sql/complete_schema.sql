@@ -459,10 +459,33 @@ CREATE POLICY dining_events_group_read ON dining_events
         WHERE user_id = auth.uid()
     ));
 
--- 為user_matching_info表添加用戶訪問權限
-CREATE POLICY user_view_own_matching_info ON user_matching_info 
-    FOR SELECT TO authenticated 
-    USING (user_id = auth.uid());
+
+-- 允許用戶讀取自己的配對資訊
+CREATE POLICY "用戶可以讀取自己的配對資訊"
+ON public.user_matching_info
+FOR SELECT
+USING (user_id = auth.uid());
+
+-- 創建函數來獲取用戶的 matching_group_id
+CREATE OR REPLACE FUNCTION public.get_user_matching_group_id(p_user_id uuid)
+RETURNS uuid
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT matching_group_id
+  FROM public.user_matching_info
+  WHERE user_id = p_user_id
+  LIMIT 1;
+$$;
+
+CREATE POLICY "用戶可以讀取同組成員的配對資訊"
+ON public.user_matching_info
+FOR SELECT
+USING (
+  matching_group_id = public.get_user_matching_group_id(auth.uid())
+  AND matching_group_id IS NOT NULL
+);
 
 -- 用戶只能查看自己的評價會話
 CREATE POLICY sessions_select_own ON rating_sessions FOR SELECT TO authenticated USING (from_user_id = auth.uid());
