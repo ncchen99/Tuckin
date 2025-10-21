@@ -1602,20 +1602,19 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                         vertical: 15.h,
                                       ),
                                       child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceEvenly,
                                         children: [
                                           // 左側聚餐時間
-                                          SizedBox(
-                                            width: cardWidth * 0.4,
-                                            child: Row(
-                                              children: [
-                                                // 時間圖標
-                                                Padding(
-                                                  padding: EdgeInsets.only(
-                                                    bottom: 5.h,
-                                                  ),
-                                                  child: SizedBox(
+                                          Expanded(
+                                            child: Padding(
+                                              padding: EdgeInsets.only(
+                                                left: 5.w,
+                                              ),
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  // 時間圖標 - 固定在左側
+                                                  SizedBox(
                                                     width: 35.w,
                                                     height: 35.h,
                                                     child: Stack(
@@ -1646,62 +1645,62 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                       ],
                                                     ),
                                                   ),
-                                                ),
 
-                                                SizedBox(width: 10.w),
+                                                  SizedBox(width: 15.w),
 
-                                                // 時間資訊文字
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        '聚餐時間',
-                                                        style: TextStyle(
-                                                          fontSize: 16.sp,
-                                                          fontFamily:
-                                                              'OtsutomeFont',
-                                                          color: const Color(
-                                                            0xFF23456B,
-                                                          ),
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                      SizedBox(height: 2.h),
-                                                      Consumer<
-                                                        UserStatusService
-                                                      >(
-                                                        builder: (
-                                                          context,
-                                                          userStatusService,
-                                                          child,
-                                                        ) {
-                                                          final dinnerTime =
-                                                              userStatusService
-                                                                  .confirmedDinnerTime;
-                                                          return Text(
-                                                            dinnerTime != null
-                                                                ? '${dinnerTime.month}月${dinnerTime.day}日 ${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}'
-                                                                : '時間待定',
-                                                            style: TextStyle(
-                                                              fontSize: 12.sp,
-                                                              fontFamily:
-                                                                  'OtsutomeFont',
-                                                              color:
-                                                                  const Color(
-                                                                    0xFF666666,
-                                                                  ),
+                                                  // 時間資訊文字 - 固定在圖標右側
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          '聚餐時間',
+                                                          style: TextStyle(
+                                                            fontSize: 16.sp,
+                                                            fontFamily:
+                                                                'OtsutomeFont',
+                                                            color: const Color(
+                                                              0xFF23456B,
                                                             ),
-                                                          );
-                                                        },
-                                                      ),
-                                                    ],
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                        SizedBox(height: 2.h),
+                                                        Consumer<
+                                                          UserStatusService
+                                                        >(
+                                                          builder: (
+                                                            context,
+                                                            userStatusService,
+                                                            child,
+                                                          ) {
+                                                            final dinnerTime =
+                                                                userStatusService
+                                                                    .confirmedDinnerTime;
+                                                            return Text(
+                                                              dinnerTime != null
+                                                                  ? '${dinnerTime.month}月${dinnerTime.day}日 ${dinnerTime.hour}:${dinnerTime.minute.toString().padLeft(2, '0')}'
+                                                                  : '時間待定',
+                                                              style: TextStyle(
+                                                                fontSize: 12.sp,
+                                                                fontFamily:
+                                                                    'OtsutomeFont',
+                                                                color:
+                                                                    const Color(
+                                                                      0xFF666666,
+                                                                    ),
+                                                              ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
                                           ),
 
@@ -1713,16 +1712,17 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                           ),
 
                                           // 右側人數部分
-                                          SizedBox(
-                                            width: cardWidth * 0.4,
-                                            child: Row(
-                                              children: [
-                                                // 人數圖標
-                                                Padding(
-                                                  padding: EdgeInsets.only(
-                                                    bottom: 5.h,
-                                                  ),
-                                                  child: SizedBox(
+                                          Expanded(
+                                            child: Padding(
+                                              padding: EdgeInsets.only(
+                                                left: 15.w,
+                                              ),
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  // 人數圖標 - 固定在左側
+                                                  SizedBox(
                                                     width: 35.w,
                                                     height: 35.h,
                                                     child: Stack(
@@ -1733,7 +1733,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                           left: 0,
                                                           top: 2.h,
                                                           child: Image.asset(
-                                                            'assets/images/icon/attendee.webp',
+                                                            'assets/images/icon/list.webp',
                                                             width: 35.w,
                                                             height: 35.h,
                                                             color: Colors.black
@@ -1746,64 +1746,65 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                         ),
                                                         // 主圖標
                                                         Image.asset(
-                                                          'assets/images/icon/attendee.webp',
+                                                          'assets/images/icon/list.webp',
                                                           width: 35.w,
                                                           height: 35.h,
                                                         ),
                                                       ],
                                                     ),
                                                   ),
-                                                ),
-                                                SizedBox(width: 10.w),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        '用餐人數',
-                                                        style: TextStyle(
-                                                          fontSize: 16.sp,
-                                                          fontFamily:
-                                                              'OtsutomeFont',
-                                                          color: const Color(
-                                                            0xFF23456B,
+                                                  SizedBox(width: 15.w),
+                                                  // 人數文字 - 固定在圖標右側
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          '用餐人數',
+                                                          style: TextStyle(
+                                                            fontSize: 16.sp,
+                                                            fontFamily:
+                                                                'OtsutomeFont',
+                                                            color: const Color(
+                                                              0xFF23456B,
+                                                            ),
                                                           ),
                                                         ),
-                                                      ),
-                                                      SizedBox(height: 2.h),
-                                                      Consumer<
-                                                        UserStatusService
-                                                      >(
-                                                        builder: (
-                                                          context,
-                                                          userStatusService,
-                                                          child,
-                                                        ) {
-                                                          // 從UserStatusService獲取人數，如未設置則顯示2人
-                                                          final attendees =
-                                                              userStatusService
-                                                                  .attendees ??
-                                                              2;
-                                                          return Text(
-                                                            '$attendees人',
-                                                            style: TextStyle(
-                                                              fontSize: 12.sp,
-                                                              fontFamily:
-                                                                  'OtsutomeFont',
-                                                              color:
-                                                                  const Color(
-                                                                    0xFF666666,
-                                                                  ),
-                                                            ),
-                                                          );
-                                                        },
-                                                      ),
-                                                    ],
+                                                        SizedBox(height: 2.h),
+                                                        Consumer<
+                                                          UserStatusService
+                                                        >(
+                                                          builder: (
+                                                            context,
+                                                            userStatusService,
+                                                            child,
+                                                          ) {
+                                                            // 從UserStatusService獲取人數，如未設置則顯示2人
+                                                            final attendees =
+                                                                userStatusService
+                                                                    .attendees ??
+                                                                2;
+                                                            return Text(
+                                                              '${NumberFormatter.toChinese(attendees)}個人',
+                                                              style: TextStyle(
+                                                                fontSize: 12.sp,
+                                                                fontFamily:
+                                                                    'OtsutomeFont',
+                                                                color:
+                                                                    const Color(
+                                                                      0xFF666666,
+                                                                    ),
+                                                              ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1826,12 +1827,9 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                         vertical: 15.h,
                                       ),
                                       child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceEvenly,
                                         children: [
                                           // 左側電話資訊
-                                          SizedBox(
-                                            width: cardWidth * 0.4,
+                                          Expanded(
                                             child: InkWell(
                                               onTap: () {
                                                 if (_restaurantPhone != null &&
@@ -1843,19 +1841,20 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                   );
                                                 }
                                               },
-                                              child: Row(
-                                                children: [
-                                                  // 電話圖標 - 使用指定的圖標並添加陰影效果
-                                                  Padding(
-                                                    padding: EdgeInsets.only(
-                                                      bottom: 5.h,
-                                                    ),
-                                                    child: SizedBox(
+                                              child: Padding(
+                                                padding: EdgeInsets.only(
+                                                  left: 5.w,
+                                                ),
+                                                child: Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    // 電話圖標 - 固定在左側
+                                                    SizedBox(
                                                       width: 35.w,
                                                       height: 35.h,
                                                       child: Stack(
-                                                        clipBehavior:
-                                                            Clip.none, // 允許陰影超出容器範圍
+                                                        clipBehavior: Clip.none,
                                                         children: [
                                                           // 底部陰影
                                                           Positioned(
@@ -1884,47 +1883,50 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                         ],
                                                       ),
                                                     ),
-                                                  ),
 
-                                                  SizedBox(width: 10.w),
+                                                    SizedBox(width: 15.w),
 
-                                                  // 電話資訊文字
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          '電話',
-                                                          style: TextStyle(
-                                                            fontSize: 16.sp,
-                                                            fontFamily:
-                                                                'OtsutomeFont',
-                                                            color: const Color(
-                                                              0xFF23456B,
-                                                            ),
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 2.h),
-                                                        Text(
-                                                          _restaurantPhone ??
-                                                              '未提供',
-                                                          style: TextStyle(
-                                                            fontSize: 12.sp,
-                                                            fontFamily:
-                                                                'OtsutomeFont',
-                                                            color: const Color(
-                                                              0xFF666666,
+                                                    // 電話資訊文字 - 固定在圖標右側
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            '電話',
+                                                            style: TextStyle(
+                                                              fontSize: 16.sp,
+                                                              fontFamily:
+                                                                  'OtsutomeFont',
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF23456B,
+                                                                  ),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
                                                             ),
                                                           ),
-                                                        ),
-                                                      ],
+                                                          SizedBox(height: 2.h),
+                                                          Text(
+                                                            _restaurantPhone ??
+                                                                '未提供',
+                                                            style: TextStyle(
+                                                              fontSize: 12.sp,
+                                                              fontFamily:
+                                                                  'OtsutomeFont',
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF666666,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -1937,8 +1939,7 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                           ),
 
                                           // 右側網站部分
-                                          SizedBox(
-                                            width: cardWidth * 0.4,
+                                          Expanded(
                                             child: InkWell(
                                               onTap: () {
                                                 if (_restaurantWebsite !=
@@ -1954,14 +1955,16 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                   );
                                                 }
                                               },
-                                              child: Row(
-                                                children: [
-                                                  // 網站圖標
-                                                  Padding(
-                                                    padding: EdgeInsets.only(
-                                                      bottom: 5.h,
-                                                    ),
-                                                    child: SizedBox(
+                                              child: Padding(
+                                                padding: EdgeInsets.only(
+                                                  left: 15.w,
+                                                ),
+                                                child: Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    // 網站圖標 - 固定在左側
+                                                    SizedBox(
                                                       width: 35.w,
                                                       height: 35.h,
                                                       child: Stack(
@@ -1994,50 +1997,53 @@ class _RestaurantReservationPageState extends State<RestaurantReservationPage>
                                                         ],
                                                       ),
                                                     ),
-                                                  ),
-                                                  SizedBox(width: 10.w),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          '網站',
-                                                          style: TextStyle(
-                                                            fontSize: 16.sp,
-                                                            fontFamily:
-                                                                'OtsutomeFont',
-                                                            color: const Color(
-                                                              0xFF23456B,
+                                                    SizedBox(width: 15.w),
+                                                    // 網站文字 - 固定在圖標右側
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            '網站',
+                                                            style: TextStyle(
+                                                              fontSize: 16.sp,
+                                                              fontFamily:
+                                                                  'OtsutomeFont',
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF23456B,
+                                                                  ),
                                                             ),
                                                           ),
-                                                        ),
-                                                        SizedBox(height: 2.h),
-                                                        Text(
-                                                          _restaurantWebsite !=
-                                                                      null &&
-                                                                  _restaurantWebsite!
-                                                                      .isNotEmpty &&
-                                                                  _restaurantWebsite !=
-                                                                      "未提供" &&
-                                                                  _restaurantWebsite !=
-                                                                      "https://example.com/restaurant"
-                                                              ? '點擊前往'
-                                                              : '未提供',
-                                                          style: TextStyle(
-                                                            fontSize: 12.sp,
-                                                            fontFamily:
-                                                                'OtsutomeFont',
-                                                            color: const Color(
-                                                              0xFF666666,
+                                                          SizedBox(height: 2.h),
+                                                          Text(
+                                                            _restaurantWebsite !=
+                                                                        null &&
+                                                                    _restaurantWebsite!
+                                                                        .isNotEmpty &&
+                                                                    _restaurantWebsite !=
+                                                                        "未提供" &&
+                                                                    _restaurantWebsite !=
+                                                                        "https://example.com/restaurant"
+                                                                ? '點擊前往'
+                                                                : '未提供',
+                                                            style: TextStyle(
+                                                              fontSize: 12.sp,
+                                                              fontFamily:
+                                                                  'OtsutomeFont',
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF666666,
+                                                                  ),
                                                             ),
                                                           ),
-                                                        ),
-                                                      ],
+                                                        ],
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                           ),

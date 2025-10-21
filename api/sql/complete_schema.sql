@@ -314,20 +314,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 創建用戶狀態擴展視圖（保持與原結構兼容）
-CREATE OR REPLACE VIEW user_status_extended AS
-SELECT 
-    us.id, 
-    us.user_id, 
-    us.status, 
-    umi.matching_group_id AS group_id,
-    umi.confirmation_deadline,
-    us.created_at, 
-    us.updated_at
-FROM 
-    user_status us
-LEFT JOIN 
-    user_matching_info umi ON us.user_id = umi.user_id;
 
 
 -- 創建必要的索引來優化查詢性能
@@ -398,12 +384,27 @@ ALTER TABLE rating_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_ratings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE dining_history ENABLE ROW LEVEL SECURITY;
 
--- 對視圖應用安全性
-ALTER VIEW user_status_extended SECURITY INVOKER;
 
 -- 創建基本政策，允許用戶讀取自己的資料
 CREATE POLICY user_profiles_select ON user_profiles
     FOR SELECT USING (auth.uid() = user_id);
+
+-- ✅ 新增一條 Policy：允許查詢同組組員的資料
+CREATE POLICY "用戶可以查詢同組組員的資料"
+ON public.user_profiles
+FOR SELECT
+USING (
+  user_id IN (
+    SELECT umi.user_id
+    FROM public.user_matching_info umi
+    WHERE umi.matching_group_id IN (
+      SELECT matching_group_id
+      FROM public.user_matching_info
+      WHERE user_id = auth.uid()
+    )
+  )
+);
+
 
 -- 允許所有已認證用戶讀取食物偏好表
 CREATE POLICY food_preferences_select ON food_preferences

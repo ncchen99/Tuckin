@@ -1282,24 +1282,21 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                       child: Column(
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               // 左側時間信息
-                              SizedBox(
-                                width: cardWidth * 0.4,
-                                child: Row(
-                                  children: [
-                                    // 時間圖標 - 使用指定的圖標並添加陰影效果
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        left: 0.w,
-                                        bottom: 5.h,
-                                      ),
-                                      child: SizedBox(
+                              Expanded(
+                                child: Padding(
+                                  padding: EdgeInsets.only(left: 5.w),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      // 時間圖標 - 固定在左側
+                                      SizedBox(
                                         width: 35.w,
                                         height: 35.h,
                                         child: Stack(
-                                          clipBehavior: Clip.none, // 允許陰影超出容器範圍
+                                          clipBehavior: Clip.none,
                                           children: [
                                             // 底部陰影
                                             Positioned(
@@ -1324,49 +1321,49 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                           ],
                                         ),
                                       ),
-                                    ),
 
-                                    SizedBox(width: 10.w),
+                                      SizedBox(width: 15.w),
 
-                                    // 時間信息文字
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '聚餐時間',
-                                            style: TextStyle(
-                                              fontSize: 16.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
+                                      // 時間信息文字 - 固定在圖標右側
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '聚餐時間',
+                                              style: TextStyle(
+                                                fontSize: 16.sp,
+                                                fontFamily: 'OtsutomeFont',
+                                                color: const Color(0xFF23456B),
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
-                                          ),
-                                          SizedBox(height: 2.h),
-                                          Consumer<UserStatusService>(
-                                            builder: (
-                                              context,
-                                              userStatusService,
-                                              child,
-                                            ) {
-                                              return Text(
-                                                userStatusService
-                                                    .simpleDinnerTimeDescription,
-                                                style: TextStyle(
-                                                  fontSize: 14.sp,
-                                                  fontFamily: 'OtsutomeFont',
-                                                  color: const Color(
-                                                    0xFF666666,
+                                            SizedBox(height: 2.h),
+                                            Consumer<UserStatusService>(
+                                              builder: (
+                                                context,
+                                                userStatusService,
+                                                child,
+                                              ) {
+                                                return Text(
+                                                  userStatusService
+                                                      .simpleDinnerTimeDescription,
+                                                  style: TextStyle(
+                                                    fontSize: 14.sp,
+                                                    fontFamily: 'OtsutomeFont',
+                                                    color: const Color(
+                                                      0xFF666666,
+                                                    ),
                                                   ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ],
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
 
@@ -1378,8 +1375,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                               ),
 
                               // 右側導航部分
-                              SizedBox(
-                                width: cardWidth * 0.4,
+                              Expanded(
                                 child: InkWell(
                                   onTap: () {
                                     debugPrint(
@@ -1431,13 +1427,14 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                           });
                                     }
                                   },
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      // 導航圖標
-                                      Padding(
-                                        padding: EdgeInsets.only(bottom: 5.h),
-                                        child: SizedBox(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(left: 15.w),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        // 導航圖標 - 固定在左側
+                                        SizedBox(
                                           width: 35.w,
                                           height: 35.h,
                                           child: Stack(
@@ -1466,32 +1463,228 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                             ],
                                           ),
                                         ),
+                                        SizedBox(width: 15.w),
+                                        // 導航文字 - 固定在圖標右側
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '導航',
+                                                style: TextStyle(
+                                                  fontSize: 16.sp,
+                                                  fontFamily: 'OtsutomeFont',
+                                                  color: const Color(
+                                                    0xFF23456B,
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(height: 2.h),
+                                              Text(
+                                                'Google Map',
+                                                style: TextStyle(
+                                                  fontSize: 14.sp,
+                                                  fontFamily: 'OtsutomeFont',
+                                                  color: const Color(
+                                                    0xFF666666,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // 水平分隔線
+                          Container(
+                            height: 1,
+                            color: Colors.grey[300],
+                            margin: EdgeInsets.symmetric(
+                              horizontal: 0.w,
+                              vertical: 15.h,
+                            ),
+                          ),
+
+                          // 第二行：參加名單和聊天室
+                          Row(
+                            children: [
+                              // 左側參加名單
+                              Expanded(
+                                child: Padding(
+                                  padding: EdgeInsets.only(left: 5.w),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      // 名單圖標 - 固定在左側
+                                      SizedBox(
+                                        width: 35.w,
+                                        height: 35.h,
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            // 底部陰影
+                                            Positioned(
+                                              left: 0,
+                                              top: 2.h,
+                                              child: Image.asset(
+                                                'assets/images/icon/list.webp',
+                                                width: 35.w,
+                                                height: 35.h,
+                                                color: Colors.black.withOpacity(
+                                                  0.4,
+                                                ),
+                                                colorBlendMode: BlendMode.srcIn,
+                                              ),
+                                            ),
+                                            // 主圖標
+                                            Image.asset(
+                                              'assets/images/icon/list.webp',
+                                              width: 35.w,
+                                              height: 35.h,
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      SizedBox(width: 10.w),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '導航',
-                                            style: TextStyle(
-                                              fontSize: 16.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
+
+                                      SizedBox(width: 15.w),
+
+                                      // 名單信息文字 - 固定在圖標右側
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '參加名單',
+                                              style: TextStyle(
+                                                fontSize: 16.sp,
+                                                fontFamily: 'OtsutomeFont',
+                                                color: const Color(0xFF23456B),
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
-                                          ),
-                                          SizedBox(height: 2.h),
-                                          Text(
-                                            'Google Map',
-                                            style: TextStyle(
-                                              fontSize: 14.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF666666),
+                                            SizedBox(height: 2.h),
+                                            Consumer<UserStatusService>(
+                                              builder: (
+                                                context,
+                                                userStatusService,
+                                                child,
+                                              ) {
+                                                final attendees =
+                                                    userStatusService
+                                                        .attendees ??
+                                                    0;
+                                                return Text(
+                                                  '${NumberFormatter.toChinese(attendees)}個人',
+                                                  style: TextStyle(
+                                                    fontSize: 14.sp,
+                                                    fontFamily: 'OtsutomeFont',
+                                                    color: const Color(
+                                                      0xFF666666,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ],
+                                  ),
+                                ),
+                              ),
+
+                              // 垂直分隔線
+                              Container(
+                                height: 45.h,
+                                width: 1.w,
+                                color: Colors.grey[300],
+                              ),
+
+                              // 右側聊天室部分
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () {
+                                    // TODO: 導航到聊天室頁面
+                                    debugPrint('點擊了聊天室按鈕');
+                                  },
+                                  child: Padding(
+                                    padding: EdgeInsets.only(left: 15.w),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        // 聊天室圖標 - 固定在左側
+                                        SizedBox(
+                                          width: 35.w,
+                                          height: 35.h,
+                                          child: Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              // 底部陰影
+                                              Positioned(
+                                                left: 0,
+                                                top: 2.h,
+                                                child: Image.asset(
+                                                  'assets/images/icon/chat2.webp',
+                                                  width: 35.w,
+                                                  height: 35.h,
+                                                  color: Colors.black
+                                                      .withOpacity(0.4),
+                                                  colorBlendMode:
+                                                      BlendMode.srcIn,
+                                                ),
+                                              ),
+                                              // 主圖標
+                                              Image.asset(
+                                                'assets/images/icon/chat2.webp',
+                                                width: 35.w,
+                                                height: 35.h,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        SizedBox(width: 15.w),
+                                        // 聊天室文字 - 固定在圖標右側
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '聊天室',
+                                                style: TextStyle(
+                                                  fontSize: 16.sp,
+                                                  fontFamily: 'OtsutomeFont',
+                                                  color: const Color(
+                                                    0xFF23456B,
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(height: 2.h),
+                                              Text(
+                                                '點擊開啟',
+                                                style: TextStyle(
+                                                  fontSize: 14.sp,
+                                                  fontFamily: 'OtsutomeFont',
+                                                  color: const Color(
+                                                    0xFF666666,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),

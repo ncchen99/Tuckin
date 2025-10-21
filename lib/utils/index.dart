@@ -16,3 +16,6 @@ export 'navigation_service.dart';
 
 // 導出聚餐時間工具
 export 'dinner_time_utils.dart';
+
+// 導出數字格式化工具
+export 'number_formatter.dart';
