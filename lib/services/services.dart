@@ -14,3 +14,5 @@ export 'matching_service.dart';
 export 'user_status_service.dart';
 export 'image_cache_service.dart';
 export 'user_service.dart';
+export 'chat_service.dart';
+export 'dining_service.dart';

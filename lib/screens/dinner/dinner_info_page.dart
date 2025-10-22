@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:tuckin/services/dining_service.dart';
 import 'package:tuckin/services/realtime_service.dart';
 import 'package:tuckin/services/user_service.dart';
+import 'package:tuckin/screens/chat/chat_page.dart';
 import 'dart:math';
 import 'dart:io';
 import 'dart:ui';
@@ -1660,8 +1661,34 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                               Expanded(
                                 child: InkWell(
                                   onTap: () {
-                                    // TODO: 導航到聊天室頁面
+                                    // 導航到聊天室頁面
                                     debugPrint('點擊了聊天室按鈕');
+                                    final diningEventId =
+                                        userStatusService.diningEventId;
+                                    if (diningEventId != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => ChatPage(
+                                                diningEventId: diningEventId,
+                                              ),
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            '無法開啟聊天室',
+                                            style: TextStyle(
+                                              fontFamily: 'OtsutomeFont',
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
                                   },
                                   child: Padding(
                                     padding: EdgeInsets.only(left: 15.w),
@@ -1765,46 +1792,17 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 ),
               ),
               child: SafeArea(
-                child: Stack(
+                child: Column(
                   children: [
-                    // 右下角背景圖片
-                    Positioned(
-                      right: -7.w, // 負值使圖片右側超出螢幕
-                      bottom: -45.h, // 負值使圖片底部超出螢幕
-                      child: Opacity(
-                        opacity: 0.65, // 降低透明度，使圖片更加融入背景
-                        child: ColorFiltered(
-                          // 降低彩度的矩陣
-                          colorFilter: const ColorFilter.matrix(<double>[
-                            0.6, 0.1, 0.1, 0, 0, // R影響
-                            0.1, 0.6, 0.1, 0, 0, // G影響
-                            0.1, 0.1, 0.6, 0, 0, // B影響
-                            0, 0, 0, 1, 0, // A影響
-                          ]),
-                          child: Image.asset(
-                            'assets/images/illustrate/p3.webp',
-                            width: 220.w, // 增大尺寸
-                            height: 220.h, // 增大尺寸
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                    ),
+                    // 頂部導航欄
+                    HeaderBar(title: _getStatusTextFor(currentUserStatus)),
 
                     // 主要內容
-                    Column(
-                      children: [
-                        // 頂部導航欄
-                        HeaderBar(title: _getStatusTextFor(currentUserStatus)),
-
-                        // 主要內容
-                        Expanded(
-                          child: SingleChildScrollView(
-                            physics: const BouncingScrollPhysics(),
-                            child: content,
-                          ),
-                        ),
-                      ],
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: content,
+                      ),
                     ),
                   ],
                 ),
@@ -1922,7 +1920,7 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
               SizedBox(height: 15.h),
 
               // 內容區域（可滑動）- 根據實際參加人數動態計算高度
-              Container(
+              SizedBox(
                 // 計算高度：每個成員卡片 = 12h (margin) + 12h (padding top) + 55h (content) + 12h (padding bottom) = 91h
                 // 最多顯示5個，超過則可滾動
                 height: _calculateDialogContentHeight(),
