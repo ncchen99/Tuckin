@@ -188,6 +188,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 獲取所有圖片訊息（按時間順序，從舊到新）
+  List<ChatMessage> _getImageMessages() {
+    final imageMessages =
+        _messages
+            .where((message) => message.isImage && message.imagePath != null)
+            .toList();
+    // 按時間升序排序（從舊到新），確保滑動順序正確
+    imageMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return imageMessages;
+  }
+
+  /// 打開圖片查看器
+  void _openImageViewer(ChatMessage message) {
+    final imageMessages = _getImageMessages();
+    if (imageMessages.isEmpty) return;
+
+    // 找到當前圖片在列表中的索引
+    final index = imageMessages.indexWhere((m) => m.id == message.id);
+    if (index == -1) return;
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false, // 設置為透明路由
+        pageBuilder:
+            (context, animation, secondaryAnimation) =>
+                ImageViewer(imageMessages: imageMessages, initialIndex: index),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+  }
+
   Future<void> _sendTextMessage() async {
     final content = _messageController.text.trim();
     if (content.isEmpty || _isSending) return;
@@ -823,12 +856,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
           return GestureDetector(
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => ImageViewer(imageUrl: imageUrl),
-                  fullscreenDialog: true,
-                ),
-              );
+              _openImageViewer(message);
             },
             child: Hero(
               tag: message.id,
@@ -942,12 +970,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
           return GestureDetector(
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => ImageViewer(imageUrl: imageUrl),
-                  fullscreenDialog: true,
-                ),
-              );
+              _openImageViewer(message);
             },
             child: Hero(
               tag: message.id,
