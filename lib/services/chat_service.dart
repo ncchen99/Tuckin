@@ -9,6 +9,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/painting.dart';
 import '../models/chat_message.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
@@ -41,7 +43,7 @@ class ChatService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (Database db, int version) async {
         await db.execute('''
           CREATE TABLE chat_messages (
@@ -54,7 +56,11 @@ class ChatService {
             created_at TEXT NOT NULL,
             sender_nickname TEXT,
             sender_avatar_path TEXT,
-            sender_gender TEXT
+            sender_gender TEXT,
+            image_width INTEGER,
+            image_height INTEGER,
+            send_status TEXT,
+            fixed_avatar_index INTEGER
           )
         ''');
         await db.execute(
@@ -63,6 +69,43 @@ class ChatService {
         await db.execute(
           'CREATE INDEX idx_created_at ON chat_messages(created_at)',
         );
+
+        // 建立固定頭像表
+        await db.execute('''
+          CREATE TABLE user_fixed_avatars (
+            user_id TEXT NOT NULL,
+            dining_event_id TEXT NOT NULL,
+            fixed_avatar_index INTEGER NOT NULL,
+            PRIMARY KEY (user_id, dining_event_id)
+          )
+        ''');
+      },
+      onUpgrade: (Database db, int oldVersion, int newVersion) async {
+        if (oldVersion < 2) {
+          // 新增欄位
+          await db.execute(
+            'ALTER TABLE chat_messages ADD COLUMN image_width INTEGER',
+          );
+          await db.execute(
+            'ALTER TABLE chat_messages ADD COLUMN image_height INTEGER',
+          );
+          await db.execute(
+            'ALTER TABLE chat_messages ADD COLUMN send_status TEXT',
+          );
+          await db.execute(
+            'ALTER TABLE chat_messages ADD COLUMN fixed_avatar_index INTEGER',
+          );
+
+          // 建立固定頭像表
+          await db.execute('''
+            CREATE TABLE user_fixed_avatars (
+              user_id TEXT NOT NULL,
+              dining_event_id TEXT NOT NULL,
+              fixed_avatar_index INTEGER NOT NULL,
+              PRIMARY KEY (user_id, dining_event_id)
+            )
+          ''');
+        }
       },
     );
   }
@@ -93,12 +136,15 @@ class ChatService {
         .from('chat_messages')
         .stream(primaryKey: ['id'])
         .eq('dining_event_id', diningEventId)
-        .order('created_at')
+        .order('created_at', ascending: true)
         .listen((data) async {
           debugPrint('收到 Realtime 更新: ${data.length} 則訊息');
 
           // 將訊息轉換為 ChatMessage 並補充發送者資訊
           final messages = await _convertAndEnrichMessages(data);
+
+          // 確保訊息按 created_at 升序排序（從舊到新）
+          messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
           // 儲存到本地資料庫
           await _saveMessagesToLocal(messages);
@@ -136,7 +182,12 @@ class ChatService {
         orderBy: 'created_at ASC',
       );
 
-      return maps.map((map) => ChatMessage.fromMap(map)).toList();
+      final messages = maps.map((map) => ChatMessage.fromMap(map)).toList();
+
+      // 確保訊息按 created_at 升序排序（從舊到新）
+      messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+      return messages;
     } catch (e) {
       debugPrint('載入本地訊息失敗: $e');
       return [];
@@ -150,11 +201,32 @@ class ChatService {
           .from('chat_messages')
           .select()
           .eq('dining_event_id', diningEventId)
-          .order('created_at');
+          .order('created_at', ascending: true);
 
-      final messages = await _convertAndEnrichMessages(
+      final remoteMessages = await _convertAndEnrichMessages(
         response as List<dynamic>,
       );
+
+      // 載入本地訊息以進行合併
+      final localMessages = await _loadLocalMessages(diningEventId);
+      final localMessagesMap = {for (var m in localMessages) m.id: m};
+
+      final messages =
+          remoteMessages.map((remoteMessage) {
+            final localMessage = localMessagesMap[remoteMessage.id];
+            if (localMessage != null) {
+              // 如果遠端訊息沒有圖片尺寸，則保留本地已有的尺寸
+              return remoteMessage.copyWith(
+                imageWidth: remoteMessage.imageWidth ?? localMessage.imageWidth,
+                imageHeight:
+                    remoteMessage.imageHeight ?? localMessage.imageHeight,
+              );
+            }
+            return remoteMessage;
+          }).toList();
+
+      // 確保訊息按 created_at 升序排序（從舊到新）
+      messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
       // 儲存到本地
       await _saveMessagesToLocal(messages);
@@ -199,6 +271,9 @@ class ChatService {
         messages.add(message);
       }
     }
+
+    // 確保訊息按 created_at 升序排序（從舊到新）
+    messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
     return messages;
   }
@@ -292,6 +367,11 @@ class ChatService {
         return false;
       }
 
+      // 解碼圖片以獲取尺寸
+      final decodedImage = await decodeImageFromList(imageBytes);
+      final imageWidth = decodedImage.width;
+      final imageHeight = decodedImage.height;
+
       // 3. 生成訊息 ID
       final messageId = _uuid.v4();
 
@@ -319,6 +399,8 @@ class ChatService {
         'user_id': currentUser.id,
         'message_type': 'image',
         'image_path': imagePath,
+        'image_width': imageWidth,
+        'image_height': imageHeight,
       });
 
       // 7. 發送通知
@@ -388,9 +470,31 @@ class ChatService {
     }
   }
 
-  /// 獲取圖片讀取 URL
+  /// 獲取圖片讀取 URL（帶緩存）
+  /// 使用 imagePath 作為緩存 key，避免每次重新獲取 URL
   Future<String?> getImageUrl(String imagePath) async {
     try {
+      // 先檢查本地緩存（使用 SharedPreferences 緩存 URL）
+      final prefs = await SharedPreferences.getInstance();
+      final cacheKey = 'chat_image_url_$imagePath';
+      final cachedUrl = prefs.getString(cacheKey);
+
+      // 如果緩存存在且未過期（presigned URL 通常有效期 1 小時）
+      // 我們設置緩存時間為 50 分鐘，確保 URL 仍然有效
+      final cacheTimeKey = '${cacheKey}_time';
+      final cacheTime = prefs.getInt(cacheTimeKey);
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      if (cachedUrl != null && cacheTime != null) {
+        final cacheAge = now - cacheTime;
+        // 50 分鐘 = 50 * 60 * 1000 毫秒
+        if (cacheAge < 50 * 60 * 1000) {
+          debugPrint('使用緩存的圖片 URL: $imagePath');
+          return cachedUrl;
+        }
+      }
+
+      // 緩存不存在或已過期，重新獲取
       final session = Supabase.instance.client.auth.currentSession;
       final token = session?.accessToken;
 
@@ -411,7 +515,16 @@ class ChatService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        return data['url'] as String?;
+        final imageUrl = data['url'] as String?;
+
+        // 緩存 URL 和時間戳
+        if (imageUrl != null) {
+          await prefs.setString(cacheKey, imageUrl);
+          await prefs.setInt(cacheTimeKey, now);
+          debugPrint('已緩存圖片 URL: $imagePath');
+        }
+
+        return imageUrl;
       } else {
         debugPrint('獲取圖片 URL 失敗: ${response.body}');
         return null;
@@ -467,6 +580,62 @@ class ChatService {
     await _fetchAndMergeMessages(diningEventId);
   }
 
+  /// 獲取或生成用戶在特定聊天室的固定頭像索引
+  Future<int> getFixedAvatarIndex(
+    String userId,
+    String diningEventId,
+    String? gender,
+  ) async {
+    try {
+      final db = await database;
+
+      // 先查詢是否已有固定頭像
+      final List<Map<String, dynamic>> result = await db.query(
+        'user_fixed_avatars',
+        where: 'user_id = ? AND dining_event_id = ?',
+        whereArgs: [userId, diningEventId],
+      );
+
+      if (result.isNotEmpty) {
+        return result.first['fixed_avatar_index'] as int;
+      }
+
+      // 沒有則生成新的隨機索引（1-6）
+      final random = DateTime.now().millisecondsSinceEpoch % 6 + 1;
+
+      await db.insert('user_fixed_avatars', {
+        'user_id': userId,
+        'dining_event_id': diningEventId,
+        'fixed_avatar_index': random,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+      return random;
+    } catch (e) {
+      debugPrint('獲取固定頭像索引失敗: $e');
+      return 1; // 預設返回 1
+    }
+  }
+
+  /// 儲存圖片尺寸到本地資料庫
+  Future<void> saveImageDimensions(
+    String messageId,
+    int width,
+    int height,
+  ) async {
+    try {
+      final db = await database;
+      await db.update(
+        'chat_messages',
+        {'image_width': width, 'image_height': height},
+        where: 'id = ?',
+        whereArgs: [messageId],
+      );
+      debugPrint('已儲存圖片尺寸: $width x $height');
+    } catch (e) {
+      debugPrint('儲存圖片尺寸失敗: $e');
+    }
+  }
+
   /// 清理資源
   Future<void> dispose() async {
     for (final subscription in _realtimeSubscriptions.values) {
@@ -483,4 +652,3 @@ class ChatService {
     _database = null;
   }
 }
-

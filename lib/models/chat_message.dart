@@ -12,6 +12,16 @@ class ChatMessage {
   String? senderAvatarPath;
   String? senderGender;
 
+  // 圖片尺寸快取
+  int? imageWidth;
+  int? imageHeight;
+
+  // 傳送狀態 (pending, sent, error)
+  String? sendStatus;
+
+  // 固定頭像索引（用於沒有自訂頭像的用戶）
+  int? fixedAvatarIndex;
+
   ChatMessage({
     required this.id,
     required this.diningEventId,
@@ -23,6 +33,10 @@ class ChatMessage {
     this.senderNickname,
     this.senderAvatarPath,
     this.senderGender,
+    this.imageWidth,
+    this.imageHeight,
+    this.sendStatus,
+    this.fixedAvatarIndex,
   });
 
   /// 從 Supabase JSON 轉換
@@ -38,6 +52,8 @@ class ChatMessage {
       senderNickname: json['sender_nickname'] as String?,
       senderAvatarPath: json['sender_avatar_path'] as String?,
       senderGender: json['sender_gender'] as String?,
+      imageWidth: json['image_width'] as int?,
+      imageHeight: json['image_height'] as int?,
     );
   }
 
@@ -67,6 +83,10 @@ class ChatMessage {
       senderNickname: map['sender_nickname'] as String?,
       senderAvatarPath: map['sender_avatar_path'] as String?,
       senderGender: map['sender_gender'] as String?,
+      imageWidth: map['image_width'] as int?,
+      imageHeight: map['image_height'] as int?,
+      sendStatus: map['send_status'] as String?,
+      fixedAvatarIndex: map['fixed_avatar_index'] as int?,
     );
   }
 
@@ -83,6 +103,10 @@ class ChatMessage {
       'sender_nickname': senderNickname,
       'sender_avatar_path': senderAvatarPath,
       'sender_gender': senderGender,
+      'image_width': imageWidth,
+      'image_height': imageHeight,
+      'send_status': sendStatus,
+      'fixed_avatar_index': fixedAvatarIndex,
     };
   }
 
@@ -98,6 +122,10 @@ class ChatMessage {
     String? senderNickname,
     String? senderAvatarPath,
     String? senderGender,
+    int? imageWidth,
+    int? imageHeight,
+    String? sendStatus,
+    int? fixedAvatarIndex,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -110,6 +138,10 @@ class ChatMessage {
       senderNickname: senderNickname ?? this.senderNickname,
       senderAvatarPath: senderAvatarPath ?? this.senderAvatarPath,
       senderGender: senderGender ?? this.senderGender,
+      imageWidth: imageWidth ?? this.imageWidth,
+      imageHeight: imageHeight ?? this.imageHeight,
+      sendStatus: sendStatus ?? this.sendStatus,
+      fixedAvatarIndex: fixedAvatarIndex ?? this.fixedAvatarIndex,
     );
   }
 
@@ -124,4 +156,3 @@ class ChatMessage {
     return 'ChatMessage(id: $id, type: $messageType, userId: $userId, content: $content)';
   }
 }
-

@@ -6,6 +6,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 enum CacheType {
   avatar, // 用戶頭像
   restaurant, // 餐廳圖片
+  chat, // 聊天圖片
 }
 
 /// 圖片緩存服務
@@ -49,6 +50,23 @@ class ImageCacheService {
     return _restaurantCacheManager!;
   }
 
+  /// 聊天圖片緩存管理器
+  /// - 30天過期（聊天圖片需要更長的保存時間）
+  /// - 最多500個文件
+  static CacheManager? _chatCacheManager;
+  CacheManager get chatCacheManager {
+    _chatCacheManager ??= CacheManager(
+      Config(
+        'chat_cache',
+        stalePeriod: const Duration(days: 30), // 30天後過期
+        maxNrOfCacheObjects: 500, // 最多500個文件
+        repo: JsonCacheInfoRepository(databaseName: 'chat_cache'),
+        fileService: HttpFileService(),
+      ),
+    );
+    return _chatCacheManager!;
+  }
+
   /// 根據類型獲取對應的緩存管理器
   CacheManager getCacheManager(CacheType type) {
     switch (type) {
@@ -56,6 +74,8 @@ class ImageCacheService {
         return avatarCacheManager;
       case CacheType.restaurant:
         return restaurantCacheManager;
+      case CacheType.chat:
+        return chatCacheManager;
     }
   }
 
@@ -108,6 +128,7 @@ class ImageCacheService {
     await Future.wait([
       clearCache(CacheType.avatar),
       clearCache(CacheType.restaurant),
+      clearCache(CacheType.chat),
     ]);
     debugPrint('已清除所有圖片緩存');
   }
