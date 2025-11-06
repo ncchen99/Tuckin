@@ -78,6 +78,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         sortedMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
         // 為沒有自訂頭像的用戶載入固定頭像索引
+        bool needFixedAvatarUpdate = false;
         for (final message in sortedMessages) {
           if ((message.senderAvatarPath == null ||
                   message.senderAvatarPath!.isEmpty ||
@@ -89,18 +90,87 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               message.senderGender,
             );
             _fixedAvatars[message.userId] = index;
+            needFixedAvatarUpdate = true;
           }
         }
 
-        setState(() {
-          // 反轉訊息順序：最新訊息在前 [新, 中, 舊]
-          // 這樣配合 reverse: true，最新訊息會顯示在底部
-          _messages = sortedMessages.reversed.toList();
-        });
-        // 自動滾動到最新訊息
-        _scrollToBottom();
+        // 檢查是否需要更新 UI（比較圖片相關字段）
+        final reversedMessages = sortedMessages.reversed.toList();
+        final needsUpdate = _shouldUpdateMessages(_messages, reversedMessages);
+
+        if (needsUpdate || needFixedAvatarUpdate) {
+          setState(() {
+            // 反轉訊息順序：最新訊息在前 [新, 中, 舊]
+            // 這樣配合 reverse: true，最新訊息會顯示在底部
+            _messages = reversedMessages;
+          });
+          // 自動滾動到最新訊息
+          _scrollToBottom();
+        }
       }
     });
+  }
+
+  /// 檢查是否需要更新訊息列表
+  /// 如果圖片相關字段（imagePath, senderAvatarPath）沒有變化，則不需要更新
+  bool _shouldUpdateMessages(
+    List<ChatMessage> oldMessages,
+    List<ChatMessage> newMessages,
+  ) {
+    // 如果訊息數量不同，需要更新
+    if (oldMessages.length != newMessages.length) {
+      return true;
+    }
+
+    // 建立舊訊息的 Map 以便快速查找
+    final oldMessagesMap = {for (var m in oldMessages) m.id: m};
+
+    // 比較每個訊息
+    for (final newMessage in newMessages) {
+      final oldMessage = oldMessagesMap[newMessage.id];
+
+      // 如果訊息不存在於舊列表中，需要更新
+      if (oldMessage == null) {
+        return true;
+      }
+
+      // 比較圖片相關字段
+      if (newMessage.imagePath != oldMessage.imagePath) {
+        return true;
+      }
+
+      if (newMessage.senderAvatarPath != oldMessage.senderAvatarPath) {
+        return true;
+      }
+
+      // 比較其他可能影響顯示的字段
+      if (newMessage.content != oldMessage.content) {
+        return true;
+      }
+
+      if (newMessage.sendStatus != oldMessage.sendStatus) {
+        return true;
+      }
+
+      if (newMessage.senderNickname != oldMessage.senderNickname) {
+        return true;
+      }
+
+      // 比較圖片尺寸（如果從 null 變成有值，需要更新）
+      if ((newMessage.imageWidth != oldMessage.imageWidth) ||
+          (newMessage.imageHeight != oldMessage.imageHeight)) {
+        // 只有在從 null 變成有值時才需要更新（避免重複載入）
+        if (oldMessage.imageWidth == null && newMessage.imageWidth != null) {
+          return true;
+        }
+        if (oldMessage.imageHeight == null && newMessage.imageHeight != null) {
+          return true;
+        }
+      }
+    }
+
+    // 所有訊息都沒有變化，不需要更新
+    return false;
   }
 
   void _scrollToBottom() {
@@ -467,7 +537,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Widget _buildAvatar(ChatMessage message) {
+    // 使用穩定的 key，基於 userId 和 avatarPath，避免不必要的重建
+    final avatarKey =
+        'avatar_${message.userId}_${message.senderAvatarPath ?? 'default'}';
     return Container(
+      key: ValueKey(avatarKey),
       width: 50.w,
       height: 50.w,
       decoration: BoxDecoration(
@@ -487,17 +561,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         avatarPath.isEmpty ||
         !avatarPath.startsWith('avatars/')) {
       final fixedIndex = _fixedAvatars[message.userId] ?? 1;
+      // 使用穩定的 key，避免重複載入相同的預設頭像
       return Container(
+        key: ValueKey('default_avatar_${message.userId}_$fixedIndex'),
         color: Colors.white,
         child: Image.asset(
           _getFixedDefaultAvatar(gender, fixedIndex),
           fit: BoxFit.cover,
+          cacheWidth: 100, // 限制緩存尺寸，節省記憶體
         ),
       );
     }
 
-    // 如果是 R2 上的自訂頭像
+    // 如果是 R2 上的自訂頭像，使用穩定的 key
+    final avatarCacheKey = 'avatar_${message.userId}_$avatarPath';
     return FutureBuilder<File?>(
+      key: ValueKey(avatarCacheKey),
       future: ImageCacheService().getCachedImageByKey(
         avatarPath,
         CacheType.avatar,
@@ -506,7 +585,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (snapshot.connectionState == ConnectionState.done &&
             snapshot.data != null &&
             snapshot.data!.existsSync()) {
-          return Image.file(snapshot.data!, fit: BoxFit.cover);
+          // 本地緩存存在，直接使用
+          return Image.file(
+            snapshot.data!,
+            fit: BoxFit.cover,
+            cacheWidth: 100, // 限制緩存尺寸，節省記憶體
+          );
         }
 
         // 嘗試從網路載入
@@ -519,8 +603,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 cacheManager: ImageCacheService().getCacheManager(
                   CacheType.avatar,
                 ),
-                cacheKey: avatarPath,
+                cacheKey: avatarPath, // 使用 avatarPath 作為緩存 key
                 fit: BoxFit.cover,
+                memCacheWidth: 100, // 限制記憶體緩存尺寸
                 placeholder:
                     (context, url) => Container(
                       color: Colors.white,
@@ -539,6 +624,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     child: Image.asset(
                       _getFixedDefaultAvatar(gender, fixedIndex),
                       fit: BoxFit.cover,
+                      cacheWidth: 100,
                     ),
                   );
                 },
@@ -551,6 +637,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               child: Image.asset(
                 _getFixedDefaultAvatar(gender, fixedIndex),
                 fit: BoxFit.cover,
+                cacheWidth: 100,
               ),
             );
           },
@@ -700,7 +787,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     double displayWidth,
     double displayHeight,
   ) {
+    // 使用穩定的 key，基於 message.id 和 imagePath，避免不必要的重建
+    final imageKey = 'image_${message.id}_${message.imagePath}';
     return FutureBuilder<String?>(
+      key: ValueKey(imageKey),
       future: _chatService.getImageUrl(message.imagePath!),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -762,10 +852,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     cacheManager: ImageCacheService().getCacheManager(
                       CacheType.chat,
                     ),
-                    cacheKey: message.imagePath,
+                    cacheKey: message.imagePath, // 使用 imagePath 作為緩存 key
                     fit: BoxFit.cover, // 使用 cover 填滿容器
                     width: displayWidth,
                     height: displayHeight,
+                    memCacheWidth: displayWidth.toInt(), // 限制記憶體緩存尺寸
+                    memCacheHeight: displayHeight.toInt(),
                     placeholder:
                         (context, url) => Container(
                           width: displayWidth,
@@ -814,7 +906,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final displayWidth = 200.w;
     final displayHeight = 200.w; // 初始使用正方形，載入後會調整
 
+    // 使用穩定的 key，基於 message.id 和 imagePath，避免不必要的重建
+    final imageKey = 'image_${message.id}_${message.imagePath}';
     return FutureBuilder<String?>(
+      key: ValueKey(imageKey),
       future: _chatService.getImageUrl(message.imagePath!),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -876,10 +971,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     cacheManager: ImageCacheService().getCacheManager(
                       CacheType.chat,
                     ),
-                    cacheKey: message.imagePath,
+                    cacheKey: message.imagePath, // 使用 imagePath 作為緩存 key
                     fit: BoxFit.cover, // 使用 cover 填滿容器
                     width: displayWidth,
                     height: displayHeight,
+                    memCacheWidth: displayWidth.toInt(), // 限制記憶體緩存尺寸
+                    memCacheHeight: displayHeight.toInt(),
                     placeholder:
                         (context, url) => Container(
                           width: displayWidth,
@@ -902,7 +999,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                         ),
                     imageBuilder: (context, imageProvider) {
                       // 當圖片載入完成後，儲存圖片尺寸以便下次使用
-                      _saveImageSize(message, imageProvider);
+                      // 只在尺寸尚未儲存時才儲存，避免重複操作
+                      if (message.imageWidth == null ||
+                          message.imageHeight == null) {
+                        _saveImageSize(message, imageProvider);
+                      }
                       return Image(
                         image: imageProvider,
                         fit: BoxFit.cover, // 使用 cover 填滿容器
