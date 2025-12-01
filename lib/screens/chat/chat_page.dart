@@ -228,6 +228,48 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  bool _isSameDay(DateTime date1, DateTime date2) {
+    final local1 = date1.toLocal();
+    final local2 = date2.toLocal();
+    return local1.year == local2.year &&
+        local1.month == local2.month &&
+        local1.day == local2.day;
+  }
+
+  String _formatDate(DateTime date) {
+    final localDate = date.toLocal();
+    final now = DateTime.now();
+    if (localDate.year == now.year &&
+        localDate.month == now.month &&
+        localDate.day == now.day) {
+      return '今天';
+    }
+    return '${localDate.month.toString()} 月 ${localDate.day.toString()} 日';
+  }
+
+  Widget _buildDateHeader(DateTime date) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 16.h),
+      child: Center(
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+          child: Text(
+            _formatDate(date),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12.sp,
+              fontFamily: 'OtsutomeFont',
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 獲取所有圖片訊息（按時間順序，從舊到新）
   List<ChatMessage> _getImageMessages() {
     final imageMessages =
@@ -470,8 +512,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final message = _messages[index];
         final isMe = message.userId == _currentUserId;
 
-        // 使用訊息 ID 作為 key，確保 Flutter 正確追蹤每個訊息
-        return _buildMessageItem(message, isMe, key: ValueKey(message.id));
+        final messageItem = _buildMessageItem(
+          message,
+          isMe,
+          key: ValueKey(message.id),
+        );
+
+        // 檢查是否需要顯示日期標籤
+        // 因為是 reverse: true，index 越大代表時間越早
+        // 如果是最後一個項目（最早的訊息），一定顯示日期
+        // 否則，如果當前訊息（較新）與下一個訊息（較舊）不在同一天，則在它們中間顯示日期
+        bool showDateHeader = false;
+        if (index == _messages.length - 1) {
+          showDateHeader = true;
+        } else {
+          final nextMessage = _messages[index + 1];
+          if (!_isSameDay(message.createdAt, nextMessage.createdAt)) {
+            showDateHeader = true;
+          }
+        }
+
+        if (showDateHeader) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 因為是 Column，順序是從上到下
+              // 我們希望日期在訊息上方
+              _buildDateHeader(message.createdAt),
+              messageItem,
+            ],
+          );
+        }
+
+        return messageItem;
       },
     );
   }
@@ -574,11 +647,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         'avatar_${message.userId}_${message.senderAvatarPath ?? 'default'}';
     return Container(
       key: ValueKey(avatarKey),
-      width: 50.w,
-      height: 50.w,
+      width: 40.w,
+      height: 40.w,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFF23456B), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 4,
+            offset: Offset(0, 2.h),
+          ),
+        ],
       ),
       child: ClipOval(child: _buildAvatarImage(message)),
     );
@@ -795,9 +874,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    // 使用 12 小時制顯示時間
-    final hour = message.createdAt.hour;
-    final minute = message.createdAt.minute;
+    // 使用 12 小時制顯示時間，並轉換為本地時間
+    final localTime = message.createdAt.toLocal();
+    final hour = localTime.hour;
+    final minute = localTime.minute;
     final hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
     final period = hour >= 12 ? 'PM' : 'AM';
 
