@@ -32,6 +32,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _isSending = false;
   bool _isInputFocused = false;
   final Map<String, int> _fixedAvatars = {}; // 儲存固定頭像索引
+  final Map<String, String?> _avatarUrlCache = {}; // 儲存頭像 URL 緩存
+  final Map<String, bool> _avatarUrlLoading = {}; // 追蹤正在加載的頭像 URL
 
   @override
   void initState() {
@@ -87,20 +89,46 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final sortedMessages = List<ChatMessage>.from(messages);
         sortedMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
+        // 收集需要處理的用戶
+        final usersNeedingFixedAvatar = <String>[];
+        final usersNeedingAvatarUrl = <String>[];
+
+        for (final message in sortedMessages) {
+          final avatarPath = message.senderAvatarPath;
+          final hasCustomAvatar =
+              avatarPath != null &&
+              avatarPath.isNotEmpty &&
+              avatarPath.startsWith('avatars/');
+
+          if (!hasCustomAvatar && !_fixedAvatars.containsKey(message.userId)) {
+            usersNeedingFixedAvatar.add(message.userId);
+          }
+
+          // 收集需要預取頭像 URL 的用戶（有自訂頭像且尚未緩存 URL）
+          if (hasCustomAvatar && !_avatarUrlCache.containsKey(message.userId)) {
+            usersNeedingAvatarUrl.add(message.userId);
+          }
+        }
+
         // 為沒有自訂頭像的用戶載入固定頭像索引
         bool needFixedAvatarUpdate = false;
-        for (final message in sortedMessages) {
-          if ((message.senderAvatarPath == null ||
-                  message.senderAvatarPath!.isEmpty ||
-                  !message.senderAvatarPath!.startsWith('avatars/')) &&
-              !_fixedAvatars.containsKey(message.userId)) {
-            final index = await _chatService.getFixedAvatarIndex(
-              message.userId,
-              widget.diningEventId,
-              message.senderGender,
-            );
-            _fixedAvatars[message.userId] = index;
-            needFixedAvatarUpdate = true;
+        for (final userId in usersNeedingFixedAvatar) {
+          final message = sortedMessages.firstWhere((m) => m.userId == userId);
+          final index = await _chatService.getFixedAvatarIndex(
+            userId,
+            widget.diningEventId,
+            message.senderGender,
+          );
+          _fixedAvatars[userId] = index;
+          needFixedAvatarUpdate = true;
+        }
+
+        // 批量預取自訂頭像的 URL
+        if (usersNeedingAvatarUrl.isNotEmpty) {
+          final uniqueUserIds = usersNeedingAvatarUrl.toSet().toList();
+          final urls = await UserService().prefetchAvatarUrls(uniqueUserIds);
+          for (final entry in urls.entries) {
+            _avatarUrlCache[entry.key] = entry.value;
           }
         }
 
@@ -108,7 +136,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final reversedMessages = sortedMessages.reversed.toList();
         final needsUpdate = _shouldUpdateMessages(_messages, reversedMessages);
 
-        if (needsUpdate || needFixedAvatarUpdate) {
+        if (needsUpdate ||
+            needFixedAvatarUpdate ||
+            usersNeedingAvatarUrl.isNotEmpty) {
           setState(() {
             // 反轉訊息順序：最新訊息在前 [新, 中, 舊]
             // 這樣配合 reverse: true，最新訊息會顯示在底部
@@ -374,7 +404,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   Widget _buildHeader() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+      padding: EdgeInsets.only(
+        left: 20.w,
+        right: 20.w,
+        top: 20.h,
+        bottom: 12.h,
+      ),
       child: Row(
         children: [
           // 左側返回按鈕
@@ -552,15 +587,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _buildAvatarImage(ChatMessage message) {
     final avatarPath = message.senderAvatarPath;
     final gender = message.senderGender;
+    final userId = message.userId;
 
     // 如果沒有頭像或不是自訂頭像，使用固定的預設頭像
     if (avatarPath == null ||
         avatarPath.isEmpty ||
         !avatarPath.startsWith('avatars/')) {
-      final fixedIndex = _fixedAvatars[message.userId] ?? 1;
+      final fixedIndex = _fixedAvatars[userId] ?? 1;
       // 使用穩定的 key，避免重複載入相同的預設頭像
       return Container(
-        key: ValueKey('default_avatar_${message.userId}_$fixedIndex'),
+        key: ValueKey('default_avatar_${userId}_$fixedIndex'),
         color: Colors.white,
         child: Image.asset(
           _getFixedDefaultAvatar(gender, fixedIndex),
@@ -570,8 +606,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    // 如果是 R2 上的自訂頭像，使用穩定的 key
-    final avatarCacheKey = 'avatar_${message.userId}_$avatarPath';
+    // 如果是 R2 上的自訂頭像
+    final avatarCacheKey = 'avatar_${userId}_$avatarPath';
+
+    // 檢查內存中是否有緩存的 URL
+    final cachedUrl = _avatarUrlCache[userId];
+
+    // 如果已經有 URL，直接使用 CachedNetworkImage
+    if (cachedUrl != null) {
+      return _buildCachedAvatarImage(
+        key: ValueKey(avatarCacheKey),
+        imageUrl: cachedUrl,
+        avatarPath: avatarPath,
+        gender: gender,
+        userId: userId,
+      );
+    }
+
+    // 首先嘗試從本地快取獲取
     return FutureBuilder<File?>(
       key: ValueKey(avatarCacheKey),
       future: ImageCacheService().getCachedImageByKey(
@@ -582,7 +634,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (snapshot.connectionState == ConnectionState.done &&
             snapshot.data != null &&
             snapshot.data!.existsSync()) {
-          // 本地緩存存在，直接使用
+          // 本地緩存存在，直接使用 Image.file，不需要請求 URL
           return Image.file(
             snapshot.data!,
             fit: BoxFit.cover,
@@ -590,54 +642,112 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           );
         }
 
-        // 嘗試從網路載入
-        return FutureBuilder<String?>(
-          future: UserService().getOtherUserAvatarUrl(message.userId),
-          builder: (context, urlSnapshot) {
-            if (urlSnapshot.hasData && urlSnapshot.data != null) {
-              return CachedNetworkImage(
-                imageUrl: urlSnapshot.data!,
-                cacheManager: ImageCacheService().getCacheManager(
-                  CacheType.avatar,
-                ),
-                cacheKey: avatarPath, // 使用 avatarPath 作為緩存 key
-                fit: BoxFit.cover,
-                memCacheWidth: 100, // 限制記憶體緩存尺寸
-                placeholder:
-                    (context, url) => Container(
-                      color: Colors.white,
-                      child: Center(
-                        child: LoadingImage(
-                          width: 20.w,
-                          height: 20.h,
-                          color: const Color(0xFF23456B),
-                        ),
-                      ),
-                    ),
-                errorWidget: (context, url, error) {
-                  final fixedIndex = _fixedAvatars[message.userId] ?? 1;
-                  return Container(
-                    color: Colors.white,
-                    child: Image.asset(
-                      _getFixedDefaultAvatar(gender, fixedIndex),
-                      fit: BoxFit.cover,
-                      cacheWidth: 100,
-                    ),
-                  );
-                },
-              );
-            }
+        // 本地快取不存在，需要從網路載入
+        // 異步獲取 URL 並緩存（避免在 build 中重複請求）
+        _loadAvatarUrlIfNeeded(userId, avatarPath, gender);
 
-            final fixedIndex = _fixedAvatars[message.userId] ?? 1;
-            return Container(
-              color: Colors.white,
-              child: Image.asset(
+        // 顯示載入中的預設頭像
+        final fixedIndex = _fixedAvatars[userId] ?? 1;
+        return Container(
+          color: Colors.white,
+          child: Stack(
+            children: [
+              Image.asset(
                 _getFixedDefaultAvatar(gender, fixedIndex),
                 fit: BoxFit.cover,
                 cacheWidth: 100,
               ),
-            );
-          },
+              Positioned.fill(
+                child: Container(
+                  color: Colors.white.withOpacity(0.5),
+                  child: Center(
+                    child: LoadingImage(
+                      width: 15.w,
+                      height: 15.h,
+                      color: const Color(0xFF23456B),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 異步載入頭像 URL 並緩存（避免重複請求）
+  void _loadAvatarUrlIfNeeded(
+    String userId,
+    String avatarPath,
+    String? gender,
+  ) {
+    // 如果已經在加載中或已有緩存，跳過
+    if (_avatarUrlLoading[userId] == true ||
+        _avatarUrlCache.containsKey(userId)) {
+      return;
+    }
+
+    // 標記為加載中
+    _avatarUrlLoading[userId] = true;
+
+    // 異步獲取 URL
+    UserService()
+        .getOtherUserAvatarUrl(userId)
+        .then((url) {
+          if (mounted) {
+            setState(() {
+              _avatarUrlCache[userId] = url;
+              _avatarUrlLoading[userId] = false;
+            });
+          }
+        })
+        .catchError((e) {
+          debugPrint('獲取頭像 URL 失敗: $e');
+          if (mounted) {
+            setState(() {
+              _avatarUrlCache[userId] = null;
+              _avatarUrlLoading[userId] = false;
+            });
+          }
+        });
+  }
+
+  /// 使用已緩存的 URL 構建頭像圖片
+  Widget _buildCachedAvatarImage({
+    required Key key,
+    required String imageUrl,
+    required String avatarPath,
+    required String? gender,
+    required String userId,
+  }) {
+    return CachedNetworkImage(
+      key: key,
+      imageUrl: imageUrl,
+      cacheManager: ImageCacheService().getCacheManager(CacheType.avatar),
+      cacheKey: avatarPath, // 使用 avatarPath 作為緩存 key
+      fit: BoxFit.cover,
+      memCacheWidth: 100, // 限制記憶體緩存尺寸
+      placeholder:
+          (context, url) => Container(
+            color: Colors.white,
+            child: Center(
+              child: LoadingImage(
+                width: 20.w,
+                height: 20.h,
+                color: const Color(0xFF23456B),
+              ),
+            ),
+          ),
+      errorWidget: (context, url, error) {
+        final fixedIndex = _fixedAvatars[userId] ?? 1;
+        return Container(
+          color: Colors.white,
+          child: Image.asset(
+            _getFixedDefaultAvatar(gender, fixedIndex),
+            fit: BoxFit.cover,
+            cacheWidth: 100,
+          ),
         );
       },
     );
