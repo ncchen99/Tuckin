@@ -236,6 +236,59 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         local1.day == local2.day;
   }
 
+  /// 判斷兩條訊息是否屬於同一個群組（同一用戶 + 2分鐘內 + 都是文字訊息）
+  bool _isSameGroup(ChatMessage message1, ChatMessage message2) {
+    // 不同用戶不算同一群組
+    if (message1.userId != message2.userId) return false;
+
+    // 如果其中一條是圖片訊息，不算同一群組（只有文字訊息才會群組處理）
+    if (message1.isImage || message2.isImage) return false;
+
+    // 時間差超過 2 分鐘不算同一群組
+    final timeDiff = message1.createdAt.difference(message2.createdAt).abs();
+    if (timeDiff.inMinutes >= 2) return false;
+
+    return true;
+  }
+
+  /// 獲取訊息在群組中的位置
+  /// 返回 (isFirstInGroup, isLastInGroup)
+  (bool, bool) _getMessageGroupPosition(int index) {
+    final message = _messages[index];
+
+    // 如果是圖片訊息，不參與群組處理，直接返回單獨訊息
+    if (message.isImage) {
+      return (true, true);
+    }
+
+    // 因為 _messages 是 [新, 中, 舊]，reverse: true 顯示
+    // index 越小 = 時間越新，index 越大 = 時間越舊
+
+    // 檢查是否是群組中的第一條（時間最早的那條）
+    // 往後看（index + 1 = 更舊的訊息）
+    bool isFirstInGroup = true;
+    if (index < _messages.length - 1) {
+      final olderMessage = _messages[index + 1];
+      if (_isSameGroup(message, olderMessage) &&
+          _isSameDay(message.createdAt, olderMessage.createdAt)) {
+        isFirstInGroup = false;
+      }
+    }
+
+    // 檢查是否是群組中的最後一條（時間最新的那條）
+    // 往前看（index - 1 = 更新的訊息）
+    bool isLastInGroup = true;
+    if (index > 0) {
+      final newerMessage = _messages[index - 1];
+      if (_isSameGroup(message, newerMessage) &&
+          _isSameDay(message.createdAt, newerMessage.createdAt)) {
+        isLastInGroup = false;
+      }
+    }
+
+    return (isFirstInGroup, isLastInGroup);
+  }
+
   String _formatDate(DateTime date) {
     final localDate = date.toLocal();
     final now = DateTime.now();
@@ -512,9 +565,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         final message = _messages[index];
         final isMe = message.userId == _currentUserId;
 
+        // 獲取訊息在群組中的位置
+        final (isFirstInGroup, isLastInGroup) = _getMessageGroupPosition(index);
+
         final messageItem = _buildMessageItem(
           message,
           isMe,
+          isFirstInGroup: isFirstInGroup,
+          isLastInGroup: isLastInGroup,
           key: ValueKey(message.id),
         );
 
@@ -549,17 +607,48 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMessageItem(ChatMessage message, bool isMe, {Key? key}) {
+  Widget _buildMessageItem(
+    ChatMessage message,
+    bool isMe, {
+    Key? key,
+    bool isFirstInGroup = true,
+    bool isLastInGroup = true,
+  }) {
+    // 根據群組位置調整間距
+    // 我們希望群組內訊息之間的總間距固定且較小（例如 2.h）
+    // 所以每條訊息在群組內側的 padding 設為 1.h
+    final double innerPadding = 2.h;
+
+    // 群組邊緣的額外間距
+    final double groupEdgePadding = 10.h;
+
+    final topPadding = isFirstInGroup ? groupEdgePadding : innerPadding;
+    final bottomPadding = isLastInGroup ? groupEdgePadding : innerPadding;
+
+    // 計算訊息框的圓角
+    // 根據群組位置調整圓角，讓連續訊息看起來更像一個整體
+    final borderRadius = _getMessageBorderRadius(
+      isMe,
+      isFirstInGroup,
+      isLastInGroup,
+    );
+
     return Padding(
       key: key,
-      padding: EdgeInsets.symmetric(vertical: 10.h),
+      padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
       child: Row(
         mainAxisAlignment:
             isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // 他人訊息：左側頭像
-          if (!isMe) ...[_buildAvatar(message), SizedBox(width: 10.w)],
+          // 他人訊息：左側頭像（只在群組最後一條顯示）
+          if (!isMe) ...[
+            if (isLastInGroup)
+              _buildAvatar(message)
+            else
+              SizedBox(width: 40.w), // 佔位，保持對齊
+            SizedBox(width: 10.w),
+          ],
 
           // 訊息內容區域（包含名字、訊息框、時間）
           Flexible(
@@ -567,8 +656,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               crossAxisAlignment:
                   isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                // 發送者名字（只在不是自己時顯示）
-                if (!isMe && message.senderNickname != null) ...[
+                // 發送者名字（只在群組第一條顯示）
+                if (!isMe &&
+                    message.senderNickname != null &&
+                    isFirstInGroup) ...[
                   Padding(
                     padding: EdgeInsets.only(left: 8.w, bottom: 4.h),
                     child: Text(
@@ -588,8 +679,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // 時間（左側，僅當是自己的訊息時）
-                    if (isMe) ...[
+                    // 時間（左側，僅當是自己的訊息且是群組最後一條時顯示）
+                    if (isMe && isLastInGroup) ...[
                       Padding(
                         padding: EdgeInsets.only(right: 6.w, bottom: 2.h),
                         child: _buildTimeText(message),
@@ -607,7 +698,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       isMe
                                           ? const Color(0xFFFFD9B3) // 淡橘色
                                           : Colors.white.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(12.r),
+                                  borderRadius: borderRadius,
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black.withOpacity(0.1),
@@ -618,11 +709,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                 ),
                                 child: _buildTextContent(message),
                               )
-                              : _buildImageMessage(message),
+                              : _buildImageMessage(
+                                message,
+                                borderRadius: borderRadius,
+                              ),
                     ),
 
-                    // 時間（右側，僅當是他人的訊息時）
-                    if (!isMe) ...[
+                    // 時間（右側，僅當是他人的訊息且是群組最後一條時顯示）
+                    if (!isMe && isLastInGroup) ...[
                       Padding(
                         padding: EdgeInsets.only(left: 6.w, bottom: 2.h),
                         child: _buildTimeText(message),
@@ -634,11 +728,82 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             ),
           ),
 
-          // 自己訊息：不顯示頭像，但保留空間
-          if (isMe) SizedBox(width: 10.w),
+          // // 自己訊息：不顯示頭像，但保留空間
+          // if (isMe) SizedBox(width: 10.w),
         ],
       ),
     );
+  }
+
+  /// 根據訊息在群組中的位置計算圓角
+  BorderRadius _getMessageBorderRadius(
+    bool isMe,
+    bool isFirstInGroup,
+    bool isLastInGroup,
+  ) {
+    final double normalRadius = 12.r;
+    final double smallRadius = 4.r;
+
+    if (isFirstInGroup && isLastInGroup) {
+      // 單獨一條訊息，四角都是正常圓角
+      return BorderRadius.circular(normalRadius);
+    }
+
+    if (isMe) {
+      // 自己的訊息在右側
+      if (isFirstInGroup) {
+        // 群組第一條（視覺上最上面）：右下角小圓角
+        return BorderRadius.only(
+          topLeft: Radius.circular(normalRadius),
+          topRight: Radius.circular(normalRadius),
+          bottomLeft: Radius.circular(normalRadius),
+          bottomRight: Radius.circular(smallRadius),
+        );
+      } else if (isLastInGroup) {
+        // 群組最後一條（視覺上最下面）：右上角小圓角
+        return BorderRadius.only(
+          topLeft: Radius.circular(normalRadius),
+          topRight: Radius.circular(smallRadius),
+          bottomLeft: Radius.circular(normalRadius),
+          bottomRight: Radius.circular(normalRadius),
+        );
+      } else {
+        // 群組中間：右側兩個角都是小圓角
+        return BorderRadius.only(
+          topLeft: Radius.circular(normalRadius),
+          topRight: Radius.circular(smallRadius),
+          bottomLeft: Radius.circular(normalRadius),
+          bottomRight: Radius.circular(smallRadius),
+        );
+      }
+    } else {
+      // 他人的訊息在左側
+      if (isFirstInGroup) {
+        // 群組第一條（視覺上最上面）：左下角小圓角
+        return BorderRadius.only(
+          topLeft: Radius.circular(normalRadius),
+          topRight: Radius.circular(normalRadius),
+          bottomLeft: Radius.circular(smallRadius),
+          bottomRight: Radius.circular(normalRadius),
+        );
+      } else if (isLastInGroup) {
+        // 群組最後一條（視覺上最下面）：左上角小圓角
+        return BorderRadius.only(
+          topLeft: Radius.circular(smallRadius),
+          topRight: Radius.circular(normalRadius),
+          bottomLeft: Radius.circular(normalRadius),
+          bottomRight: Radius.circular(normalRadius),
+        );
+      } else {
+        // 群組中間：左側兩個角都是小圓角
+        return BorderRadius.only(
+          topLeft: Radius.circular(smallRadius),
+          topRight: Radius.circular(normalRadius),
+          bottomLeft: Radius.circular(smallRadius),
+          bottomRight: Radius.circular(normalRadius),
+        );
+      }
+    }
   }
 
   Widget _buildAvatar(ChatMessage message) {
@@ -891,7 +1056,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildImageMessage(ChatMessage message) {
+  Widget _buildImageMessage(ChatMessage message, {BorderRadius? borderRadius}) {
+    final effectiveBorderRadius = borderRadius ?? BorderRadius.circular(12.r);
+
     // 如果是傳送中的圖片，顯示載入狀態
     if (message.sendStatus == 'pending') {
       return Container(
@@ -899,7 +1066,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         height: 200.w,
         decoration: BoxDecoration(
           color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: effectiveBorderRadius,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.15),
@@ -937,7 +1104,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         padding: EdgeInsets.all(12.w),
         decoration: BoxDecoration(
           color: Colors.grey[300],
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: effectiveBorderRadius,
         ),
         child: const Text('[圖片載入失敗]'),
       );
@@ -961,19 +1128,29 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         displayWidth = displayHeight * aspectRatio;
       }
 
-      return _buildImageWithSize(message, displayWidth, displayHeight);
+      return _buildImageWithSize(
+        message,
+        displayWidth,
+        displayHeight,
+        borderRadius: effectiveBorderRadius,
+      );
     }
 
     // 如果沒有尺寸資訊，使用自適應方式
-    return _buildImageWithAutoSize(message);
+    return _buildImageWithAutoSize(
+      message,
+      borderRadius: effectiveBorderRadius,
+    );
   }
 
   /// 使用已知尺寸建構圖片訊息
   Widget _buildImageWithSize(
     ChatMessage message,
     double displayWidth,
-    double displayHeight,
-  ) {
+    double displayHeight, {
+    BorderRadius? borderRadius,
+  }) {
+    final effectiveBorderRadius = borderRadius ?? BorderRadius.circular(12.r);
     // 使用穩定的 key，基於 message.id 和 imagePath，避免不必要的重建
     final imageKey = 'image_${message.id}_${message.imagePath}';
     return FutureBuilder<String?>(
@@ -986,7 +1163,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             height: displayHeight,
             decoration: BoxDecoration(
               color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(12.r),
+              borderRadius: effectiveBorderRadius,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.15),
@@ -1018,7 +1195,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 width: displayWidth,
                 height: displayHeight,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: effectiveBorderRadius,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.15),
@@ -1028,7 +1205,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: effectiveBorderRadius,
                   child: CachedNetworkImage(
                     imageUrl: imageUrl,
                     cacheManager: ImageCacheService().getCacheManager(
@@ -1072,7 +1249,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           height: displayHeight,
           decoration: BoxDecoration(
             color: Colors.grey[300],
-            borderRadius: BorderRadius.circular(12.r),
+            borderRadius: effectiveBorderRadius,
           ),
           child: const Icon(Icons.error),
         );
@@ -1081,7 +1258,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   /// 自動調整尺寸的圖片訊息（用於沒有尺寸資訊的情況）
-  Widget _buildImageWithAutoSize(ChatMessage message) {
+  Widget _buildImageWithAutoSize(
+    ChatMessage message, {
+    BorderRadius? borderRadius,
+  }) {
+    final effectiveBorderRadius = borderRadius ?? BorderRadius.circular(12.r);
     // 為了避免圖片載入時改變高度導致 ListView 跳動
     // 使用固定的初始容器，載入完成後也保持固定大小
     // 使用較大的預設尺寸，載入後會根據實際比例調整
@@ -1100,7 +1281,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             height: displayHeight,
             decoration: BoxDecoration(
               color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(12.r),
+              borderRadius: effectiveBorderRadius,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.15),
@@ -1132,7 +1313,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 width: displayWidth,
                 height: displayHeight,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: effectiveBorderRadius,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.15),
@@ -1142,7 +1323,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: effectiveBorderRadius,
                   child: CachedNetworkImage(
                     imageUrl: imageUrl,
                     cacheManager: ImageCacheService().getCacheManager(
@@ -1200,7 +1381,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           height: displayHeight,
           decoration: BoxDecoration(
             color: Colors.grey[300],
-            borderRadius: BorderRadius.circular(12.r),
+            borderRadius: effectiveBorderRadius,
           ),
           child: const Icon(Icons.error),
         );
