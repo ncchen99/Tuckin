@@ -10,7 +10,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/painting.dart';
 import '../models/chat_message.dart';
 import 'api_service.dart';
 import 'auth_service.dart';

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/painting.dart';
 import 'dart:ui' as ui;
 import 'dart:async';
 import 'package:tuckin/components/components.dart';
@@ -180,7 +179,7 @@ class _ImageViewerState extends State<ImageViewer> {
 
         // 創建柔和的微光顏色（降低飽和度，與背景融合）
         final baseColor = Color.fromRGBO(avgR, avgG, avgB, 1.0);
-        final glowColor = baseColor.withOpacity(0.15);
+        final glowColor = baseColor.withValues(alpha: 0.15);
 
         // 緩存微光顏色
         _glowColorCache[imagePath] = glowColor;
@@ -196,7 +195,7 @@ class _ImageViewerState extends State<ImageViewer> {
       }
     } catch (e) {
       // 如果計算失敗，使用默認的柔和顏色並緩存
-      final defaultColor = Colors.white.withOpacity(0.1);
+      final defaultColor = Colors.white.withValues(alpha: 0.1);
       _glowColorCache[imagePath] = defaultColor;
 
       // 如果是當前顯示的圖片，觸發 UI 更新
@@ -274,7 +273,7 @@ class _ImageViewerState extends State<ImageViewer> {
             child: BackdropFilter(
               filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
               child: Container(
-                color: Colors.black.withOpacity(backgroundOpacity),
+                color: Colors.black.withValues(alpha: backgroundOpacity),
               ),
             ),
           ),
@@ -366,7 +365,9 @@ class _ImageViewerState extends State<ImageViewer> {
                                     fontWeight: FontWeight.bold,
                                     shadows: [
                                       Shadow(
-                                        color: Colors.black.withOpacity(0.5),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.5,
+                                        ),
                                         blurRadius: 4,
                                         offset: Offset(0, 2.h),
                                       ),
@@ -465,7 +466,7 @@ class _ImageViewerState extends State<ImageViewer> {
     final borderRadius = 16.r;
 
     // 使用計算的微光顏色，如果沒有則使用默認的柔和白色
-    final effectiveGlowColor = glowColor ?? Colors.white.withOpacity(0.2);
+    final effectiveGlowColor = glowColor ?? Colors.white.withValues(alpha: 0.2);
 
     return SafeArea(
       child: Padding(
@@ -482,7 +483,7 @@ class _ImageViewerState extends State<ImageViewer> {
               boxShadow: [
                 // 四周整體微光（主要效果）
                 BoxShadow(
-                  color: effectiveGlowColor.withOpacity(0.7),
+                  color: effectiveGlowColor.withValues(alpha: 0.7),
                   blurRadius: 60,
                   spreadRadius: 8,
                 ),

@@ -25,10 +25,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _messageFocusNode = FocusNode();
 
   String? _currentUserId;
   List<ChatMessage> _messages = [];
   bool _isSending = false;
+  bool _isInputFocused = false;
   final Map<String, int> _fixedAvatars = {}; // 儲存固定頭像索引
 
   @override
@@ -39,6 +41,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
     // 註冊生命週期監聽
     WidgetsBinding.instance.addObserver(this);
+
+    // 監聽輸入框焦點狀態
+    _messageFocusNode.addListener(() {
+      setState(() {
+        _isInputFocused = _messageFocusNode.hasFocus;
+      });
+    });
   }
 
   @override
@@ -46,6 +55,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _chatService.unsubscribeFromMessages(widget.diningEventId);
     _messageController.dispose();
     _scrollController.dispose();
+    _messageFocusNode.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -351,53 +361,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               _buildHeader(),
 
               // 訊息區域 - 可滾動
-              Expanded(
-                child: Stack(
-                  children: [
-                    // 右下角背景圖片
-                    Positioned(
-                      right: -7.w,
-                      bottom: -45.h,
-                      child: Opacity(
-                        opacity: 0.65,
-                        child: ColorFiltered(
-                          colorFilter: const ColorFilter.matrix(<double>[
-                            0.6,
-                            0.1,
-                            0.1,
-                            0,
-                            0,
-                            0.1,
-                            0.6,
-                            0.1,
-                            0,
-                            0,
-                            0.1,
-                            0.1,
-                            0.6,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            1,
-                            0,
-                          ]),
-                          child: Image.asset(
-                            'assets/images/illustrate/p3.webp',
-                            width: 220.w,
-                            height: 220.h,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // 訊息列表
-                    _buildMessageList(),
-                  ],
-                ),
-              ),
+              Expanded(child: _buildMessageList()),
 
               // 輸入區域 - 固定在底部
               _buildInputArea(),
@@ -1093,37 +1057,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Widget _buildInputArea() {
-    return Container(
+    return Padding(
       padding: EdgeInsets.only(
         left: 15.w,
         right: 15.w,
         top: 10.h,
-        bottom: max(10.h, MediaQuery.of(context).padding.bottom),
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 5,
-            offset: Offset(0, -2.h),
-          ),
-        ],
+        bottom: max(5.h, MediaQuery.of(context).padding.bottom * 0.5),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // 相機按鈕
-          _buildCameraButton(),
+          // 相機按鈕（向上移動一點）
+          Padding(
+            padding: EdgeInsets.only(bottom: 10.h),
+            child: _buildCameraButton(),
+          ),
 
           SizedBox(width: 10.w),
 
-          // 輸入框
+          // 輸入框（包含內部的發送按鈕）
           Expanded(child: _buildMessageInput()),
-
-          SizedBox(width: 10.w),
-
-          // 發送按鈕
-          _buildSendButton(),
         ],
       ),
     );
@@ -1190,37 +1143,73 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   Widget _buildMessageInput() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 15.w),
+      constraints: BoxConstraints(
+        minHeight: 50.h, // 確保有足夠高度顯示按鈕
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: const Color(0xFF23456B), width: 2),
-      ),
-      child: TextField(
-        controller: _messageController,
-        enabled: !_isSending,
-        maxLines: null,
-        style: TextStyle(
-          fontFamily: 'OtsutomeFont',
-          fontSize: 16.sp,
-          height: 1.2,
-        ),
-        decoration: InputDecoration(
-          hintText: '輸入訊息...',
-          border: InputBorder.none,
-          hintStyle: TextStyle(
-            color: Colors.grey,
-            fontFamily: 'OtsutomeFont',
-            fontSize: 16.sp,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 8,
+            offset: Offset(0, 2.h),
           ),
-          contentPadding: EdgeInsets.symmetric(vertical: 12.h),
-        ),
+        ],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // 輸入框
+          Padding(
+            padding: EdgeInsets.only(
+              right: _isInputFocused ? 50.w : 0, // 為發送按鈕預留空間
+            ),
+            child: TextField(
+              controller: _messageController,
+              focusNode: _messageFocusNode,
+              enabled: !_isSending,
+              maxLines: null,
+              minLines: 1,
+              textAlignVertical: TextAlignVertical.center,
+              style: TextStyle(
+                fontFamily: 'OtsutomeFont',
+                fontSize: 16.sp,
+                height: 1.2,
+              ),
+              decoration: InputDecoration(
+                hintText: '輸入訊息...',
+                border: InputBorder.none,
+                isDense: true,
+                hintStyle: TextStyle(
+                  color: Colors.grey,
+                  fontFamily: 'OtsutomeFont',
+                  fontSize: 16.sp,
+                  height: 1,
+                  fontWeight: FontWeight.w500,
+                ),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 10.w,
+                  vertical: 16.h,
+                ),
+              ),
+            ),
+          ),
+          // 發送按鈕（只在 focus 時顯示，貼齊底部）
+          if (_isInputFocused)
+            Positioned(
+              right: 8.w,
+              bottom: 11.h, // 與 contentPadding 的 vertical 保持一致
+              child: _buildSendButton(),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildSendButton() {
-    bool _isPressed = false;
+    bool isPressed = false;
 
     return StatefulBuilder(
       builder: (context, setButtonState) {
@@ -1228,22 +1217,24 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           onTapDown: (_) {
             if (!_isSending) {
               setButtonState(() {
-                _isPressed = true;
+                isPressed = true;
               });
             }
           },
           onTapUp: (_) {
             if (!_isSending) {
               setButtonState(() {
-                _isPressed = false;
+                isPressed = false;
               });
               _sendTextMessage();
+              // 發送後移除焦點
+              _messageFocusNode.unfocus();
             }
           },
           onTapCancel: () {
             if (!_isSending) {
               setButtonState(() {
-                _isPressed = false;
+                isPressed = false;
               });
             }
           },
@@ -1252,22 +1243,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             duration: const Duration(milliseconds: 100),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 100),
-              transform: Matrix4.translationValues(0, _isPressed ? 2.h : 0, 0),
+              transform: Matrix4.translationValues(0, isPressed ? 2.h : 0, 0),
               child: SizedBox(
-                width: 35.w,
-                height: 35.h,
+                width: 30.w,
+                height: 30.h,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
                     // 底部陰影（按下時隱藏）
-                    if (!_isPressed && !_isSending)
+                    if (!isPressed && !_isSending)
                       Positioned(
                         left: 0,
                         top: 2.h,
                         child: Image.asset(
                           'assets/images/icon/send.webp',
-                          width: 35.w,
-                          height: 35.h,
+                          width: 30.w,
+                          height: 30.h,
                           color: Colors.black.withOpacity(0.4),
                           colorBlendMode: BlendMode.srcIn,
                         ),
@@ -1275,8 +1266,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     // 主圖標
                     Image.asset(
                       'assets/images/icon/send.webp',
-                      width: 35.w,
-                      height: 35.h,
+                      width: 30.w,
+                      height: 30.h,
                     ),
                   ],
                 ),
