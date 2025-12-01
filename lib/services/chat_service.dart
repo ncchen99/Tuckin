@@ -332,15 +332,11 @@ class ChatService {
     }
   }
 
-  /// 拍照並發送圖片訊息
-  Future<bool> sendImageMessage(String diningEventId) async {
+  /// 選擇圖片（拍照）並返回圖片資訊
+  /// 返回 Map 包含: localPath, imageBytes, width, height
+  /// 如果用戶取消或失敗則返回 null
+  Future<Map<String, dynamic>?> pickImageFromCamera() async {
     try {
-      final currentUser = await _authService.getCurrentUser();
-      if (currentUser == null) {
-        debugPrint('用戶未登入');
-        return false;
-      }
-
       // 1. 使用相機拍照
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
@@ -349,7 +345,7 @@ class ChatService {
 
       if (photo == null) {
         debugPrint('用戶取消拍照');
-        return false;
+        return null;
       }
 
       // 2. 壓縮圖片為 WebP 格式
@@ -363,7 +359,7 @@ class ChatService {
 
       if (imageBytes == null) {
         debugPrint('圖片壓縮失敗');
-        return false;
+        return null;
       }
 
       // 解碼圖片以獲取尺寸
@@ -371,10 +367,37 @@ class ChatService {
       final imageWidth = decodedImage.width;
       final imageHeight = decodedImage.height;
 
-      // 3. 生成訊息 ID
+      return {
+        'localPath': photo.path,
+        'imageBytes': imageBytes,
+        'width': imageWidth,
+        'height': imageHeight,
+      };
+    } catch (e) {
+      debugPrint('選擇圖片失敗: $e');
+      return null;
+    }
+  }
+
+  /// 上傳並發送已選擇的圖片訊息
+  /// 返回 true 表示成功，false 表示失敗
+  Future<bool> uploadAndSendImage(
+    String diningEventId,
+    Uint8List imageBytes,
+    int imageWidth,
+    int imageHeight,
+  ) async {
+    try {
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null) {
+        debugPrint('用戶未登入');
+        return false;
+      }
+
+      // 生成訊息 ID
       final messageId = _uuid.v4();
 
-      // 4. 獲取上傳 URL
+      // 獲取上傳 URL
       final uploadData = await _getImageUploadUrl(diningEventId, messageId);
       if (uploadData == null) {
         debugPrint('獲取上傳 URL 失敗');
@@ -384,14 +407,14 @@ class ChatService {
       final uploadUrl = uploadData['upload_url'] as String;
       final imagePath = uploadData['image_path'] as String;
 
-      // 5. 上傳圖片到 R2
+      // 上傳圖片到 R2
       final uploadSuccess = await _uploadImageToR2(uploadUrl, imageBytes);
       if (!uploadSuccess) {
         debugPrint('上傳圖片失敗');
         return false;
       }
 
-      // 6. 插入訊息到 Supabase
+      // 插入訊息到 Supabase
       await Supabase.instance.client.from('chat_messages').insert({
         'id': messageId,
         'dining_event_id': diningEventId,
@@ -402,7 +425,7 @@ class ChatService {
         'image_height': imageHeight,
       });
 
-      // 7. 發送通知
+      // 發送通知
       await _sendChatNotification(diningEventId, '[圖片]', 'image');
 
       debugPrint('圖片訊息已發送');
@@ -411,6 +434,19 @@ class ChatService {
       debugPrint('發送圖片訊息失敗: $e');
       return false;
     }
+  }
+
+  /// 拍照並發送圖片訊息（保留舊方法以兼容）
+  Future<bool> sendImageMessage(String diningEventId) async {
+    final imageData = await pickImageFromCamera();
+    if (imageData == null) return false;
+
+    return await uploadAndSendImage(
+      diningEventId,
+      imageData['imageBytes'] as Uint8List,
+      imageData['width'] as int,
+      imageData['height'] as int,
+    );
   }
 
   /// 獲取圖片上傳 URL

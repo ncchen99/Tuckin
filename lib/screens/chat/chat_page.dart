@@ -10,6 +10,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 import 'dart:math';
 import 'dart:io';
+import 'dart:typed_data';
 
 class ChatPage extends StatefulWidget {
   final String diningEventId;
@@ -29,11 +30,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   String? _currentUserId;
   List<ChatMessage> _messages = [];
-  bool _isSending = false;
   bool _isInputFocused = false;
   final Map<String, int> _fixedAvatars = {}; // 儲存固定頭像索引
   final Map<String, String?> _avatarUrlCache = {}; // 儲存頭像 URL 緩存
   final Map<String, bool> _avatarUrlLoading = {}; // 追蹤正在加載的頭像 URL
+
+  // 儲存正在發送的圖片本地資訊（tempId -> {localPath, imageBytes, width, height}）
+  final Map<String, Map<String, dynamic>> _pendingImageData = {};
 
   @override
   void initState() {
@@ -142,7 +145,53 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           setState(() {
             // 反轉訊息順序：最新訊息在前 [新, 中, 舊]
             // 這樣配合 reverse: true，最新訊息會顯示在底部
-            _messages = reversedMessages;
+
+            // 保留當前的 pending 狀態訊息（樂觀更新）
+            final pendingMessages =
+                _messages.where((m) => m.sendStatus == 'pending').toList();
+
+            // 匹配 pending 訊息與遠端訊息，轉移本地圖片資訊
+            final pendingToRemove = <String>{};
+            for (final pendingMessage in pendingMessages) {
+              for (final remoteMessage in reversedMessages) {
+                // 如果是同一個用戶，且時間差在 30 秒內，且類型相同
+                if (remoteMessage.userId == pendingMessage.userId &&
+                    remoteMessage.messageType == pendingMessage.messageType &&
+                    remoteMessage.createdAt
+                            .difference(pendingMessage.createdAt)
+                            .abs()
+                            .inSeconds <
+                        30) {
+                  // 如果是文字訊息，比較內容
+                  if (remoteMessage.messageType == 'text' &&
+                      remoteMessage.content == pendingMessage.content) {
+                    pendingToRemove.add(pendingMessage.id);
+                    break;
+                  }
+                  // 如果是圖片訊息，比較尺寸
+                  if (remoteMessage.messageType == 'image' &&
+                      remoteMessage.imageWidth == pendingMessage.imageWidth &&
+                      remoteMessage.imageHeight == pendingMessage.imageHeight) {
+                    pendingToRemove.add(pendingMessage.id);
+                    // 將本地圖片資訊轉移到新的 messageId（用於 placeholder）
+                    if (_pendingImageData.containsKey(pendingMessage.id)) {
+                      _pendingImageData[remoteMessage.id] =
+                          _pendingImageData[pendingMessage.id]!;
+                      _pendingImageData.remove(pendingMessage.id);
+                    }
+                    break;
+                  }
+                }
+              }
+            }
+
+            // 過濾掉已被遠端訊息替代的 pending 訊息
+            final remainingPendingMessages =
+                pendingMessages
+                    .where((m) => !pendingToRemove.contains(m.id))
+                    .toList();
+
+            _messages = [...remainingPendingMessages, ...reversedMessages];
           });
           // 自動滾動到最新訊息
           _scrollToBottom();
@@ -358,14 +407,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   Future<void> _sendTextMessage() async {
     final content = _messageController.text.trim();
-    if (content.isEmpty || _isSending) return;
+    if (content.isEmpty) return;
 
-    // 清空輸入框
+    // 確保用戶 ID 已載入
+    if (_currentUserId == null) {
+      await _loadCurrentUser();
+      if (_currentUserId == null) {
+        _showErrorSnackBar('用戶資訊載入失敗');
+        return;
+      }
+    }
+
+    // 清空輸入框（立即清空，不等待發送完成）
     _messageController.clear();
-
-    setState(() {
-      _isSending = true;
-    });
 
     // 樂觀UI更新：立即顯示訊息（傳送中狀態）
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
@@ -380,50 +434,77 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
 
     setState(() {
-      _messages = [..._messages, optimisticMessage];
+      // 將新訊息插入到列表開頭（因為列表是 [新, 中, 舊]）
+      _messages = [optimisticMessage, ..._messages];
     });
     _scrollToBottom();
 
+    // 異步發送訊息（不阻塞 UI）
     final success = await _chatService.sendTextMessage(
       widget.diningEventId,
       content,
     );
 
-    if (mounted) {
+    if (mounted && !success) {
+      // 發送失敗，移除樂觀訊息並顯示錯誤提示
       setState(() {
-        _isSending = false;
+        _messages = _messages.where((m) => m.id != tempId).toList();
       });
 
-      if (!success) {
-        // 發送失敗，移除樂觀訊息並顯示錯誤
-        setState(() {
-          _messages = _messages.where((m) => m.id != tempId).toList();
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                '發送訊息失敗',
-                style: TextStyle(fontFamily: 'OtsutomeFont'),
-              ),
-            ),
-          );
-        }
-      }
-      // 成功的話，Realtime 會自動更新訊息列表
+      _showErrorSnackBar('發送訊息失敗');
     }
+    // 成功的話，Realtime 會自動更新訊息列表
+  }
+
+  /// 顯示錯誤提示框
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFFB33D1C), // 深橘色背景
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: 'OtsutomeFont',
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _sendImageMessage() async {
-    if (_isSending) return;
+    // 1. 先選擇/拍攝圖片（這步會打開相機，不阻塞其他操作）
+    final imageData = await _chatService.pickImageFromCamera();
 
-    setState(() {
-      _isSending = true;
-    });
+    // 如果用戶取消或失敗，直接返回
+    if (imageData == null) return;
 
-    // 樂觀UI更新：顯示傳送中的圖片訊息
+    // 確保用戶 ID 已載入
+    if (_currentUserId == null) {
+      await _loadCurrentUser();
+      if (_currentUserId == null) {
+        _showErrorSnackBar('用戶資訊載入失敗');
+        return;
+      }
+    }
+
+    final localPath = imageData['localPath'] as String;
+    final imageBytes = imageData['imageBytes'] as Uint8List;
+    final imageWidth = imageData['width'] as int;
+    final imageHeight = imageData['height'] as int;
+
+    // 2. 樂觀UI更新：立即顯示本地圖片預覽（傳送中狀態）
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+
+    // 儲存本地圖片資訊以便顯示預覽
+    _pendingImageData[tempId] = {
+      'localPath': localPath,
+      'imageBytes': imageBytes,
+      'width': imageWidth,
+      'height': imageHeight,
+    };
+
     final optimisticMessage = ChatMessage(
       id: tempId,
       diningEventId: widget.diningEventId,
@@ -431,38 +512,37 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       messageType: 'image',
       createdAt: DateTime.now(),
       sendStatus: 'pending',
+      imageWidth: imageWidth,
+      imageHeight: imageHeight,
     );
 
     setState(() {
-      _messages = [..._messages, optimisticMessage];
+      // 將新訊息插入到列表開頭（因為列表是 [新, 中, 舊]）
+      _messages = [optimisticMessage, ..._messages];
     });
     _scrollToBottom();
 
-    final success = await _chatService.sendImageMessage(widget.diningEventId);
+    // 3. 異步上傳圖片（不阻塞 UI，可以繼續發送其他訊息）
+    final success = await _chatService.uploadAndSendImage(
+      widget.diningEventId,
+      imageBytes,
+      imageWidth,
+      imageHeight,
+    );
 
     if (mounted) {
-      setState(() {
-        _isSending = false;
-      });
-
       if (!success) {
-        // 發送失敗，移除樂觀訊息
+        // 發送失敗，移除樂觀訊息和本地圖片資訊
         setState(() {
           _messages = _messages.where((m) => m.id != tempId).toList();
         });
+        _pendingImageData.remove(tempId);
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                '發送圖片失敗',
-                style: TextStyle(fontFamily: 'OtsutomeFont'),
-              ),
-            ),
-          );
-        }
+        _showErrorSnackBar('發送圖片失敗');
       }
-      // 成功的話，Realtime 會自動更新訊息列表
+      // 成功後不要立即移除 _pendingImageData
+      // 讓圖片顯示元件在網路圖片載入完成後再清理
+      // 這樣可以避免「傳送中預覽消失 -> 等待 -> 網路圖片出現」的空白期
     }
   }
 
@@ -1059,44 +1139,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   Widget _buildImageMessage(ChatMessage message, {BorderRadius? borderRadius}) {
     final effectiveBorderRadius = borderRadius ?? BorderRadius.circular(12.r);
 
-    // 如果是傳送中的圖片，顯示載入狀態
+    // 如果是傳送中的圖片，顯示本地圖片預覽
     if (message.sendStatus == 'pending') {
-      return Container(
-        width: 200.w,
-        height: 200.w,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: effectiveBorderRadius,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 8,
-              offset: Offset(0, 2.h),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LoadingImage(
-                width: 40.w,
-                height: 40.h,
-                color: const Color(0xFF23456B),
-              ),
-              SizedBox(height: 10.h),
-              Text(
-                '上傳中...',
-                style: TextStyle(
-                  fontSize: 12.sp,
-                  fontFamily: 'OtsutomeFont',
-                  color: const Color(0xFF666666),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return _buildPendingImageMessage(message, effectiveBorderRadius);
     }
 
     if (message.imagePath == null) {
@@ -1143,6 +1188,114 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 建構傳送中的圖片訊息（顯示本地預覽）
+  Widget _buildPendingImageMessage(
+    ChatMessage message,
+    BorderRadius borderRadius,
+  ) {
+    final pendingData = _pendingImageData[message.id];
+
+    // 計算顯示尺寸
+    final imageWidth = message.imageWidth ?? 200;
+    final imageHeight = message.imageHeight ?? 200;
+    final aspectRatio = imageWidth / imageHeight;
+
+    final maxWidth = 200.w;
+    final maxHeight = 300.h;
+    double displayWidth = min(maxWidth, imageWidth.toDouble());
+    double displayHeight = displayWidth / aspectRatio;
+
+    if (displayHeight > maxHeight) {
+      displayHeight = maxHeight;
+      displayWidth = displayHeight * aspectRatio;
+    }
+
+    // 如果有本地圖片資訊，顯示本地預覽
+    if (pendingData != null) {
+      final localPath = pendingData['localPath'] as String?;
+      final imageBytes = pendingData['imageBytes'] as Uint8List?;
+
+      Widget imageWidget;
+
+      // 優先使用 imageBytes，因為已經壓縮過
+      if (imageBytes != null) {
+        imageWidget = Image.memory(
+          imageBytes,
+          fit: BoxFit.cover,
+          width: displayWidth,
+          height: displayHeight,
+        );
+      } else if (localPath != null) {
+        imageWidget = Image.file(
+          File(localPath),
+          fit: BoxFit.cover,
+          width: displayWidth,
+          height: displayHeight,
+        );
+      } else {
+        imageWidget = Container(
+          color: Colors.grey[200],
+          width: displayWidth,
+          height: displayHeight,
+        );
+      }
+
+      return Stack(
+        children: [
+          // 本地圖片預覽
+          Container(
+            width: displayWidth,
+            height: displayHeight,
+            decoration: BoxDecoration(
+              borderRadius: borderRadius,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: Offset(0, 2.h),
+                ),
+              ],
+            ),
+            child: ClipRRect(borderRadius: borderRadius, child: imageWidget),
+          ),
+          // 半透明黑色遮罩（讓圖片變暗，表示傳送中）
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.35),
+                borderRadius: borderRadius,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 如果沒有本地圖片資訊，顯示純載入狀態（備用）
+    return Container(
+      width: displayWidth,
+      height: displayHeight,
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: borderRadius,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 8,
+            offset: Offset(0, 2.h),
+          ),
+        ],
+      ),
+      child: Center(
+        child: LoadingImage(
+          width: 40.w,
+          height: 40.h,
+          color: const Color(0xFF23456B),
+        ),
+      ),
+    );
+  }
+
   /// 使用已知尺寸建構圖片訊息
   Widget _buildImageWithSize(
     ChatMessage message,
@@ -1153,16 +1306,78 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final effectiveBorderRadius = borderRadius ?? BorderRadius.circular(12.r);
     // 使用穩定的 key，基於 message.id 和 imagePath，避免不必要的重建
     final imageKey = 'image_${message.id}_${message.imagePath}';
+
+    // 檢查是否有本地預覽資訊（用於 placeholder）
+    final pendingData = _pendingImageData[message.id];
+
     return FutureBuilder<String?>(
       key: ValueKey(imageKey),
       future: _chatService.getImageUrl(message.imagePath!),
       builder: (context, snapshot) {
+        // 構建本地預覽或灰色背景的 placeholder
+        Widget buildPlaceholder({bool withDarkOverlay = true}) {
+          if (pendingData != null) {
+            final imageBytes = pendingData['imageBytes'] as Uint8List?;
+            final localPath = pendingData['localPath'] as String?;
+
+            Widget? localImage;
+            if (imageBytes != null) {
+              localImage = Image.memory(
+                imageBytes,
+                fit: BoxFit.cover,
+                width: displayWidth,
+                height: displayHeight,
+              );
+            } else if (localPath != null) {
+              localImage = Image.file(
+                File(localPath),
+                fit: BoxFit.cover,
+                width: displayWidth,
+                height: displayHeight,
+              );
+            }
+
+            if (localImage != null) {
+              return Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: effectiveBorderRadius,
+                    child: localImage,
+                  ),
+                  if (withDarkOverlay)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.35),
+                          borderRadius: effectiveBorderRadius,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            }
+          }
+
+          // 沒有本地預覽，顯示灰色背景和載入動畫
+          return Container(
+            width: displayWidth,
+            height: displayHeight,
+            color: Colors.grey[200],
+            child: Center(
+              child: LoadingImage(
+                width: 40.w,
+                height: 40.h,
+                color: const Color(0xFF23456B),
+              ),
+            ),
+          );
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
             width: displayWidth,
             height: displayHeight,
             decoration: BoxDecoration(
-              color: Colors.grey[200],
               borderRadius: effectiveBorderRadius,
               boxShadow: [
                 BoxShadow(
@@ -1172,12 +1387,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
               ],
             ),
-            child: Center(
-              child: LoadingImage(
-                width: 40.w,
-                height: 40.h,
-                color: const Color(0xFF23456B),
-              ),
+            child: ClipRRect(
+              borderRadius: effectiveBorderRadius,
+              child: buildPlaceholder(),
             ),
           );
         }
@@ -1217,19 +1429,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     height: displayHeight,
                     memCacheWidth: displayWidth.toInt(), // 限制記憶體緩存尺寸
                     memCacheHeight: displayHeight.toInt(),
-                    placeholder:
-                        (context, url) => Container(
-                          width: displayWidth,
-                          height: displayHeight,
-                          color: Colors.grey[200],
-                          child: Center(
-                            child: LoadingImage(
-                              width: 40.w,
-                              height: 40.h,
-                              color: const Color(0xFF23456B),
-                            ),
-                          ),
-                        ),
+                    placeholder: (context, url) => buildPlaceholder(),
+                    imageBuilder: (context, imageProvider) {
+                      // 網路圖片載入完成，清理本地預覽資訊
+                      if (_pendingImageData.containsKey(message.id)) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _pendingImageData.remove(message.id);
+                        });
+                      }
+                      return Image(
+                        image: imageProvider,
+                        fit: BoxFit.cover,
+                        width: displayWidth,
+                        height: displayHeight,
+                      );
+                    },
                     errorWidget:
                         (context, url, error) => Container(
                           width: displayWidth,
@@ -1271,6 +1485,69 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
     // 使用穩定的 key，基於 message.id 和 imagePath，避免不必要的重建
     final imageKey = 'image_${message.id}_${message.imagePath}';
+
+    // 檢查是否有本地預覽資訊（用於 placeholder）
+    final pendingData = _pendingImageData[message.id];
+
+    // 構建本地預覽或灰色背景的 placeholder
+    Widget buildPlaceholder({bool withDarkOverlay = true}) {
+      if (pendingData != null) {
+        final imageBytes = pendingData['imageBytes'] as Uint8List?;
+        final localPath = pendingData['localPath'] as String?;
+
+        Widget? localImage;
+        if (imageBytes != null) {
+          localImage = Image.memory(
+            imageBytes,
+            fit: BoxFit.cover,
+            width: displayWidth,
+            height: displayHeight,
+          );
+        } else if (localPath != null) {
+          localImage = Image.file(
+            File(localPath),
+            fit: BoxFit.cover,
+            width: displayWidth,
+            height: displayHeight,
+          );
+        }
+
+        if (localImage != null) {
+          return Stack(
+            children: [
+              ClipRRect(
+                borderRadius: effectiveBorderRadius,
+                child: localImage,
+              ),
+              if (withDarkOverlay)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.35),
+                      borderRadius: effectiveBorderRadius,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        }
+      }
+
+      // 沒有本地預覽，顯示灰色背景和載入動畫
+      return Container(
+        width: displayWidth,
+        height: displayHeight,
+        color: Colors.grey[200],
+        child: Center(
+          child: LoadingImage(
+            width: 40.w,
+            height: 40.h,
+            color: const Color(0xFF23456B),
+          ),
+        ),
+      );
+    }
+
     return FutureBuilder<String?>(
       key: ValueKey(imageKey),
       future: _chatService.getImageUrl(message.imagePath!),
@@ -1280,7 +1557,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             width: displayWidth,
             height: displayHeight,
             decoration: BoxDecoration(
-              color: Colors.grey[200],
               borderRadius: effectiveBorderRadius,
               boxShadow: [
                 BoxShadow(
@@ -1290,12 +1566,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 ),
               ],
             ),
-            child: Center(
-              child: LoadingImage(
-                width: 40.w,
-                height: 40.h,
-                color: const Color(0xFF23456B),
-              ),
+            child: ClipRRect(
+              borderRadius: effectiveBorderRadius,
+              child: buildPlaceholder(),
             ),
           );
         }
@@ -1335,19 +1608,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     height: displayHeight,
                     memCacheWidth: displayWidth.toInt(), // 限制記憶體緩存尺寸
                     memCacheHeight: displayHeight.toInt(),
-                    placeholder:
-                        (context, url) => Container(
-                          width: displayWidth,
-                          height: displayHeight,
-                          color: Colors.grey[200],
-                          child: Center(
-                            child: LoadingImage(
-                              width: 40.w,
-                              height: 40.h,
-                              color: const Color(0xFF23456B),
-                            ),
-                          ),
-                        ),
+                    placeholder: (context, url) => buildPlaceholder(),
                     errorWidget:
                         (context, url, error) => Container(
                           width: displayWidth,
@@ -1361,6 +1622,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                       if (message.imageWidth == null ||
                           message.imageHeight == null) {
                         _saveImageSize(message, imageProvider);
+                      }
+                      // 清理本地預覽資訊
+                      if (_pendingImageData.containsKey(message.id)) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _pendingImageData.remove(message.id);
+                        });
                       }
                       return Image(
                         image: imageProvider,
@@ -1454,61 +1721,69 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Widget _buildCameraButton() {
-    return GestureDetector(
-      onTapDown:
-          _isSending
-              ? null
-              : (_) {
-                setState(() {});
-              },
-      onTapUp:
-          _isSending
-              ? null
-              : (_) {
-                setState(() {});
-                _sendImageMessage();
-              },
-      onTapCancel:
-          _isSending
-              ? null
-              : () {
-                setState(() {});
-              },
-      child: AnimatedScale(
-        scale: _isSending ? 1.0 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: AnimatedOpacity(
-          opacity: _isSending ? 0.5 : 1.0,
-          duration: const Duration(milliseconds: 100),
-          child: SizedBox(
-            width: 35.w,
-            height: 35.h,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // 底部陰影
-                Positioned(
-                  left: 0,
-                  top: 2.h,
-                  child: Image.asset(
-                    'assets/images/icon/camera.webp',
-                    width: 35.w,
-                    height: 35.h,
-                    color: Colors.black.withOpacity(0.4),
-                    colorBlendMode: BlendMode.srcIn,
+    bool isPressed = false;
+
+    return StatefulBuilder(
+      builder: (context, setButtonState) {
+        return GestureDetector(
+          onTapDown: (_) {
+            setButtonState(() {
+              isPressed = true;
+            });
+          },
+          onTapUp: (_) {
+            setButtonState(() {
+              isPressed = false;
+            });
+            _sendImageMessage();
+          },
+          onTapCancel: () {
+            setButtonState(() {
+              isPressed = false;
+            });
+          },
+          child: AnimatedScale(
+            scale: isPressed ? 0.95 : 1.0,
+            duration: const Duration(milliseconds: 100),
+            child: SizedBox(
+              width: 35.w,
+              height: 35.h,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // 底部陰影（按下時隱藏）
+                  if (!isPressed)
+                    Positioned(
+                      left: 0,
+                      top: 2.h,
+                      child: Image.asset(
+                        'assets/images/icon/camera.webp',
+                        width: 35.w,
+                        height: 35.h,
+                        color: Colors.black.withOpacity(0.4),
+                        colorBlendMode: BlendMode.srcIn,
+                      ),
+                    ),
+                  // 主圖標
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 100),
+                    transform: Matrix4.translationValues(
+                      0,
+                      isPressed ? 2.h : 0,
+                      0,
+                    ),
+                    child: Image.asset(
+                      'assets/images/icon/camera.webp',
+                      width: 35.w,
+                      height: 35.h,
+                    ),
                   ),
-                ),
-                // 主圖標
-                Image.asset(
-                  'assets/images/icon/camera.webp',
-                  width: 35.w,
-                  height: 35.h,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1540,7 +1815,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             child: TextField(
               controller: _messageController,
               focusNode: _messageFocusNode,
-              enabled: !_isSending,
               maxLines: null,
               minLines: 1,
               textAlignVertical: TextAlignVertical.center,
@@ -1586,62 +1860,51 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       builder: (context, setButtonState) {
         return GestureDetector(
           onTapDown: (_) {
-            if (!_isSending) {
-              setButtonState(() {
-                isPressed = true;
-              });
-            }
+            setButtonState(() {
+              isPressed = true;
+            });
           },
           onTapUp: (_) {
-            if (!_isSending) {
-              setButtonState(() {
-                isPressed = false;
-              });
-              _sendTextMessage();
-              // 發送後移除焦點
-              _messageFocusNode.unfocus();
-            }
+            setButtonState(() {
+              isPressed = false;
+            });
+            _sendTextMessage();
+            // 保持焦點，讓用戶可以連續輸入訊息
           },
           onTapCancel: () {
-            if (!_isSending) {
-              setButtonState(() {
-                isPressed = false;
-              });
-            }
+            setButtonState(() {
+              isPressed = false;
+            });
           },
-          child: AnimatedOpacity(
-            opacity: _isSending ? 0.5 : 1.0,
+          child: AnimatedContainer(
             duration: const Duration(milliseconds: 100),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 100),
-              transform: Matrix4.translationValues(0, isPressed ? 2.h : 0, 0),
-              child: SizedBox(
-                width: 30.w,
-                height: 30.h,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // 底部陰影（按下時隱藏）
-                    if (!isPressed && !_isSending)
-                      Positioned(
-                        left: 0,
-                        top: 2.h,
-                        child: Image.asset(
-                          'assets/images/icon/send.webp',
-                          width: 30.w,
-                          height: 30.h,
-                          color: Colors.black.withOpacity(0.4),
-                          colorBlendMode: BlendMode.srcIn,
-                        ),
+            transform: Matrix4.translationValues(0, isPressed ? 2.h : 0, 0),
+            child: SizedBox(
+              width: 30.w,
+              height: 30.h,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // 底部陰影（按下時隱藏）
+                  if (!isPressed)
+                    Positioned(
+                      left: 0,
+                      top: 2.h,
+                      child: Image.asset(
+                        'assets/images/icon/send.webp',
+                        width: 30.w,
+                        height: 30.h,
+                        color: Colors.black.withOpacity(0.4),
+                        colorBlendMode: BlendMode.srcIn,
                       ),
-                    // 主圖標
-                    Image.asset(
-                      'assets/images/icon/send.webp',
-                      width: 30.w,
-                      height: 30.h,
                     ),
-                  ],
-                ),
+                  // 主圖標
+                  Image.asset(
+                    'assets/images/icon/send.webp',
+                    width: 30.w,
+                    height: 30.h,
+                  ),
+                ],
               ),
             ),
           ),
