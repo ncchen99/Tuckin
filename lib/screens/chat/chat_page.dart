@@ -31,7 +31,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   String? _currentUserId;
   List<ChatMessage> _messages = [];
   bool _isLoading = true; // 新增：訊息載入狀態
-  bool _isInputFocused = false;
+  bool _hasText = false; // 追蹤輸入框是否有內容
   final Map<String, int> _fixedAvatars = {}; // 儲存固定頭像索引
   final Map<String, String?> _avatarUrlCache = {}; // 儲存頭像 URL 緩存
   final Map<String, bool> _avatarUrlLoading = {}; // 追蹤正在加載的頭像 URL
@@ -52,11 +52,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 註冊生命週期監聽
     WidgetsBinding.instance.addObserver(this);
 
-    // 監聽輸入框焦點狀態
-    _messageFocusNode.addListener(() {
-      setState(() {
-        _isInputFocused = _messageFocusNode.hasFocus;
-      });
+    // 監聽輸入框內容變化
+    _messageController.addListener(() {
+      final hasText = _messageController.text.trim().isNotEmpty;
+      if (_hasText != hasText) {
+        setState(() {
+          _hasText = hasText;
+        });
+      }
     });
   }
 
@@ -1910,7 +1913,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 輸入框
           Padding(
             padding: EdgeInsets.only(
-              right: _isInputFocused ? 50.w : 0, // 為發送按鈕預留空間
+              right: _hasText ? 50.w : 0, // 為發送按鈕預留空間
             ),
             child: TextField(
               controller: _messageController,
@@ -1941,8 +1944,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
           ),
-          // 發送按鈕（只在 focus 時顯示，貼齊底部）
-          if (_isInputFocused)
+          // 發送按鈕（只在有內容時顯示，貼齊底部）
+          if (_hasText)
             Positioned(
               right: 8.w,
               bottom: 11.h, // 與 contentPadding 的 vertical 保持一致

@@ -122,7 +122,9 @@ class ChatService {
 
     // 先從本地資料庫載入歷史訊息
     _loadLocalMessages(diningEventId).then((localMessages) {
-      if (!controller.isClosed) {
+      // 只有當本地有訊息時才發送，避免空列表覆蓋遠端已獲取的數據
+      // （Supabase Realtime 會在訂閱時同步觸發，可能比本地 DB 查詢更快完成）
+      if (!controller.isClosed && localMessages.isNotEmpty) {
         controller.add(localMessages);
       }
     });

@@ -1862,17 +1862,32 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
     }
   }
 
-  /// 根據參加人數計算對話框內容區域高度
-  double _calculateDialogContentHeight() {
-    // 新的扁平設計：每個成員項目高度 = padding(12*2) + content(55) + divider(1) = 80h
-    // 最後一個沒有分隔線是 79h
-    const double itemHeight = 80.0;
+  /// 根據參加人數計算對話框內容區域高度（考慮不同螢幕比例）
+  double _calculateDialogContentHeight(BuildContext context) {
+    // 每個成員項目高度 = padding(12*2) + content(55) + divider(1) = 80h
+    const double itemHeight = 85.0;
 
-    // 使用預期的參加人數來計算，最多顯示5個避免對話框太高
-    final displayCount =
-        widget.expectedAttendeeCount > 5 ? 5 : widget.expectedAttendeeCount;
+    // 獲取螢幕高度
+    final screenHeight = MediaQuery.of(context).size.height;
 
-    return (itemHeight * displayCount).h;
+    // 對話框其他元素大致高度：padding(40) + 標題(50) + SizedBox(15) + 按鈕(58) + 安全邊距
+    final otherElementsHeight = 200.h;
+
+    // 計算可用於列表的最大高度（螢幕高度的 60% 減去其他元素）
+    final maxAvailableHeight = screenHeight * 0.6 - otherElementsHeight;
+
+    // 計算實際需要的高度
+    final displayCount = widget.expectedAttendeeCount;
+    final neededHeight = (itemHeight * displayCount).h;
+
+    // 設定最小高度，確保至少能顯示一個項目
+    final minHeight = itemHeight.h;
+
+    // 返回合適的高度：不超過可用空間，不小於最小高度
+    if (neededHeight > maxAvailableHeight) {
+      return maxAvailableHeight > minHeight ? maxAvailableHeight : minHeight;
+    }
+    return neededHeight;
   }
 
   @override
@@ -1920,11 +1935,12 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
 
               SizedBox(height: 0.h),
 
-              // 內容區域（可滑動）- 根據實際參加人數動態計算高度
-              SizedBox(
-                // 計算高度：每個成員卡片 = 12h (margin) + 12h (padding top) + 55h (content) + 12h (padding bottom) = 91h
-                // 最多顯示5個，超過則可滾動
-                height: _calculateDialogContentHeight(),
+              // 內容區域（可滑動）- 根據實際參加人數和螢幕比例動態計算高度
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: _calculateDialogContentHeight(context),
+                  minHeight: 80.h, // 至少顯示一個項目的高度
+                ),
                 child:
                     _isLoading
                         ? Container(
