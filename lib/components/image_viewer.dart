@@ -345,7 +345,7 @@ class _ImageViewerState extends State<ImageViewer> {
                       height: 35.h,
                     ),
 
-                    // 中央顯示發送者名稱
+                    // 中央顯示發送者名稱 (上方增加一些 padding 讓文字垂直置中)
                     Expanded(
                       child: Center(
                         child:
@@ -354,24 +354,29 @@ class _ImageViewerState extends State<ImageViewer> {
                                             .imageMessages[_currentIndex]
                                             .senderNickname !=
                                         null
-                                ? Text(
-                                  widget
-                                      .imageMessages[_currentIndex]
-                                      .senderNickname!,
-                                  style: TextStyle(
-                                    fontSize: 20.sp,
-                                    fontFamily: 'OtsutomeFont',
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.5,
+                                ? Padding(
+                                  padding: EdgeInsets.only(
+                                    top: 6.h,
+                                  ), // 加上一點上方 padding
+                                  child: Text(
+                                    widget
+                                        .imageMessages[_currentIndex]
+                                        .senderNickname!,
+                                    style: TextStyle(
+                                      fontSize: 20.sp,
+                                      fontFamily: 'OtsutomeFont',
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black.withAlpha(
+                                            (0.5 * 255).toInt(),
+                                          ),
+                                          blurRadius: 4,
+                                          offset: Offset(0, 2.h),
                                         ),
-                                        blurRadius: 4,
-                                        offset: Offset(0, 2.h),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 )
                                 : const SizedBox.shrink(),

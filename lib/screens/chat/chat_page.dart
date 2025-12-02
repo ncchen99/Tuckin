@@ -599,13 +599,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           // 中央標題
           Expanded(
             child: Center(
-              child: Text(
-                '聊天室',
-                style: TextStyle(
-                  fontSize: 20.sp,
-                  fontFamily: 'OtsutomeFont',
-                  color: const Color(0xFF23456B),
-                  fontWeight: FontWeight.bold,
+              child: Padding(
+                padding: EdgeInsets.only(top: 6.h), // 增加上方 padding
+                child: Text(
+                  '聊天室',
+                  style: TextStyle(
+                    fontSize: 20.sp,
+                    fontFamily: 'OtsutomeFont',
+                    color: const Color(0xFF23456B),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -1515,10 +1518,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         if (localImage != null) {
           return Stack(
             children: [
-              ClipRRect(
-                borderRadius: effectiveBorderRadius,
-                child: localImage,
-              ),
+              ClipRRect(borderRadius: effectiveBorderRadius, child: localImage),
               if (withDarkOverlay)
                 Positioned.fill(
                   child: Container(
