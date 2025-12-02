@@ -38,6 +38,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // 儲存正在發送的圖片本地資訊（tempId -> {localPath, imageBytes, width, height}）
   final Map<String, Map<String, dynamic>> _pendingImageData = {};
 
+  // 儲存聊天圖片 URL 緩存（imagePath -> url）
+  final Map<String, String?> _chatImageUrlCache = {};
+  final Map<String, bool> _chatImageUrlLoading = {};
+
   @override
   void initState() {
     super.initState();
@@ -133,6 +137,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           for (final entry in urls.entries) {
             _avatarUrlCache[entry.key] = entry.value;
           }
+        }
+
+        // 預取聊天圖片 URL（只預取尚未緩存的）
+        final imagePathsToFetch = <String>[];
+        for (final message in sortedMessages) {
+          if (message.isImage &&
+              message.imagePath != null &&
+              !_chatImageUrlCache.containsKey(message.imagePath)) {
+            imagePathsToFetch.add(message.imagePath!);
+          }
+        }
+
+        // 異步預取圖片 URL（不阻塞 UI）
+        if (imagePathsToFetch.isNotEmpty) {
+          _prefetchChatImageUrls(imagePathsToFetch);
         }
 
         // 檢查是否需要更新 UI（比較圖片相關字段）
@@ -392,17 +411,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final index = imageMessages.indexWhere((m) => m.id == message.id);
     if (index == -1) return;
 
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false, // 設置為透明路由
-        pageBuilder:
-            (context, animation, secondaryAnimation) =>
-                ImageViewer(imageMessages: imageMessages, initialIndex: index),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-      ),
-    );
+    // 暫時禁止輸入框獲取焦點，防止鍵盤在導航過程中彈出
+    _messageFocusNode.canRequestFocus = false;
+    // 確保當前已經失去焦點
+    FocusScope.of(context).unfocus();
+
+    Navigator.of(context)
+        .push(
+          PageRouteBuilder(
+            opaque: false, // 設置為透明路由
+            pageBuilder:
+                (context, animation, secondaryAnimation) => ImageViewer(
+                  imageMessages: imageMessages,
+                  initialIndex: index,
+                ),
+            transitionsBuilder: (
+              context,
+              animation,
+              secondaryAnimation,
+              child,
+            ) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
+        )
+        .then((_) {
+          // 恢復輸入框可獲取焦點的能力
+          // 使用 addPostFrameCallback 確保在下一幀才恢復，避免路由動畫結束時的自動焦點恢復機制觸發
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _messageFocusNode.canRequestFocus = true;
+            }
+          });
+        });
   }
 
   Future<void> _sendTextMessage() async {
@@ -551,26 +592,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     return Scaffold(
       // 使用 resizeToAvoidBottomInset: true 讓鍵盤出現時推動內容
       resizeToAvoidBottomInset: true,
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/background/bg2.jpg'),
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
+      body: GestureDetector(
+        // 點擊空白區域時收起鍵盤
+        onTap: () {
+          FocusScope.of(context).unfocus();
+        },
+        // 使用 translucent 確保不會攔截子組件的點擊事件
+        behavior: HitTestBehavior.translucent,
+        child: Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/background/bg2.jpg'),
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header - 固定在頂部
-              _buildHeader(),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Header - 固定在頂部
+                _buildHeader(),
 
-              // 訊息區域 - 可滾動
-              Expanded(child: _buildMessageList()),
+                // 訊息區域 - 可滾動
+                Expanded(child: _buildMessageList()),
 
-              // 輸入區域 - 固定在底部
-              _buildInputArea(),
-            ],
+                // 輸入區域 - 固定在底部
+                _buildInputArea(),
+              ],
+            ),
           ),
         ),
       ),
@@ -1003,6 +1052,46 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 批量預取聊天圖片 URL
+  void _prefetchChatImageUrls(List<String> imagePaths) {
+    for (final imagePath in imagePaths) {
+      _loadChatImageUrlIfNeeded(imagePath);
+    }
+  }
+
+  /// 異步載入聊天圖片 URL 並緩存（避免重複請求）
+  void _loadChatImageUrlIfNeeded(String imagePath) {
+    // 如果已經在加載中或已有緩存，跳過
+    if (_chatImageUrlLoading[imagePath] == true ||
+        _chatImageUrlCache.containsKey(imagePath)) {
+      return;
+    }
+
+    // 標記為加載中
+    _chatImageUrlLoading[imagePath] = true;
+
+    // 異步獲取 URL
+    _chatService
+        .getImageUrl(imagePath)
+        .then((url) {
+          if (mounted) {
+            setState(() {
+              _chatImageUrlCache[imagePath] = url;
+              _chatImageUrlLoading[imagePath] = false;
+            });
+          }
+        })
+        .catchError((e) {
+          debugPrint('獲取圖片 URL 失敗: $e');
+          if (mounted) {
+            setState(() {
+              _chatImageUrlCache[imagePath] = null;
+              _chatImageUrlLoading[imagePath] = false;
+            });
+          }
+        });
+  }
+
   /// 異步載入頭像 URL 並緩存（避免重複請求）
   void _loadAvatarUrlIfNeeded(
     String userId,
@@ -1313,164 +1402,153 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 檢查是否有本地預覽資訊（用於 placeholder）
     final pendingData = _pendingImageData[message.id];
 
-    return FutureBuilder<String?>(
+    // 構建本地預覽或灰色背景的 placeholder
+    Widget buildPlaceholder({bool withDarkOverlay = true}) {
+      if (pendingData != null) {
+        final imageBytes = pendingData['imageBytes'] as Uint8List?;
+        final localPath = pendingData['localPath'] as String?;
+
+        Widget? localImage;
+        if (imageBytes != null) {
+          localImage = Image.memory(
+            imageBytes,
+            fit: BoxFit.cover,
+            width: displayWidth,
+            height: displayHeight,
+          );
+        } else if (localPath != null) {
+          localImage = Image.file(
+            File(localPath),
+            fit: BoxFit.cover,
+            width: displayWidth,
+            height: displayHeight,
+          );
+        }
+
+        if (localImage != null) {
+          return Stack(
+            children: [
+              ClipRRect(borderRadius: effectiveBorderRadius, child: localImage),
+              if (withDarkOverlay)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.35),
+                      borderRadius: effectiveBorderRadius,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        }
+      }
+
+      // 沒有本地預覽，顯示灰色背景和載入動畫
+      return Container(
+        width: displayWidth,
+        height: displayHeight,
+        color: Colors.grey[200],
+        child: Center(
+          child: LoadingImage(
+            width: 40.w,
+            height: 40.h,
+            color: const Color(0xFF23456B),
+          ),
+        ),
+      );
+    }
+
+    // 檢查緩存中是否有 URL
+    final imagePath = message.imagePath!;
+    final cachedUrl = _chatImageUrlCache[imagePath];
+
+    // 如果沒有緩存且不在載入中，觸發異步載入
+    if (!_chatImageUrlCache.containsKey(imagePath)) {
+      _loadChatImageUrlIfNeeded(imagePath);
+    }
+
+    // 如果緩存中沒有 URL（正在載入或載入失敗），顯示 placeholder
+    if (cachedUrl == null) {
+      return Container(
+        key: ValueKey(imageKey),
+        width: displayWidth,
+        height: displayHeight,
+        decoration: BoxDecoration(
+          borderRadius: effectiveBorderRadius,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 8,
+              offset: Offset(0, 2.h),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: effectiveBorderRadius,
+          child: buildPlaceholder(),
+        ),
+      );
+    }
+
+    // 有緩存的 URL，直接顯示圖片
+    return GestureDetector(
       key: ValueKey(imageKey),
-      future: _chatService.getImageUrl(message.imagePath!),
-      builder: (context, snapshot) {
-        // 構建本地預覽或灰色背景的 placeholder
-        Widget buildPlaceholder({bool withDarkOverlay = true}) {
-          if (pendingData != null) {
-            final imageBytes = pendingData['imageBytes'] as Uint8List?;
-            final localPath = pendingData['localPath'] as String?;
-
-            Widget? localImage;
-            if (imageBytes != null) {
-              localImage = Image.memory(
-                imageBytes,
-                fit: BoxFit.cover,
-                width: displayWidth,
-                height: displayHeight,
-              );
-            } else if (localPath != null) {
-              localImage = Image.file(
-                File(localPath),
-                fit: BoxFit.cover,
-                width: displayWidth,
-                height: displayHeight,
-              );
-            }
-
-            if (localImage != null) {
-              return Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: effectiveBorderRadius,
-                    child: localImage,
-                  ),
-                  if (withDarkOverlay)
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.35),
-                          borderRadius: effectiveBorderRadius,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            }
-          }
-
-          // 沒有本地預覽，顯示灰色背景和載入動畫
-          return Container(
-            width: displayWidth,
-            height: displayHeight,
-            color: Colors.grey[200],
-            child: Center(
-              child: LoadingImage(
-                width: 40.w,
-                height: 40.h,
-                color: const Color(0xFF23456B),
-              ),
-            ),
-          );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            width: displayWidth,
-            height: displayHeight,
-            decoration: BoxDecoration(
-              borderRadius: effectiveBorderRadius,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 8,
-                  offset: Offset(0, 2.h),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: effectiveBorderRadius,
-              child: buildPlaceholder(),
-            ),
-          );
-        }
-
-        if (snapshot.hasData && snapshot.data != null) {
-          final imageUrl = snapshot.data!;
-
-          return GestureDetector(
-            onTap: () {
-              _openImageViewer(message);
-            },
-            child: Hero(
-              tag: message.id,
-              child: Container(
-                width: displayWidth,
-                height: displayHeight,
-                decoration: BoxDecoration(
-                  borderRadius: effectiveBorderRadius,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 8,
-                      offset: Offset(0, 2.h),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: effectiveBorderRadius,
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    cacheManager: ImageCacheService().getCacheManager(
-                      CacheType.chat,
-                    ),
-                    cacheKey: message.imagePath, // 使用 imagePath 作為緩存 key
-                    fit: BoxFit.cover, // 使用 cover 填滿容器
-                    width: displayWidth,
-                    height: displayHeight,
-                    memCacheWidth: displayWidth.toInt(), // 限制記憶體緩存尺寸
-                    memCacheHeight: displayHeight.toInt(),
-                    placeholder: (context, url) => buildPlaceholder(),
-                    imageBuilder: (context, imageProvider) {
-                      // 網路圖片載入完成，清理本地預覽資訊
-                      if (_pendingImageData.containsKey(message.id)) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _pendingImageData.remove(message.id);
-                        });
-                      }
-                      return Image(
-                        image: imageProvider,
-                        fit: BoxFit.cover,
-                        width: displayWidth,
-                        height: displayHeight,
-                      );
-                    },
-                    errorWidget:
-                        (context, url, error) => Container(
-                          width: displayWidth,
-                          height: displayHeight,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.error),
-                        ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-
-        return Container(
+      onTap: () {
+        _openImageViewer(message);
+      },
+      child: Hero(
+        tag: message.id,
+        child: Container(
           width: displayWidth,
           height: displayHeight,
           decoration: BoxDecoration(
-            color: Colors.grey[300],
             borderRadius: effectiveBorderRadius,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 8,
+                offset: Offset(0, 2.h),
+              ),
+            ],
           ),
-          child: const Icon(Icons.error),
-        );
-      },
+          child: ClipRRect(
+            borderRadius: effectiveBorderRadius,
+            child: CachedNetworkImage(
+              imageUrl: cachedUrl,
+              cacheManager: ImageCacheService().getCacheManager(CacheType.chat),
+              cacheKey: imagePath, // 使用 imagePath 作為緩存 key
+              fit: BoxFit.cover, // 使用 cover 填滿容器
+              width: displayWidth,
+              height: displayHeight,
+              memCacheWidth: displayWidth.toInt(), // 限制記憶體緩存尺寸
+              memCacheHeight: displayHeight.toInt(),
+              placeholder:
+                  (context, url) => buildPlaceholder(withDarkOverlay: false),
+              imageBuilder: (context, imageProvider) {
+                // 網路圖片載入完成，清理本地預覽資訊
+                if (_pendingImageData.containsKey(message.id)) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _pendingImageData.remove(message.id);
+                  });
+                }
+                return Image(
+                  image: imageProvider,
+                  fit: BoxFit.cover,
+                  width: displayWidth,
+                  height: displayHeight,
+                );
+              },
+              errorWidget:
+                  (context, url, error) => Container(
+                    width: displayWidth,
+                    height: displayHeight,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.error),
+                  ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1548,111 +1626,102 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    return FutureBuilder<String?>(
+    // 檢查緩存中是否有 URL
+    final imagePath = message.imagePath!;
+    final cachedUrl = _chatImageUrlCache[imagePath];
+
+    // 如果沒有緩存且不在載入中，觸發異步載入
+    if (!_chatImageUrlCache.containsKey(imagePath)) {
+      _loadChatImageUrlIfNeeded(imagePath);
+    }
+
+    // 如果緩存中沒有 URL（正在載入或載入失敗），顯示 placeholder
+    if (cachedUrl == null) {
+      return Container(
+        key: ValueKey(imageKey),
+        width: displayWidth,
+        height: displayHeight,
+        decoration: BoxDecoration(
+          borderRadius: effectiveBorderRadius,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 8,
+              offset: Offset(0, 2.h),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: effectiveBorderRadius,
+          child: buildPlaceholder(),
+        ),
+      );
+    }
+
+    // 有緩存的 URL，直接顯示圖片
+    return GestureDetector(
       key: ValueKey(imageKey),
-      future: _chatService.getImageUrl(message.imagePath!),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            width: displayWidth,
-            height: displayHeight,
-            decoration: BoxDecoration(
-              borderRadius: effectiveBorderRadius,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 8,
-                  offset: Offset(0, 2.h),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: effectiveBorderRadius,
-              child: buildPlaceholder(),
-            ),
-          );
-        }
-
-        if (snapshot.hasData && snapshot.data != null) {
-          final imageUrl = snapshot.data!;
-
-          return GestureDetector(
-            onTap: () {
-              _openImageViewer(message);
-            },
-            child: Hero(
-              tag: message.id,
-              child: Container(
-                width: displayWidth,
-                height: displayHeight,
-                decoration: BoxDecoration(
-                  borderRadius: effectiveBorderRadius,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 8,
-                      offset: Offset(0, 2.h),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: effectiveBorderRadius,
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    cacheManager: ImageCacheService().getCacheManager(
-                      CacheType.chat,
-                    ),
-                    cacheKey: message.imagePath, // 使用 imagePath 作為緩存 key
-                    fit: BoxFit.cover, // 使用 cover 填滿容器
-                    width: displayWidth,
-                    height: displayHeight,
-                    memCacheWidth: displayWidth.toInt(), // 限制記憶體緩存尺寸
-                    memCacheHeight: displayHeight.toInt(),
-                    placeholder: (context, url) => buildPlaceholder(),
-                    errorWidget:
-                        (context, url, error) => Container(
-                          width: displayWidth,
-                          height: displayHeight,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.error),
-                        ),
-                    imageBuilder: (context, imageProvider) {
-                      // 當圖片載入完成後，儲存圖片尺寸以便下次使用
-                      // 只在尺寸尚未儲存時才儲存，避免重複操作
-                      if (message.imageWidth == null ||
-                          message.imageHeight == null) {
-                        _saveImageSize(message, imageProvider);
-                      }
-                      // 清理本地預覽資訊
-                      if (_pendingImageData.containsKey(message.id)) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _pendingImageData.remove(message.id);
-                        });
-                      }
-                      return Image(
-                        image: imageProvider,
-                        fit: BoxFit.cover, // 使用 cover 填滿容器
-                        width: displayWidth,
-                        height: displayHeight,
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-
-        return Container(
+      onTap: () {
+        _openImageViewer(message);
+      },
+      child: Hero(
+        tag: message.id,
+        child: Container(
           width: displayWidth,
           height: displayHeight,
           decoration: BoxDecoration(
-            color: Colors.grey[300],
             borderRadius: effectiveBorderRadius,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 8,
+                offset: Offset(0, 2.h),
+              ),
+            ],
           ),
-          child: const Icon(Icons.error),
-        );
-      },
+          child: ClipRRect(
+            borderRadius: effectiveBorderRadius,
+            child: CachedNetworkImage(
+              imageUrl: cachedUrl,
+              cacheManager: ImageCacheService().getCacheManager(CacheType.chat),
+              cacheKey: imagePath, // 使用 imagePath 作為緩存 key
+              fit: BoxFit.cover, // 使用 cover 填滿容器
+              width: displayWidth,
+              height: displayHeight,
+              memCacheWidth: displayWidth.toInt(), // 限制記憶體緩存尺寸
+              memCacheHeight: displayHeight.toInt(),
+              placeholder:
+                  (context, url) => buildPlaceholder(withDarkOverlay: false),
+              errorWidget:
+                  (context, url, error) => Container(
+                    width: displayWidth,
+                    height: displayHeight,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.error),
+                  ),
+              imageBuilder: (context, imageProvider) {
+                // 當圖片載入完成後，儲存圖片尺寸以便下次使用
+                // 只在尺寸尚未儲存時才儲存，避免重複操作
+                if (message.imageWidth == null || message.imageHeight == null) {
+                  _saveImageSize(message, imageProvider);
+                }
+                // 清理本地預覽資訊
+                if (_pendingImageData.containsKey(message.id)) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _pendingImageData.remove(message.id);
+                  });
+                }
+                return Image(
+                  image: imageProvider,
+                  fit: BoxFit.cover, // 使用 cover 填滿容器
+                  width: displayWidth,
+                  height: displayHeight,
+                );
+              },
+            ),
+          ),
+        ),
+      ),
     );
   }
 
