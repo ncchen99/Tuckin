@@ -240,41 +240,56 @@ class ChatService {
     }
   }
 
-  /// 轉換訊息並補充發送者資訊
+  /// 轉換訊息並補充發送者資訊（使用批量查詢優化）
   Future<List<ChatMessage>> _convertAndEnrichMessages(
     List<dynamic> data,
   ) async {
-    final List<ChatMessage> messages = [];
+    if (data.isEmpty) return [];
 
-    for (final item in data) {
-      final message = ChatMessage.fromJson(item as Map<String, dynamic>);
+    // 1. 先將所有訊息轉換為 ChatMessage 物件
+    final List<ChatMessage> messages =
+        data
+            .map((item) => ChatMessage.fromJson(item as Map<String, dynamic>))
+            .toList();
 
-      // 查詢發送者資訊
-      try {
-        final profile =
-            await Supabase.instance.client
-                .from('user_profiles')
-                .select('nickname, avatar_path, gender')
-                .eq('user_id', message.userId)
-                .single();
+    // 2. 收集所有不重複的 userId
+    final uniqueUserIds = messages.map((m) => m.userId).toSet().toList();
 
-        messages.add(
-          message.copyWith(
-            senderNickname: profile['nickname'] as String?,
-            senderAvatarPath: profile['avatar_path'] as String?,
-            senderGender: profile['gender'] as String?,
-          ),
-        );
-      } catch (e) {
-        debugPrint('查詢發送者資訊失敗: $e');
-        messages.add(message);
+    // 3. 批量查詢所有用戶的 profile（一次查詢）
+    final Map<String, Map<String, dynamic>> profilesMap = {};
+    try {
+      final profiles = await Supabase.instance.client
+          .from('user_profiles')
+          .select('user_id, nickname, avatar_path, gender')
+          .inFilter('user_id', uniqueUserIds);
+
+      for (final profile in profiles) {
+        final userId = profile['user_id'] as String;
+        profilesMap[userId] = profile;
       }
+      debugPrint('批量查詢 ${uniqueUserIds.length} 個用戶的 profile');
+    } catch (e) {
+      debugPrint('批量查詢發送者資訊失敗: $e');
     }
 
-    // 確保訊息按 created_at 升序排序（從舊到新）
-    messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    // 4. 將 profile 資訊補充到訊息中
+    final enrichedMessages =
+        messages.map((message) {
+          final profile = profilesMap[message.userId];
+          if (profile != null) {
+            return message.copyWith(
+              senderNickname: profile['nickname'] as String?,
+              senderAvatarPath: profile['avatar_path'] as String?,
+              senderGender: profile['gender'] as String?,
+            );
+          }
+          return message;
+        }).toList();
 
-    return messages;
+    // 確保訊息按 created_at 升序排序（從舊到新）
+    enrichedMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    return enrichedMessages;
   }
 
   /// 儲存訊息到本地資料庫（使用 upsert 邏輯）

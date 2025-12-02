@@ -30,6 +30,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   String? _currentUserId;
   List<ChatMessage> _messages = [];
+  bool _isLoading = true; // 新增：訊息載入狀態
   bool _isInputFocused = false;
   final Map<String, int> _fixedAvatars = {}; // 儲存固定頭像索引
   final Map<String, String?> _avatarUrlCache = {}; // 儲存頭像 URL 緩存
@@ -160,8 +161,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
         if (needsUpdate ||
             needFixedAvatarUpdate ||
-            usersNeedingAvatarUrl.isNotEmpty) {
+            usersNeedingAvatarUrl.isNotEmpty ||
+            _isLoading) {
           setState(() {
+            // 訊息已載入完成
+            _isLoading = false;
+
             // 反轉訊息順序：最新訊息在前 [新, 中, 舊]
             // 這樣配合 reverse: true，最新訊息會顯示在底部
 
@@ -671,6 +676,32 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   Widget _buildMessageList() {
+    // 載入中狀態
+    if (_isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            LoadingImage(
+              width: 40.w,
+              height: 40.h,
+              color: const Color(0xFF23456B),
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              '訊息載入中...',
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontFamily: 'OtsutomeFont',
+                color: const Color(0xFF666666),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 載入完成但沒有訊息
     if (_messages.isEmpty) {
       return Center(
         child: Text(
