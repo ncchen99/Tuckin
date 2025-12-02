@@ -1864,8 +1864,9 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
 
   /// 根據參加人數計算對話框內容區域高度
   double _calculateDialogContentHeight() {
-    // 每個成員卡片高度：margin(12) + padding-top(12) + content(55) + padding-bottom(12) = 91h
-    const double itemHeight = 91.0;
+    // 新的扁平設計：每個成員項目高度 = padding(12*2) + content(55) + divider(1) = 80h
+    // 最後一個沒有分隔線是 79h
+    const double itemHeight = 80.0;
 
     // 使用預期的參加人數來計算，最多顯示5個避免對話框太高
     final displayCount =
@@ -1917,7 +1918,7 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
                 ),
               ),
 
-              SizedBox(height: 15.h),
+              SizedBox(height: 0.h),
 
               // 內容區域（可滑動）- 根據實際參加人數動態計算高度
               SizedBox(
@@ -1950,15 +1951,19 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
                             ),
                           ),
                         )
-                        : SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
+                        : Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.w),
                           child: ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _members!.length,
                             itemBuilder: (context, index) {
                               final member = _members![index];
-                              return _MemberListItem(member: member);
+                              final isLast = index == _members!.length - 1;
+                              return _MemberListItem(
+                                member: member,
+                                isLast: isLast,
+                              );
                             },
                           ),
                         ),
@@ -1992,8 +1997,9 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
 /// 成員列表項目
 class _MemberListItem extends StatelessWidget {
   final Map<String, dynamic> member;
+  final bool isLast;
 
-  const _MemberListItem({required this.member});
+  const _MemberListItem({required this.member, this.isLast = false});
 
   /// 根據性別隨機選擇預設頭像
   String _getRandomDefaultAvatar(String? gender) {
@@ -2026,81 +2032,77 @@ class _MemberListItem extends StatelessWidget {
     final userId = member['user_id'] as String?;
     final gender = member['gender'] as String?;
 
-    return Container(
-      margin: EdgeInsets.only(bottom: 12.h),
-      padding: EdgeInsets.all(12.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 5,
-            offset: Offset(0, 2.h),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // 頭像
-          Container(
-            width: 55.w,
-            height: 55.w,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF23456B), width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: Offset(0, 2.h),
-                ),
-              ],
-            ),
-            child: ClipOval(child: _buildAvatar(avatarPath, userId, gender)),
-          ),
-
-          SizedBox(width: 12.w),
-
-          // 右側資訊
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // 暱稱
-                Text(
-                  nickname,
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    fontFamily: 'OtsutomeFont',
-                    color: const Color(0xFF23456B),
-                    fontWeight: FontWeight.bold,
-                    height: 1.3,
-                  ),
-                ),
-
-                // 個人描述
-                if (personalDesc.isNotEmpty) ...[
-                  SizedBox(height: 3.h),
-                  Text(
-                    personalDesc,
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontFamily: 'OtsutomeFont',
-                      color: const Color(0xFF666666),
-                      height: 1.3,
+    return Column(
+      children: [
+        // 成員資訊行
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 5.w),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 頭像 - 保留陰影，無邊框
+              Container(
+                width: 55.w,
+                height: 55.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 3,
+                      offset: Offset(0, 1.h),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: _buildAvatar(avatarPath, userId, gender),
+                ),
+              ),
+
+              SizedBox(width: 12.w),
+
+              // 右側資訊
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 暱稱
+                    Text(
+                      nickname,
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontFamily: 'OtsutomeFont',
+                        color: const Color(0xFF23456B),
+                        fontWeight: FontWeight.bold,
+                        height: 1.3,
+                      ),
+                    ),
+
+                    // 個人描述
+                    if (personalDesc.isNotEmpty) ...[
+                      SizedBox(height: 3.h),
+                      Text(
+                        personalDesc,
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontFamily: 'OtsutomeFont',
+                          color: const Color(0xFF666666),
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        // 分隔線 - 如果不是最後一項
+        if (!isLast) Container(height: 1, color: Colors.grey[300]),
+      ],
     );
   }
 

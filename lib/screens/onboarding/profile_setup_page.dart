@@ -970,12 +970,14 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                               height: 120.h,
                                               decoration: BoxDecoration(
                                                 shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: const Color(
-                                                    0xFF23456B,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withOpacity(0.1),
+                                                    blurRadius: 4,
+                                                    offset: Offset(0, 2.h),
                                                   ),
-                                                  width: 2.5,
-                                                ),
+                                                ],
                                               ),
                                               child: ClipOval(
                                                 child:
