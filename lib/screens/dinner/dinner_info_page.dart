@@ -11,7 +11,9 @@ import 'package:provider/provider.dart';
 import 'package:tuckin/services/dining_service.dart';
 import 'package:tuckin/services/realtime_service.dart';
 import 'package:tuckin/services/user_service.dart';
+import 'package:tuckin/services/chat_service.dart';
 import 'package:tuckin/screens/chat/chat_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'dart:io';
 import 'dart:ui';
@@ -1021,15 +1023,16 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
   /// 顯示參加名單對話框
   void _showAttendeeListDialog() async {
-    // 獲取配對組ID和參加人數
+    // 獲取配對組ID、聚餐事件ID和參加人數
     final userStatusService = Provider.of<UserStatusService>(
       context,
       listen: false,
     );
     final matchingGroupId = userStatusService.matchingGroupId;
+    final diningEventId = userStatusService.diningEventId;
     final attendeeCount = userStatusService.attendees ?? 4; // 預設4人
 
-    if (matchingGroupId == null) {
+    if (matchingGroupId == null || diningEventId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1049,6 +1052,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
       builder:
           (context) => _AttendeeListDialog(
             matchingGroupId: matchingGroupId,
+            diningEventId: diningEventId,
             expectedAttendeeCount: attendeeCount,
           ),
     );
@@ -1818,10 +1822,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 /// 參加名單對話框
 class _AttendeeListDialog extends StatefulWidget {
   final String matchingGroupId;
+  final String diningEventId;
   final int expectedAttendeeCount;
 
   const _AttendeeListDialog({
     required this.matchingGroupId,
+    required this.diningEventId,
     required this.expectedAttendeeCount,
   });
 
@@ -1831,24 +1837,105 @@ class _AttendeeListDialog extends StatefulWidget {
 
 class _AttendeeListDialogState extends State<_AttendeeListDialog> {
   final DatabaseService _databaseService = DatabaseService();
+  final ChatService _chatService = ChatService();
   List<Map<String, dynamic>>? _members;
+  Map<String, String?> _avatarUrls = {}; // 批量獲取的頭像 URL
+  Map<String, String> _cachedFilePaths = {}; // 已快取的本地檔案路徑
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMembers();
+    _loadMembersAndAvatars();
   }
 
-  Future<void> _loadMembers() async {
+  Future<void> _loadMembersAndAvatars() async {
     try {
+      // 先獲取成員資料
       final members = await _databaseService.getGroupMembersInfo(
         widget.matchingGroupId,
       );
 
+      if (members.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _members = members;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // 預先載入所有成員頭像的本地快取路徑
+      final imageCacheService = ImageCacheService();
+      final cachedPaths = <String, String>{};
+      final usersNeedingUrl = <String>[];
+
+      for (final member in members) {
+        final avatarPath = member['avatar_path'] as String?;
+        final userId = member['user_id'] as String?;
+
+        if (avatarPath != null &&
+            avatarPath.isNotEmpty &&
+            avatarPath.startsWith('avatars/') &&
+            userId != null) {
+          try {
+            final cachedFile = await imageCacheService.getCachedImageByKey(
+              avatarPath,
+              CacheType.avatar,
+            );
+            if (cachedFile != null && cachedFile.existsSync()) {
+              cachedPaths[avatarPath] = cachedFile.path;
+            } else {
+              // 本地快取不存在，需要獲取 URL
+              usersNeedingUrl.add(userId);
+            }
+          } catch (e) {
+            debugPrint('檢查頭像快取失敗: $e');
+            usersNeedingUrl.add(userId);
+          }
+        }
+      }
+
+      // 只有在需要時才請求 API 獲取頭像 URL
+      Map<String, String?> avatars = {};
+      if (usersNeedingUrl.isNotEmpty) {
+        // 先嘗試從本地緩存讀取 URL
+        final prefs = await SharedPreferences.getInstance();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        bool needFetchFromApi = false;
+
+        for (final userId in usersNeedingUrl) {
+          final cacheKey = 'other_avatar_url_$userId';
+          final cachedUrl = prefs.getString(cacheKey);
+          final cacheTimeKey = '${cacheKey}_time';
+          final cacheTime = prefs.getInt(cacheTimeKey);
+
+          if (cachedUrl != null &&
+              cacheTime != null &&
+              (now - cacheTime) < 50 * 60 * 1000) {
+            avatars[userId] = cachedUrl;
+          } else {
+            needFetchFromApi = true;
+          }
+        }
+
+        // 如果有任何 URL 緩存過期或不存在，則從 API 獲取
+        if (needFetchFromApi) {
+          final apiAvatars = await _chatService.getGroupMemberAvatars(
+            widget.diningEventId,
+          );
+          avatars.addAll(apiAvatars);
+          // 更新 UserService 緩存
+          await UserService().updateAvatarUrlCache(apiAvatars);
+        }
+      }
+
       if (mounted) {
         setState(() {
           _members = members;
+          _avatarUrls = avatars;
+          _cachedFilePaths = cachedPaths;
           _isLoading = false;
         });
       }
@@ -1936,56 +2023,71 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
               SizedBox(height: 0.h),
 
               // 內容區域（可滑動）- 根據實際參加人數和螢幕比例動態計算高度
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: _calculateDialogContentHeight(context),
-                  minHeight: 80.h, // 至少顯示一個項目的高度
-                ),
-                child:
-                    _isLoading
-                        ? Container(
-                          padding: EdgeInsets.symmetric(vertical: 50.h),
-                          child: Center(
-                            child: LoadingImage(
-                              width: 50.w,
-                              height: 50.h,
-                              color: const Color(0xFF23456B),
-                            ),
-                          ),
-                        )
-                        : _members == null || _members!.isEmpty
-                        ? Container(
-                          padding: EdgeInsets.symmetric(vertical: 40.h),
-                          child: Center(
-                            child: Text(
-                              '暫無參加者',
-                              style: TextStyle(
-                                fontSize: 16.sp,
-                                fontFamily: 'OtsutomeFont',
-                                color: const Color(0xFF666666),
+              Builder(
+                builder: (context) {
+                  final contentHeight = _calculateDialogContentHeight(context);
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: contentHeight,
+                      minHeight: contentHeight, // 使用計算出的高度，避免載入時高度跳動
+                    ),
+                    child:
+                        _isLoading
+                            ? Center(
+                              child: LoadingImage(
+                                width: 50.w,
+                                height: 50.h,
+                                color: const Color(0xFF23456B),
+                              ),
+                            )
+                            : _members == null || _members!.isEmpty
+                            ? Container(
+                              padding: EdgeInsets.symmetric(vertical: 40.h),
+                              child: Center(
+                                child: Text(
+                                  '暫無參加者',
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    fontFamily: 'OtsutomeFont',
+                                    color: const Color(0xFF666666),
+                                  ),
+                                ),
+                              ),
+                            )
+                            : Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8.w),
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _members!.length,
+                                itemBuilder: (context, index) {
+                                  final member = _members![index];
+                                  final isLast = index == _members!.length - 1;
+                                  final userId = member['user_id'] as String?;
+                                  final avatarPath =
+                                      member['avatar_path'] as String?;
+                                  final avatarUrl =
+                                      userId != null
+                                          ? _avatarUrls[userId]
+                                          : null;
+                                  final cachedFilePath =
+                                      avatarPath != null
+                                          ? _cachedFilePaths[avatarPath]
+                                          : null;
+                                  return _MemberListItem(
+                                    member: member,
+                                    avatarUrl: avatarUrl,
+                                    cachedFilePath: cachedFilePath,
+                                    isLast: isLast,
+                                  );
+                                },
                               ),
                             ),
-                          ),
-                        )
-                        : Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _members!.length,
-                            itemBuilder: (context, index) {
-                              final member = _members![index];
-                              final isLast = index == _members!.length - 1;
-                              return _MemberListItem(
-                                member: member,
-                                isLast: isLast,
-                              );
-                            },
-                          ),
-                        ),
+                  );
+                },
               ),
 
-              SizedBox(height: 15.h),
+              // SizedBox(height: 15.h),
 
               // 關閉按鈕
               ImageButton(
@@ -2013,9 +2115,16 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
 /// 成員列表項目
 class _MemberListItem extends StatelessWidget {
   final Map<String, dynamic> member;
+  final String? avatarUrl; // 由批量 API 獲取的頭像 URL
+  final String? cachedFilePath; // 已快取的本地檔案路徑
   final bool isLast;
 
-  const _MemberListItem({required this.member, this.isLast = false});
+  const _MemberListItem({
+    required this.member,
+    this.avatarUrl,
+    this.cachedFilePath,
+    this.isLast = false,
+  });
 
   /// 根據性別隨機選擇預設頭像
   String _getRandomDefaultAvatar(String? gender) {
@@ -2045,7 +2154,6 @@ class _MemberListItem extends StatelessWidget {
     final avatarPath = member['avatar_path'] as String?;
     final nickname = member['nickname'] as String? ?? '未命名';
     final personalDesc = member['personal_desc'] as String? ?? '';
-    final userId = member['user_id'] as String?;
     final gender = member['gender'] as String?;
 
     return Column(
@@ -2070,9 +2178,7 @@ class _MemberListItem extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: ClipOval(
-                  child: _buildAvatar(avatarPath, userId, gender),
-                ),
+                child: ClipOval(child: _buildAvatar(avatarPath, gender)),
               ),
 
               SizedBox(width: 12.w),
@@ -2122,7 +2228,7 @@ class _MemberListItem extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar(String? avatarPath, String? userId, String? gender) {
+  Widget _buildAvatar(String? avatarPath, String? gender) {
     // 如果沒有頭像路徑或是空字串，根據性別隨機選擇預設頭像
     if (avatarPath == null || avatarPath.isEmpty) {
       final defaultAvatar = _getRandomDefaultAvatar(gender);
@@ -2142,115 +2248,53 @@ class _MemberListItem extends StatelessWidget {
 
     // 如果是 R2 上的自訂頭像（avatars/）
     if (avatarPath.startsWith('avatars/')) {
-      return FutureBuilder<File?>(
-        future: ImageCacheService().getCachedImageByKey(
-          avatarPath,
-          CacheType.avatar,
-        ),
-        builder: (context, snapshot) {
-          // 檢查快取是否存在且有效
-          if (snapshot.connectionState == ConnectionState.done) {
-            if (snapshot.data != null && snapshot.data!.existsSync()) {
-              // 使用本地快取
-              return Image.file(
-                snapshot.data!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  // 本地檔案損壞，根據性別顯示預設頭像
-                  debugPrint('本地快取檔案損壞: $avatarPath, 錯誤: $error');
-                  final defaultAvatar = _getRandomDefaultAvatar(gender);
-                  return Container(
-                    color: Colors.white,
-                    child: Image.asset(defaultAvatar, fit: BoxFit.cover),
-                  );
-                },
-              );
-            } else {
-              // 快取不存在，嘗試從網路載入其他用戶的頭像
-              debugPrint('快取不存在，嘗試從網路載入其他用戶頭像: $avatarPath');
+      // 優先使用預先載入的本地快取路徑（同步方式，避免閃爍）
+      if (cachedFilePath != null) {
+        return Image.file(
+          File(cachedFilePath!),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            // 本地檔案損壞，根據性別顯示預設頭像
+            debugPrint('本地快取檔案損壞: $avatarPath, 錯誤: $error');
+            final defaultAvatar = _getRandomDefaultAvatar(gender);
+            return Container(
+              color: Colors.white,
+              child: Image.asset(defaultAvatar, fit: BoxFit.cover),
+            );
+          },
+        );
+      }
 
-              if (userId == null) {
-                // 沒有 userId，無法獲取頭像，顯示預設頭像
-                final defaultAvatar = _getRandomDefaultAvatar(gender);
-                return Container(
-                  color: Colors.white,
-                  child: Image.asset(defaultAvatar, fit: BoxFit.cover),
-                );
-              }
-
-              // 嘗試從 API 獲取其他用戶的頭像 URL
-              return FutureBuilder<String?>(
-                future: UserService().getOtherUserAvatarUrl(userId),
-                builder: (context, urlSnapshot) {
-                  if (urlSnapshot.connectionState == ConnectionState.waiting) {
-                    // 載入中
-                    return Container(
-                      color: Colors.white,
-                      child: Center(
-                        child: LoadingImage(
-                          width: 15.w,
-                          height: 15.h,
-                          color: const Color(0xFF23456B),
-                        ),
-                      ),
-                    );
-                  }
-
-                  if (urlSnapshot.hasData && urlSnapshot.data != null) {
-                    // 成功獲取 URL，使用 CachedNetworkImage 載入並快取
-                    return CachedNetworkImage(
-                      imageUrl: urlSnapshot.data!,
-                      cacheManager: ImageCacheService().getCacheManager(
-                        CacheType.avatar,
-                      ),
-                      cacheKey: avatarPath, // 使用 avatar_path 作為快取 key
-                      fit: BoxFit.cover,
-                      placeholder:
-                          (context, url) => Container(
-                            color: Colors.white,
-                            child: Center(
-                              child: LoadingImage(
-                                width: 15.w,
-                                height: 15.h,
-                                color: const Color(0xFF23456B),
-                              ),
-                            ),
-                          ),
-                      errorWidget: (context, url, error) {
-                        // 載入失敗，根據性別顯示預設頭像
-                        debugPrint('載入其他用戶頭像失敗: $error');
-                        final defaultAvatar = _getRandomDefaultAvatar(gender);
-                        return Container(
-                          color: Colors.white,
-                          child: Image.asset(defaultAvatar, fit: BoxFit.cover),
-                        );
-                      },
-                    );
-                  } else {
-                    // 獲取 URL 失敗，根據性別顯示預設頭像
-                    final defaultAvatar = _getRandomDefaultAvatar(gender);
-                    return Container(
-                      color: Colors.white,
-                      child: Image.asset(defaultAvatar, fit: BoxFit.cover),
-                    );
-                  }
-                },
-              );
-            }
-          }
-
-          // 載入中，顯示 loading
-          return Container(
-            color: Colors.white,
-            child: Center(
-              child: LoadingImage(
-                width: 15.w,
-                height: 15.h,
-                color: const Color(0xFF23456B),
+      // 使用批量 API 獲取的 URL
+      if (avatarUrl != null) {
+        final defaultAvatar = _getRandomDefaultAvatar(gender);
+        return CachedNetworkImage(
+          imageUrl: avatarUrl!,
+          cacheManager: ImageCacheService().getCacheManager(CacheType.avatar),
+          cacheKey: avatarPath, // 使用 avatar_path 作為快取 key
+          fit: BoxFit.cover,
+          // 使用預設頭像作為 placeholder，避免 loading 閃爍
+          placeholder:
+              (context, url) => Container(
+                color: Colors.white,
+                child: Image.asset(defaultAvatar, fit: BoxFit.cover),
               ),
-            ),
-          );
-        },
+          errorWidget: (context, url, error) {
+            // 載入失敗，根據性別顯示預設頭像
+            debugPrint('載入其他用戶頭像失敗: $error');
+            return Container(
+              color: Colors.white,
+              child: Image.asset(defaultAvatar, fit: BoxFit.cover),
+            );
+          },
+        );
+      }
+
+      // 沒有快取也沒有 URL，顯示預設頭像
+      final defaultAvatar = _getRandomDefaultAvatar(gender);
+      return Container(
+        color: Colors.white,
+        child: Image.asset(defaultAvatar, fit: BoxFit.cover),
       );
     }
 

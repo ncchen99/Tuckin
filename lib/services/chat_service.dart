@@ -587,6 +587,143 @@ class ChatService {
     }
   }
 
+  /// 批量獲取群組成員頭像 URL
+  /// 
+  /// [diningEventId] 聚餐事件 ID
+  /// 
+  /// 返回 Map<userId, url>，沒有自訂頭像的用戶值為 null
+  Future<Map<String, String?>> getGroupMemberAvatars(String diningEventId) async {
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+
+      if (token == null) {
+        debugPrint('未找到用戶 token');
+        return {};
+      }
+
+      final url = Uri.parse('${_apiService.baseUrl}/chat/group-avatars');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'dining_event_id': diningEventId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final avatarsRaw = data['avatars'] as Map<String, dynamic>? ?? {};
+        
+        // 轉換為 Map<String, String?>
+        final avatars = <String, String?>{};
+        for (final entry in avatarsRaw.entries) {
+          avatars[entry.key] = entry.value as String?;
+        }
+        
+        debugPrint('批量獲取群組成員頭像成功: ${avatars.length} 個用戶');
+        
+        // 緩存頭像 URL
+        final prefs = await SharedPreferences.getInstance();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        for (final entry in avatars.entries) {
+          if (entry.value != null) {
+            final cacheKey = 'other_avatar_url_${entry.key}';
+            await prefs.setString(cacheKey, entry.value!);
+            await prefs.setInt('${cacheKey}_time', now);
+          }
+        }
+        
+        return avatars;
+      } else {
+        debugPrint('批量獲取群組成員頭像失敗: ${response.body}');
+        return {};
+      }
+    } catch (e) {
+      debugPrint('批量獲取群組成員頭像時發生錯誤: $e');
+      return {};
+    }
+  }
+
+  /// 批量獲取聊天圖片 URL
+  /// 
+  /// [diningEventId] 聚餐事件 ID
+  /// [limit] 每次請求的圖片數量上限（預設 200，最大 200）
+  /// [offset] 從第幾張圖片開始（預設 0）
+  /// 
+  /// 返回 Map，包含:
+  /// - 'images': Map<imagePath, url>
+  /// - 'total': 總圖片數量
+  /// - 'hasMore': 是否還有更多圖片
+  Future<Map<String, dynamic>> getBatchChatImageUrls(
+    String diningEventId, {
+    int limit = 200,
+    int offset = 0,
+  }) async {
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+
+      if (token == null) {
+        debugPrint('未找到用戶 token');
+        return {'images': <String, String>{}, 'total': 0, 'hasMore': false};
+      }
+
+      final url = Uri.parse('${_apiService.baseUrl}/chat/images/batch');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'dining_event_id': diningEventId,
+          'limit': limit,
+          'offset': offset,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final imagesRaw = data['images'] as Map<String, dynamic>? ?? {};
+        final total = data['total'] as int? ?? 0;
+        final hasMore = data['has_more'] as bool? ?? false;
+        
+        // 轉換為 Map<String, String>
+        final images = <String, String>{};
+        for (final entry in imagesRaw.entries) {
+          if (entry.value != null) {
+            images[entry.key] = entry.value as String;
+          }
+        }
+        
+        debugPrint('批量獲取聊天圖片成功: ${images.length} 張 (total: $total, hasMore: $hasMore)');
+        
+        // 緩存圖片 URL
+        final prefs = await SharedPreferences.getInstance();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        for (final entry in images.entries) {
+          final cacheKey = 'chat_image_url_${entry.key}';
+          await prefs.setString(cacheKey, entry.value);
+          await prefs.setInt('${cacheKey}_time', now);
+        }
+        
+        return {
+          'images': images,
+          'total': total,
+          'hasMore': hasMore,
+        };
+      } else {
+        debugPrint('批量獲取聊天圖片失敗: ${response.body}');
+        return {'images': <String, String>{}, 'total': 0, 'hasMore': false};
+      }
+    } catch (e) {
+      debugPrint('批量獲取聊天圖片時發生錯誤: $e');
+      return {'images': <String, String>{}, 'total': 0, 'hasMore': false};
+    }
+  }
+
   /// 發送聊天通知
   Future<void> _sendChatNotification(
     String diningEventId,

@@ -33,3 +33,29 @@ class ChatNotifyRequest(BaseModel):
     message_type: str = Field(..., description="訊息類型：text 或 image")
 
 
+class GroupAvatarsRequest(BaseModel):
+    """群組成員頭像批量請求"""
+    dining_event_id: str = Field(..., description="聚餐事件 ID")
+
+
+class GroupAvatarsResponse(BaseModel):
+    """群組成員頭像批量回應"""
+    avatars: dict = Field(..., description="用戶頭像 URL 映射 {user_id: url 或 null}")
+    expires_in: int = Field(..., description="URL 有效期（秒）")
+
+
+class BatchChatImagesRequest(BaseModel):
+    """批量聊天圖片 URL 請求"""
+    dining_event_id: str = Field(..., description="聚餐事件 ID")
+    limit: int = Field(default=50, ge=1, le=200, description="每次請求的圖片數量上限")
+    offset: int = Field(default=0, ge=0, description="從第幾張圖片開始（用於分頁）")
+
+
+class BatchChatImagesResponse(BaseModel):
+    """批量聊天圖片 URL 回應"""
+    images: dict = Field(..., description="圖片路徑與 URL 映射 {image_path: url}")
+    total: int = Field(..., description="總圖片數量")
+    has_more: bool = Field(..., description="是否還有更多圖片")
+    expires_in: int = Field(..., description="URL 有效期（秒）")
+
+

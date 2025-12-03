@@ -255,13 +255,14 @@ class UserService {
   static final Map<String, String> _avatarUrlMemoryCache = {};
   static final Map<String, int> _avatarUrlMemoryCacheTime = {};
 
-  /// 獲取其他用戶的頭像顯示 URL（帶緩存）
+  /// 獲取其他用戶的頭像顯示 URL（僅從緩存讀取）
   ///
   /// [userId] 目標用戶的 ID
   ///
-  /// 返回 presigned URL 或 null（如果失敗）
+  /// 返回 presigned URL 或 null（如果緩存不存在或已過期）
   ///
-  /// 權限控制：只能查看同一配對組成員的頭像
+  /// 注意：此方法僅從緩存讀取，不會發起 API 請求
+  /// 請先使用 ChatService.getGroupMemberAvatars() 批量獲取並填充緩存
   Future<String?> getOtherUserAvatarUrl(String userId) async {
     try {
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -273,7 +274,6 @@ class UserService {
           (now - memoryCacheTime) < _avatarUrlCacheValidMs) {
         final memoryCacheUrl = _avatarUrlMemoryCache[cacheKey];
         if (memoryCacheUrl != null) {
-          debugPrint('使用內存緩存的頭像 URL: $userId');
           return memoryCacheUrl;
         }
       }
@@ -287,7 +287,6 @@ class UserService {
       if (cachedUrl != null && cacheTime != null) {
         final cacheAge = now - cacheTime;
         if (cacheAge < _avatarUrlCacheValidMs) {
-          debugPrint('使用本地緩存的頭像 URL: $userId');
           // 更新內存緩存
           _avatarUrlMemoryCache[cacheKey] = cachedUrl;
           _avatarUrlMemoryCacheTime[cacheKey] = cacheTime;
@@ -295,60 +294,32 @@ class UserService {
         }
       }
 
-      // 3. 緩存不存在或已過期，從後端獲取
-      debugPrint('正在獲取其他用戶頭像 URL... 目標用戶 ID: $userId');
-
-      final session = Supabase.instance.client.auth.currentSession;
-      final token = session?.accessToken;
-
-      if (token == null) {
-        debugPrint('未找到用戶 token');
-        return null;
-      }
-
-      final url = Uri.parse('${_apiService.baseUrl}/user/$userId/avatar/url');
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      debugPrint('獲取其他用戶頭像 URL 響應狀態碼: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        final avatarUrl = data['url'] as String?;
-        debugPrint('成功獲取其他用戶頭像 URL');
-
-        // 緩存 URL
-        if (avatarUrl != null) {
-          await prefs.setString(cacheKey, avatarUrl);
-          await prefs.setInt(cacheTimeKey, now);
-          // 更新內存緩存
-          _avatarUrlMemoryCache[cacheKey] = avatarUrl;
-          _avatarUrlMemoryCacheTime[cacheKey] = now;
-          debugPrint('已緩存頭像 URL: $userId');
-        }
-
-        return avatarUrl;
-      } else if (response.statusCode == 404) {
-        // 用戶尚未設置頭像或使用預設頭像
-        debugPrint('目標用戶尚未設置頭像或使用預設頭像');
-        return null;
-      } else if (response.statusCode == 403) {
-        // 沒有權限查看該用戶頭像
-        debugPrint('沒有權限查看該用戶頭像');
-        return null;
-      } else {
-        debugPrint('獲取其他用戶頭像 URL 失敗: ${response.body}');
-        return null;
-      }
+      // 緩存不存在或已過期
+      return null;
     } catch (e) {
       debugPrint('獲取其他用戶頭像 URL 時發生錯誤: $e');
       return null;
     }
+  }
+
+  /// 批量更新頭像 URL 緩存
+  ///
+  /// [avatars] Map<userId, url>，由 ChatService.getGroupMemberAvatars() 返回
+  Future<void> updateAvatarUrlCache(Map<String, String?> avatars) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final prefs = await SharedPreferences.getInstance();
+    
+    for (final entry in avatars.entries) {
+      if (entry.value != null) {
+        final cacheKey = 'other_avatar_url_${entry.key}';
+        await prefs.setString(cacheKey, entry.value!);
+        await prefs.setInt('${cacheKey}_time', now);
+        // 更新內存緩存
+        _avatarUrlMemoryCache[cacheKey] = entry.value!;
+        _avatarUrlMemoryCacheTime[cacheKey] = now;
+      }
+    }
+    debugPrint('已更新 ${avatars.values.where((v) => v != null).length} 個頭像 URL 緩存');
   }
 
   /// 清除特定用戶的頭像 URL 緩存
@@ -376,54 +347,23 @@ class UserService {
     debugPrint('已清除所有頭像 URL 緩存');
   }
 
-  /// 批量預取多個用戶的頭像 URL
+  /// 批量讀取多個用戶的頭像 URL（僅從緩存讀取）
   ///
-  /// [userIds] 需要預取的用戶 ID 列表
+  /// [userIds] 需要讀取的用戶 ID 列表
   ///
-  /// 這個方法會並行獲取所有用戶的頭像 URL，並緩存起來
-  /// 返回 Map<userId, url>，失敗的用戶會返回 null
+  /// 這個方法會從緩存中讀取所有用戶的頭像 URL
+  /// 返回 Map<userId, url>，緩存中不存在的用戶會返回 null
+  ///
+  /// 注意：請先使用 ChatService.getGroupMemberAvatars() 批量獲取並填充緩存
   Future<Map<String, String?>> prefetchAvatarUrls(List<String> userIds) async {
     final results = <String, String?>{};
-    final now = DateTime.now().millisecondsSinceEpoch;
 
-    // 過濾出需要請求的用戶（排除已有有效緩存的）
-    final usersToFetch = <String>[];
     for (final userId in userIds) {
-      final cacheKey = 'other_avatar_url_$userId';
-      final memoryCacheTime = _avatarUrlMemoryCacheTime[cacheKey];
-
-      // 檢查內存緩存
-      if (memoryCacheTime != null &&
-          (now - memoryCacheTime) < _avatarUrlCacheValidMs) {
-        final memoryCacheUrl = _avatarUrlMemoryCache[cacheKey];
-        if (memoryCacheUrl != null) {
-          results[userId] = memoryCacheUrl;
-          continue;
-        }
-      }
-
-      usersToFetch.add(userId);
-    }
-
-    if (usersToFetch.isEmpty) {
-      debugPrint('所有頭像 URL 都在緩存中');
-      return results;
-    }
-
-    debugPrint('批量預取 ${usersToFetch.length} 個用戶的頭像 URL');
-
-    // 並行獲取所有需要的頭像 URL
-    final futures = usersToFetch.map((userId) async {
       final url = await getOtherUserAvatarUrl(userId);
-      return MapEntry(userId, url);
-    });
-
-    final entries = await Future.wait(futures);
-    for (final entry in entries) {
-      results[entry.key] = entry.value;
+      results[userId] = url;
     }
 
-    debugPrint('批量預取完成，成功獲取 ${results.values.where((v) => v != null).length} 個頭像 URL');
+    debugPrint('從緩存讀取 ${results.values.where((v) => v != null).length}/${userIds.length} 個頭像 URL');
     return results;
   }
 

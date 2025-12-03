@@ -7,6 +7,7 @@ import 'package:tuckin/services/image_cache_service.dart';
 import 'package:tuckin/models/chat_message.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:math';
 import 'dart:io';
@@ -34,19 +35,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _hasText = false; // 追蹤輸入框是否有內容
   final Map<String, int> _fixedAvatars = {}; // 儲存固定頭像索引
   final Map<String, String?> _avatarUrlCache = {}; // 儲存頭像 URL 緩存
-  final Map<String, bool> _avatarUrlLoading = {}; // 追蹤正在加載的頭像 URL
 
   // 儲存正在發送的圖片本地資訊（tempId -> {localPath, imageBytes, width, height}）
   final Map<String, Map<String, dynamic>> _pendingImageData = {};
 
   // 儲存聊天圖片 URL 緩存（imagePath -> url）
   final Map<String, String?> _chatImageUrlCache = {};
-  final Map<String, bool> _chatImageUrlLoading = {};
+
+  // 儲存已快取的本地檔案路徑（用於避免閃爍）
+  // key: avatarPath 或 imagePath, value: 本地檔案路徑
+  final Map<String, String> _cachedFilePaths = {};
+
+  // 批量 API 加載標記
+  bool _hasBatchLoadedAvatars = false;
+  bool _hasBatchLoadedImages = false;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUser();
+    _initializeCache(); // 先檢查本地快取，再決定是否請求 API
     _subscribeToMessages();
 
     // 註冊生命週期監聽
@@ -61,6 +69,148 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         });
       }
     });
+  }
+
+  /// 初始化快取：先檢查本地快取，再決定是否請求 API
+  Future<void> _initializeCache() async {
+    // 批量加載資源（會優先使用本地快取）
+    await _batchLoadResources();
+  }
+
+  /// 批量加載頭像和圖片 URL（優先使用本地快取）
+  Future<void> _batchLoadResources() async {
+    // 批量獲取群組成員頭像 URL
+    if (!_hasBatchLoadedAvatars) {
+      try {
+        // 先從 UserService 的記憶體/本地緩存讀取
+        // 如果緩存有效（50分鐘內），則不需要請求 API
+        final prefs = await SharedPreferences.getInstance();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        bool needFetchFromApi = false;
+
+        // 檢查是否有任何頭像 URL 緩存過期
+        final cacheKeys = prefs.getKeys().where(
+          (key) =>
+              key.startsWith('other_avatar_url_') && !key.endsWith('_time'),
+        );
+
+        if (cacheKeys.isEmpty) {
+          // 沒有任何緩存，需要從 API 獲取
+          needFetchFromApi = true;
+        } else {
+          // 檢查緩存是否過期（50分鐘）
+          for (final key in cacheKeys) {
+            final timeKey = '${key}_time';
+            final cacheTime = prefs.getInt(timeKey);
+            if (cacheTime == null || (now - cacheTime) >= 50 * 60 * 1000) {
+              needFetchFromApi = true;
+              break;
+            }
+            // 將有效的緩存載入到內存
+            final url = prefs.getString(key);
+            if (url != null) {
+              final userId = key.replaceFirst('other_avatar_url_', '');
+              _avatarUrlCache[userId] = url;
+            }
+          }
+        }
+
+        if (needFetchFromApi) {
+          final avatars = await _chatService.getGroupMemberAvatars(
+            widget.diningEventId,
+          );
+          if (mounted) {
+            setState(() {
+              for (final entry in avatars.entries) {
+                _avatarUrlCache[entry.key] = entry.value;
+              }
+              _hasBatchLoadedAvatars = true;
+            });
+            // 同時更新 UserService 的緩存
+            await UserService().updateAvatarUrlCache(avatars);
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _hasBatchLoadedAvatars = true;
+            });
+          }
+          debugPrint('頭像 URL 從本地緩存載入，跳過 API 請求');
+        }
+      } catch (e) {
+        debugPrint('批量獲取群組成員頭像失敗: $e');
+        if (mounted) {
+          setState(() {
+            _hasBatchLoadedAvatars = true;
+          });
+        }
+      }
+    }
+
+    // 批量獲取聊天圖片 URL
+    if (!_hasBatchLoadedImages) {
+      try {
+        // 先從本地緩存讀取
+        final prefs = await SharedPreferences.getInstance();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        bool needFetchFromApi = false;
+
+        // 檢查是否有任何聊天圖片 URL 緩存
+        final cacheKeys = prefs.getKeys().where(
+          (key) => key.startsWith('chat_image_url_') && !key.endsWith('_time'),
+        );
+
+        if (cacheKeys.isEmpty) {
+          // 沒有任何緩存，需要從 API 獲取
+          needFetchFromApi = true;
+        } else {
+          // 檢查緩存是否過期（50分鐘）
+          for (final key in cacheKeys) {
+            final timeKey = '${key}_time';
+            final cacheTime = prefs.getInt(timeKey);
+            if (cacheTime == null || (now - cacheTime) >= 50 * 60 * 1000) {
+              needFetchFromApi = true;
+              break;
+            }
+            // 將有效的緩存載入到內存
+            final url = prefs.getString(key);
+            if (url != null) {
+              final imagePath = key.replaceFirst('chat_image_url_', '');
+              _chatImageUrlCache[imagePath] = url;
+            }
+          }
+        }
+
+        if (needFetchFromApi) {
+          final result = await _chatService.getBatchChatImageUrls(
+            widget.diningEventId,
+          );
+          final images = result['images'] as Map<String, String>? ?? {};
+          if (mounted) {
+            setState(() {
+              for (final entry in images.entries) {
+                _chatImageUrlCache[entry.key] = entry.value;
+              }
+              _hasBatchLoadedImages = true;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _hasBatchLoadedImages = true;
+            });
+          }
+          debugPrint('聊天圖片 URL 從本地緩存載入，跳過 API 請求');
+        }
+      } catch (e) {
+        debugPrint('批量獲取聊天圖片失敗: $e');
+        if (mounted) {
+          setState(() {
+            _hasBatchLoadedImages = true;
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -134,28 +284,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           needFixedAvatarUpdate = true;
         }
 
-        // 批量預取自訂頭像的 URL
-        if (usersNeedingAvatarUrl.isNotEmpty) {
+        // 從緩存中讀取頭像 URL（已由 _batchLoadResources 批量獲取）
+        if (usersNeedingAvatarUrl.isNotEmpty && _hasBatchLoadedAvatars) {
           final uniqueUserIds = usersNeedingAvatarUrl.toSet().toList();
           final urls = await UserService().prefetchAvatarUrls(uniqueUserIds);
           for (final entry in urls.entries) {
-            _avatarUrlCache[entry.key] = entry.value;
+            if (!_avatarUrlCache.containsKey(entry.key)) {
+              _avatarUrlCache[entry.key] = entry.value;
+            }
           }
         }
 
-        // 預取聊天圖片 URL（只預取尚未緩存的）
-        final imagePathsToFetch = <String>[];
+        // 預先載入所有需要的頭像和圖片的本地快取路徑（避免顯示時閃爍）
+        await _preloadCachedFilePaths(sortedMessages);
+
+        // 圖片 URL 已由 _batchLoadResources 批量獲取
+        // 檢查是否有新圖片需要重新批量獲取
+        bool hasNewImages = false;
         for (final message in sortedMessages) {
           if (message.isImage &&
               message.imagePath != null &&
               !_chatImageUrlCache.containsKey(message.imagePath)) {
-            imagePathsToFetch.add(message.imagePath!);
+            hasNewImages = true;
+            break;
           }
         }
 
-        // 異步預取圖片 URL（不阻塞 UI）
-        if (imagePathsToFetch.isNotEmpty) {
-          _prefetchChatImageUrls(imagePathsToFetch);
+        // 如果有新圖片且已完成初始批量加載，重新批量獲取
+        if (hasNewImages && _hasBatchLoadedImages) {
+          _refreshBatchImageUrls();
         }
 
         // 檢查是否需要更新 UI（比較圖片相關字段）
@@ -1019,10 +1176,34 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 如果是 R2 上的自訂頭像
     final avatarCacheKey = 'avatar_${userId}_$avatarPath';
 
+    // 優先使用預先載入的本地快取路徑（同步方式，避免閃爍）
+    final cachedFilePath = _cachedFilePaths[avatarPath];
+    if (cachedFilePath != null) {
+      return Image.file(
+        File(cachedFilePath),
+        key: ValueKey(avatarCacheKey),
+        fit: BoxFit.cover,
+        cacheWidth: 100,
+        errorBuilder: (context, error, stackTrace) {
+          // 本地檔案損壞，移除快取路徑並顯示預設頭像
+          _cachedFilePaths.remove(avatarPath);
+          final fixedIndex = _fixedAvatars[userId] ?? 1;
+          return Container(
+            color: Colors.white,
+            child: Image.asset(
+              _getFixedDefaultAvatar(gender, fixedIndex),
+              fit: BoxFit.cover,
+              cacheWidth: 100,
+            ),
+          );
+        },
+      );
+    }
+
     // 檢查內存中是否有緩存的 URL
     final cachedUrl = _avatarUrlCache[userId];
 
-    // 如果已經有 URL，直接使用 CachedNetworkImage
+    // 如果已經有 URL，使用 CachedNetworkImage 並在載入完成後更新快取路徑
     if (cachedUrl != null) {
       return _buildCachedAvatarImage(
         key: ValueKey(avatarCacheKey),
@@ -1033,122 +1214,125 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    // 首先嘗試從本地快取獲取
-    return FutureBuilder<File?>(
+    // 本地快取不存在且沒有 URL，觸發異步載入
+    _loadAvatarUrlIfNeeded(userId, avatarPath, gender);
+
+    // 顯示預設頭像（不顯示 loading，避免閃爍）
+    final fixedIndex = _fixedAvatars[userId] ?? 1;
+    return Container(
       key: ValueKey(avatarCacheKey),
-      future: ImageCacheService().getCachedImageByKey(
-        avatarPath,
-        CacheType.avatar,
+      color: Colors.white,
+      child: Image.asset(
+        _getFixedDefaultAvatar(gender, fixedIndex),
+        fit: BoxFit.cover,
+        cacheWidth: 100,
       ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done &&
-            snapshot.data != null &&
-            snapshot.data!.existsSync()) {
-          // 本地緩存存在，直接使用 Image.file，不需要請求 URL
-          return Image.file(
-            snapshot.data!,
-            fit: BoxFit.cover,
-            cacheWidth: 100, // 限制緩存尺寸，節省記憶體
-          );
-        }
-
-        // 本地快取不存在，需要從網路載入
-        // 異步獲取 URL 並緩存（避免在 build 中重複請求）
-        _loadAvatarUrlIfNeeded(userId, avatarPath, gender);
-
-        // 顯示載入中的預設頭像
-        final fixedIndex = _fixedAvatars[userId] ?? 1;
-        return Container(
-          color: Colors.white,
-          child: Stack(
-            children: [
-              Image.asset(
-                _getFixedDefaultAvatar(gender, fixedIndex),
-                fit: BoxFit.cover,
-                cacheWidth: 100,
-              ),
-              Positioned.fill(
-                child: Container(
-                  color: Colors.white.withOpacity(0.5),
-                  child: Center(
-                    child: LoadingImage(
-                      width: 15.w,
-                      height: 15.h,
-                      color: const Color(0xFF23456B),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
-  /// 批量預取聊天圖片 URL
-  void _prefetchChatImageUrls(List<String> imagePaths) {
-    for (final imagePath in imagePaths) {
-      _loadChatImageUrlIfNeeded(imagePath);
+  /// 預先載入所有需要的頭像和圖片的本地快取路徑
+  /// 這樣在顯示時可以同步檢查，避免 FutureBuilder 導致的閃爍
+  Future<void> _preloadCachedFilePaths(List<ChatMessage> messages) async {
+    final imageCacheService = ImageCacheService();
+
+    for (final message in messages) {
+      // 預載入頭像快取路徑
+      final avatarPath = message.senderAvatarPath;
+      if (avatarPath != null &&
+          avatarPath.isNotEmpty &&
+          avatarPath.startsWith('avatars/') &&
+          !_cachedFilePaths.containsKey(avatarPath)) {
+        try {
+          final cachedFile = await imageCacheService.getCachedImageByKey(
+            avatarPath,
+            CacheType.avatar,
+          );
+          if (cachedFile != null && cachedFile.existsSync()) {
+            _cachedFilePaths[avatarPath] = cachedFile.path;
+          }
+        } catch (e) {
+          debugPrint('預載入頭像快取路徑失敗: $e');
+        }
+      }
+
+      // 預載入聊天圖片快取路徑
+      final imagePath = message.imagePath;
+      if (imagePath != null &&
+          imagePath.isNotEmpty &&
+          !_cachedFilePaths.containsKey(imagePath)) {
+        try {
+          final cachedFile = await imageCacheService.getCachedImageByKey(
+            imagePath,
+            CacheType.chat,
+          );
+          if (cachedFile != null && cachedFile.existsSync()) {
+            _cachedFilePaths[imagePath] = cachedFile.path;
+          }
+        } catch (e) {
+          debugPrint('預載入聊天圖片快取路徑失敗: $e');
+        }
+      }
     }
   }
 
-  /// 異步載入聊天圖片 URL 並緩存（避免重複請求）
+  /// 重新批量獲取聊天圖片 URL（用於有新圖片時）
+  Future<void> _refreshBatchImageUrls() async {
+    try {
+      final result = await _chatService.getBatchChatImageUrls(
+        widget.diningEventId,
+      );
+      final images = result['images'] as Map<String, String>? ?? {};
+      if (mounted) {
+        setState(() {
+          for (final entry in images.entries) {
+            _chatImageUrlCache[entry.key] = entry.value;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('重新批量獲取聊天圖片失敗: $e');
+    }
+  }
+
+  /// 異步載入聊天圖片 URL 並緩存（使用批量 API 結果）
   void _loadChatImageUrlIfNeeded(String imagePath) {
-    // 如果已經在加載中或已有緩存，跳過
-    if (_chatImageUrlLoading[imagePath] == true ||
-        _chatImageUrlCache.containsKey(imagePath)) {
+    // 如果已有緩存，跳過
+    if (_chatImageUrlCache.containsKey(imagePath)) {
       return;
     }
 
-    // 標記為加載中
-    _chatImageUrlLoading[imagePath] = true;
+    // 如果批量加載尚未完成，等待批量加載
+    if (!_hasBatchLoadedImages) {
+      return;
+    }
 
-    // 異步獲取 URL
-    _chatService
-        .getImageUrl(imagePath)
-        .then((url) {
-          if (mounted) {
-            setState(() {
-              _chatImageUrlCache[imagePath] = url;
-              _chatImageUrlLoading[imagePath] = false;
-            });
-          }
-        })
-        .catchError((e) {
-          debugPrint('獲取圖片 URL 失敗: $e');
-          if (mounted) {
-            setState(() {
-              _chatImageUrlCache[imagePath] = null;
-              _chatImageUrlLoading[imagePath] = false;
-            });
-          }
-        });
+    // 如果批量加載已完成但仍無此圖片，重新批量獲取
+    _refreshBatchImageUrls();
   }
 
-  /// 異步載入頭像 URL 並緩存（避免重複請求）
+  /// 異步載入頭像 URL 並緩存（使用批量 API 結果）
   void _loadAvatarUrlIfNeeded(
     String userId,
     String avatarPath,
     String? gender,
   ) {
-    // 如果已經在加載中或已有緩存，跳過
-    if (_avatarUrlLoading[userId] == true ||
-        _avatarUrlCache.containsKey(userId)) {
+    // 如果已有緩存，跳過
+    if (_avatarUrlCache.containsKey(userId)) {
       return;
     }
 
-    // 標記為加載中
-    _avatarUrlLoading[userId] = true;
+    // 如果批量加載尚未完成，等待批量加載
+    if (!_hasBatchLoadedAvatars) {
+      return;
+    }
 
-    // 異步獲取 URL
+    // 從 UserService 緩存讀取（可能已被批量 API 填充）
     UserService()
         .getOtherUserAvatarUrl(userId)
         .then((url) {
           if (mounted) {
             setState(() {
               _avatarUrlCache[userId] = url;
-              _avatarUrlLoading[userId] = false;
             });
           }
         })
@@ -1157,7 +1341,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           if (mounted) {
             setState(() {
               _avatarUrlCache[userId] = null;
-              _avatarUrlLoading[userId] = false;
             });
           }
         });
@@ -1171,6 +1354,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     required String? gender,
     required String userId,
   }) {
+    final fixedIndex = _fixedAvatars[userId] ?? 1;
+
     return CachedNetworkImage(
       key: key,
       imageUrl: imageUrl,
@@ -1178,19 +1363,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       cacheKey: avatarPath, // 使用 avatarPath 作為緩存 key
       fit: BoxFit.cover,
       memCacheWidth: 100, // 限制記憶體緩存尺寸
+      // 使用預設頭像作為 placeholder，避免 loading 閃爍
       placeholder:
           (context, url) => Container(
             color: Colors.white,
-            child: Center(
-              child: LoadingImage(
-                width: 20.w,
-                height: 20.h,
-                color: const Color(0xFF23456B),
-              ),
+            child: Image.asset(
+              _getFixedDefaultAvatar(gender, fixedIndex),
+              fit: BoxFit.cover,
+              cacheWidth: 100,
             ),
           ),
+      imageBuilder: (context, imageProvider) {
+        // 圖片載入完成後，異步更新本地快取路徑
+        _updateCachedFilePathForAvatar(avatarPath);
+        return Image(image: imageProvider, fit: BoxFit.cover);
+      },
       errorWidget: (context, url, error) {
-        final fixedIndex = _fixedAvatars[userId] ?? 1;
         return Container(
           color: Colors.white,
           child: Image.asset(
@@ -1201,6 +1389,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         );
       },
     );
+  }
+
+  /// 異步更新頭像的本地快取路徑
+  void _updateCachedFilePathForAvatar(String avatarPath) {
+    if (_cachedFilePaths.containsKey(avatarPath)) return;
+
+    ImageCacheService().getCachedImageByKey(avatarPath, CacheType.avatar).then((
+      file,
+    ) {
+      if (file != null && file.existsSync() && mounted) {
+        _cachedFilePaths[avatarPath] = file.path;
+      }
+    });
   }
 
   String _getFixedDefaultAvatar(String? gender, int index) {
@@ -1432,6 +1633,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final effectiveBorderRadius = borderRadius ?? BorderRadius.circular(12.r);
     // 使用穩定的 key，基於 message.id 和 imagePath，避免不必要的重建
     final imageKey = 'image_${message.id}_${message.imagePath}';
+    final imagePath = message.imagePath!;
 
     // 檢查是否有本地預覽資訊（用於 placeholder）
     final pendingData = _pendingImageData[message.id];
@@ -1492,8 +1694,49 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
+    // 優先使用預先載入的本地快取路徑（同步方式，避免閃爍）
+    final cachedFilePath = _cachedFilePaths[imagePath];
+    if (cachedFilePath != null) {
+      return GestureDetector(
+        key: ValueKey(imageKey),
+        onTap: () {
+          _openImageViewer(message);
+        },
+        child: Hero(
+          tag: message.id,
+          child: Container(
+            width: displayWidth,
+            height: displayHeight,
+            decoration: BoxDecoration(
+              borderRadius: effectiveBorderRadius,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: Offset(0, 2.h),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: effectiveBorderRadius,
+              child: Image.file(
+                File(cachedFilePath),
+                fit: BoxFit.cover,
+                width: displayWidth,
+                height: displayHeight,
+                errorBuilder: (context, error, stackTrace) {
+                  // 本地檔案損壞，移除快取路徑
+                  _cachedFilePaths.remove(imagePath);
+                  return buildPlaceholder(withDarkOverlay: false);
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     // 檢查緩存中是否有 URL
-    final imagePath = message.imagePath!;
     final cachedUrl = _chatImageUrlCache[imagePath];
 
     // 如果沒有緩存且不在載入中，觸發異步載入
@@ -1524,7 +1767,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    // 有緩存的 URL，直接顯示圖片
+    // 有緩存的 URL，使用 CachedNetworkImage 並在載入完成後更新快取路徑
     return GestureDetector(
       key: ValueKey(imageKey),
       onTap: () {
@@ -1559,12 +1802,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               placeholder:
                   (context, url) => buildPlaceholder(withDarkOverlay: false),
               imageBuilder: (context, imageProvider) {
-                // 網路圖片載入完成，清理本地預覽資訊
+                // 網路圖片載入完成，清理本地預覽資訊並更新快取路徑
                 if (_pendingImageData.containsKey(message.id)) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     _pendingImageData.remove(message.id);
                   });
                 }
+                _updateCachedFilePathForChatImage(imagePath);
                 return Image(
                   image: imageProvider,
                   fit: BoxFit.cover,
@@ -1586,6 +1830,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     );
   }
 
+  /// 異步更新聊天圖片的本地快取路徑
+  void _updateCachedFilePathForChatImage(String imagePath) {
+    if (_cachedFilePaths.containsKey(imagePath)) return;
+
+    ImageCacheService().getCachedImageByKey(imagePath, CacheType.chat).then((
+      file,
+    ) {
+      if (file != null && file.existsSync() && mounted) {
+        _cachedFilePaths[imagePath] = file.path;
+      }
+    });
+  }
+
   /// 自動調整尺寸的圖片訊息（用於沒有尺寸資訊的情況）
   Widget _buildImageWithAutoSize(
     ChatMessage message, {
@@ -1600,6 +1857,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
     // 使用穩定的 key，基於 message.id 和 imagePath，避免不必要的重建
     final imageKey = 'image_${message.id}_${message.imagePath}';
+    final imagePath = message.imagePath!;
 
     // 檢查是否有本地預覽資訊（用於 placeholder）
     final pendingData = _pendingImageData[message.id];
@@ -1660,8 +1918,49 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
+    // 優先使用預先載入的本地快取路徑（同步方式，避免閃爍）
+    final cachedFilePath = _cachedFilePaths[imagePath];
+    if (cachedFilePath != null) {
+      return GestureDetector(
+        key: ValueKey(imageKey),
+        onTap: () {
+          _openImageViewer(message);
+        },
+        child: Hero(
+          tag: message.id,
+          child: Container(
+            width: displayWidth,
+            height: displayHeight,
+            decoration: BoxDecoration(
+              borderRadius: effectiveBorderRadius,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: Offset(0, 2.h),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: effectiveBorderRadius,
+              child: Image.file(
+                File(cachedFilePath),
+                fit: BoxFit.cover,
+                width: displayWidth,
+                height: displayHeight,
+                errorBuilder: (context, error, stackTrace) {
+                  // 本地檔案損壞，移除快取路徑
+                  _cachedFilePaths.remove(imagePath);
+                  return buildPlaceholder(withDarkOverlay: false);
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     // 檢查緩存中是否有 URL
-    final imagePath = message.imagePath!;
     final cachedUrl = _chatImageUrlCache[imagePath];
 
     // 如果沒有緩存且不在載入中，觸發異步載入
@@ -1692,7 +1991,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    // 有緩存的 URL，直接顯示圖片
+    // 有緩存的 URL，使用 CachedNetworkImage 並在載入完成後更新快取路徑
     return GestureDetector(
       key: ValueKey(imageKey),
       onTap: () {
@@ -1739,12 +2038,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                 if (message.imageWidth == null || message.imageHeight == null) {
                   _saveImageSize(message, imageProvider);
                 }
-                // 清理本地預覽資訊
+                // 清理本地預覽資訊並更新快取路徑
                 if (_pendingImageData.containsKey(message.id)) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     _pendingImageData.remove(message.id);
                   });
                 }
+                _updateCachedFilePathForChatImage(imagePath);
                 return Image(
                   image: imageProvider,
                   fit: BoxFit.cover, // 使用 cover 填滿容器

@@ -8,12 +8,17 @@ from schemas.chat import (
     ChatImageUploadResponse,
     ChatImageUrlRequest,
     ChatImageUrlResponse,
-    ChatNotifyRequest
+    ChatNotifyRequest,
+    GroupAvatarsRequest,
+    GroupAvatarsResponse,
+    BatchChatImagesRequest,
+    BatchChatImagesResponse
 )
 from dependencies import get_supabase_service, get_current_user
 from utils.cloudflare import (
-    generate_presigned_put_url,
-    generate_presigned_get_url
+    generate_presigned_put_url_async,
+    generate_presigned_get_url_async,
+    generate_presigned_get_urls_batch
 )
 from services.notification_service import NotificationService
 
@@ -69,8 +74,8 @@ async def get_chat_image_upload_url(
         
         logger.info(f"用戶 {user_id} 準備上傳聊天圖片: {image_path}")
         
-        # 生成 Presigned PUT URL（有效期 1 小時）
-        upload_url = generate_presigned_put_url(
+        # 生成 Presigned PUT URL（有效期 1 小時，非同步）
+        upload_url = await generate_presigned_put_url_async(
             file_key=image_path,
             expiration=3600,
             content_type="image/webp"
@@ -153,8 +158,8 @@ async def get_chat_image_url(
                 detail="您無權讀取該圖片"
             )
         
-        # 生成 Presigned GET URL（有效期 1 小時）
-        get_url = generate_presigned_get_url(
+        # 生成 Presigned GET URL（有效期 1 小時，非同步）
+        get_url = await generate_presigned_get_url_async(
             file_key=request.image_path,
             expiration=3600
         )
@@ -316,4 +321,211 @@ async def send_chat_notification(
             detail="發送通知時發生錯誤"
         )
 
+
+@router.post("/group-avatars", response_model=GroupAvatarsResponse)
+async def get_group_member_avatars(
+    request: GroupAvatarsRequest,
+    supabase: Client = Depends(get_supabase_service),
+    current_user=Depends(get_current_user)
+):
+    """
+    批量獲取群組成員的頭像 Presigned GET URLs
+    
+    流程：
+    1. 驗證用戶是否在該聚餐事件中
+    2. 獲取配對組的所有成員資訊
+    3. 為每個有自訂頭像（avatars/ 開頭）的成員生成 Presigned URL
+    4. 返回 {user_id: url} 的映射，沒有自訂頭像的用戶值為 null
+    """
+    try:
+        user_id = current_user.user.id
+        
+        # 驗證用戶是否在該聚餐事件中
+        result = supabase.table('dining_events').select(
+            'id, matching_group_id'
+        ).eq('id', request.dining_event_id).execute()
+        
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="找不到該聚餐事件"
+            )
+        
+        matching_group_id = result.data[0]['matching_group_id']
+        
+        # 檢查用戶是否在該配對組中
+        member_check = supabase.table('user_matching_info').select('user_id').eq(
+            'matching_group_id', matching_group_id
+        ).eq('user_id', user_id).execute()
+        
+        if not member_check.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="您不在該聚餐事件中"
+            )
+        
+        # 獲取配對組的所有成員及其頭像路徑
+        members = supabase.table('user_matching_info').select(
+            'user_id'
+        ).eq('matching_group_id', matching_group_id).execute()
+        
+        if not members.data:
+            return GroupAvatarsResponse(avatars={}, expires_in=3600)
+        
+        member_ids = [member['user_id'] for member in members.data]
+        
+        # 獲取所有成員的頭像路徑
+        profiles = supabase.table('user_profiles').select(
+            'user_id, avatar_path'
+        ).in_('user_id', member_ids).execute()
+        
+        # 建立 user_id -> avatar_path 映射
+        avatar_paths = {
+            profile['user_id']: profile.get('avatar_path')
+            for profile in profiles.data
+        } if profiles.data else {}
+        
+        # 收集需要生成 URL 的頭像路徑
+        paths_to_generate = {}  # member_id -> avatar_path
+        for member_id in member_ids:
+            avatar_path = avatar_paths.get(member_id)
+            if avatar_path and avatar_path.startswith('avatars/'):
+                paths_to_generate[member_id] = avatar_path
+        
+        # 批量並行生成 Presigned URLs
+        avatars = {member_id: None for member_id in member_ids}
+        if paths_to_generate:
+            # 使用批量非同步函數
+            path_list = list(paths_to_generate.values())
+            url_map = await generate_presigned_get_urls_batch(
+                file_keys=path_list,
+                expiration=3600
+            )
+            # 映射回 user_id
+            for member_id, avatar_path in paths_to_generate.items():
+                avatars[member_id] = url_map.get(avatar_path)
+        
+        logger.info(f"已為用戶 {user_id} 批量生成 {len([v for v in avatars.values() if v])} 個群組成員頭像 URL")
+        
+        return GroupAvatarsResponse(
+            avatars=avatars,
+            expires_in=3600
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"批量獲取群組成員頭像 URL 時發生錯誤: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="批量獲取頭像 URL 時發生錯誤"
+        )
+
+
+@router.post("/images/batch", response_model=BatchChatImagesResponse)
+async def get_batch_chat_image_urls(
+    request: BatchChatImagesRequest,
+    supabase: Client = Depends(get_supabase_service),
+    current_user=Depends(get_current_user)
+):
+    """
+    批量獲取聊天圖片的 Presigned GET URLs
+    
+    流程：
+    1. 驗證用戶是否在該聚餐事件中
+    2. 從 chat_messages 表查詢圖片訊息（按時間排序）
+    3. 支援分頁：limit 和 offset 參數
+    4. 為每張圖片生成 Presigned URL
+    5. 返回 {image_path: url} 的映射
+    """
+    try:
+        user_id = current_user.user.id
+        
+        # 驗證用戶是否在該聚餐事件中
+        result = supabase.table('dining_events').select(
+            'id, matching_group_id'
+        ).eq('id', request.dining_event_id).execute()
+        
+        if not result.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="找不到該聚餐事件"
+            )
+        
+        matching_group_id = result.data[0]['matching_group_id']
+        
+        # 檢查用戶是否在該配對組中
+        member_check = supabase.table('user_matching_info').select('user_id').eq(
+            'matching_group_id', matching_group_id
+        ).eq('user_id', user_id).execute()
+        
+        if not member_check.data:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="您不在該聚餐事件中"
+            )
+        
+        # 查詢該聚餐事件的圖片訊息總數
+        count_result = supabase.table('chat_messages').select(
+            'id', count='exact'
+        ).eq('dining_event_id', request.dining_event_id).eq(
+            'message_type', 'image'
+        ).not_.is_('image_path', 'null').execute()
+        
+        total = count_result.count if count_result.count else 0
+        
+        # 查詢圖片訊息（帶分頁，按創建時間排序）
+        messages_result = supabase.table('chat_messages').select(
+            'image_path'
+        ).eq('dining_event_id', request.dining_event_id).eq(
+            'message_type', 'image'
+        ).not_.is_('image_path', 'null').order(
+            'created_at', desc=False
+        ).range(request.offset, request.offset + request.limit - 1).execute()
+        
+        if not messages_result.data:
+            return BatchChatImagesResponse(
+                images={},
+                total=total,
+                has_more=False,
+                expires_in=3600
+            )
+        
+        # 收集所有圖片路徑
+        image_paths = [
+            msg.get('image_path') 
+            for msg in messages_result.data 
+            if msg.get('image_path')
+        ]
+        
+        # 批量並行生成 Presigned URLs
+        images = await generate_presigned_get_urls_batch(
+            file_keys=image_paths,
+            expiration=3600
+        )
+        # 過濾掉生成失敗的
+        images = {k: v for k, v in images.items() if v}
+        
+        has_more = (request.offset + len(messages_result.data)) < total
+        
+        logger.info(
+            f"已為用戶 {user_id} 批量生成 {len(images)} 張聊天圖片 URL "
+            f"(offset={request.offset}, limit={request.limit}, total={total})"
+        )
+        
+        return BatchChatImagesResponse(
+            images=images,
+            total=total,
+            has_more=has_more,
+            expires_in=3600
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"批量獲取聊天圖片 URL 時發生錯誤: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="批量獲取圖片 URL 時發生錯誤"
+        )
 

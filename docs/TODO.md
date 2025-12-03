@@ -177,7 +177,8 @@
 - [ ] 等待出席頁面的real time會影響訊息的real time應該要先取消訂閱，在設定的頁面也是一樣
 - [ ] 訊息進來就會跳通知然後頁面就會重整
 - [ ] 如果已經在聊天室就不顯示通知
-- [ ] 優化presigned url的請求 新增可以一次請求大量的API
+- [x] 優化presigned url的請求 新增可以一次請求大量的API
+- [ ] 優化Cloudflare重複創建實例的問題優化cloudfire建立presigned url的同步問題改成非同步
  
 ```
 RealtimeService: 添加聚餐事件監聽器 - ID: dinner_info_page
