@@ -51,6 +51,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   bool _hasBatchLoadedAvatars = false;
   bool _hasBatchLoadedImages = false;
 
+  // 防止重複請求圖片 URL 的標記和防抖計時器
+  bool _isRefreshingImageUrls = false;
+  Timer? _refreshImageUrlsDebounceTimer;
+
+  // 記錄已知的所有圖片路徑（用於判斷是否為新圖片）
+  final Set<String> _knownImagePaths = {};
+
   @override
   void initState() {
     super.initState();
@@ -199,6 +206,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             setState(() {
               for (final entry in images.entries) {
                 _chatImageUrlCache[entry.key] = entry.value;
+                // 記錄到已知圖片路徑
+                _knownImagePaths.add(entry.key);
               }
               _hasBatchLoadedImages = true;
             });
@@ -206,6 +215,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         } else {
           if (mounted) {
             setState(() {
+              // 從本地緩存載入的圖片路徑也要記錄
+              for (final key in _chatImageUrlCache.keys) {
+                _knownImagePaths.add(key);
+              }
               _hasBatchLoadedImages = true;
             });
           }
@@ -227,6 +240,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 清除當前聊天室註冊（恢復通知顯示）
     // 使用 unawaited 因為 dispose 不能是 async
     _unregisterChatRoom();
+
+    // 取消防抖計時器
+    _refreshImageUrlsDebounceTimer?.cancel();
 
     _chatService.unsubscribeFromMessages(widget.diningEventId);
     _messageController.dispose();
@@ -318,20 +334,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         await _preloadCachedFilePaths(sortedMessages);
 
         // 圖片 URL 已由 _batchLoadResources 批量獲取
-        // 檢查是否有新圖片需要重新批量獲取
-        bool hasNewImages = false;
+        // 檢查是否有「真正的新圖片」需要獲取 URL
+        // 只有當 imagePath 不在 _knownImagePaths 中時才算新圖片
+        final newImagePaths = <String>[];
         for (final message in sortedMessages) {
-          if (message.isImage &&
-              message.imagePath != null &&
-              !_chatImageUrlCache.containsKey(message.imagePath)) {
-            hasNewImages = true;
-            break;
+          if (message.isImage && message.imagePath != null) {
+            final imagePath = message.imagePath!;
+            // 記錄所有已知的圖片路徑
+            if (!_knownImagePaths.contains(imagePath)) {
+              _knownImagePaths.add(imagePath);
+              // 只有當緩存中也沒有 URL 時才需要請求
+              if (!_chatImageUrlCache.containsKey(imagePath)) {
+                newImagePaths.add(imagePath);
+              }
+            }
           }
         }
 
-        // 如果有新圖片且已完成初始批量加載，重新批量獲取
-        if (hasNewImages && _hasBatchLoadedImages) {
-          _refreshBatchImageUrls();
+        // 如果有新圖片且已完成初始批量加載，使用防抖方式批量獲取
+        if (newImagePaths.isNotEmpty && _hasBatchLoadedImages) {
+          _debouncedRefreshImageUrls(newImagePaths);
         }
 
         // 檢查是否需要更新 UI（比較圖片相關字段）
@@ -1294,9 +1316,39 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 防抖方式刷新圖片 URL（避免短時間內多次請求）
+  void _debouncedRefreshImageUrls(List<String> newImagePaths) {
+    // 取消之前的計時器
+    _refreshImageUrlsDebounceTimer?.cancel();
+
+    // 如果正在請求中，跳過（避免重複請求）
+    if (_isRefreshingImageUrls) {
+      debugPrint('圖片 URL 請求已在進行中，跳過');
+      return;
+    }
+
+    // 設置 500ms 防抖
+    _refreshImageUrlsDebounceTimer = Timer(
+      const Duration(milliseconds: 500),
+      () => _refreshBatchImageUrls(newImagePaths),
+    );
+  }
+
   /// 重新批量獲取聊天圖片 URL（用於有新圖片時）
-  Future<void> _refreshBatchImageUrls() async {
+  /// [newImagePaths] 如果提供，只請求這些新圖片；否則請求所有圖片
+  Future<void> _refreshBatchImageUrls([List<String>? newImagePaths]) async {
+    // 標記正在請求中
+    if (_isRefreshingImageUrls) {
+      debugPrint('圖片 URL 請求已在進行中，跳過重複請求');
+      return;
+    }
+    _isRefreshingImageUrls = true;
+
     try {
+      // 如果只有少數新圖片（<= 3 張），可以考慮單獨請求
+      // 但目前 API 只支持批量請求，所以還是用批量方式
+      // 未來可以添加單圖片 URL API 來優化
+
       final result = await _chatService.getBatchChatImageUrls(
         widget.diningEventId,
       );
@@ -1305,11 +1357,16 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         setState(() {
           for (final entry in images.entries) {
             _chatImageUrlCache[entry.key] = entry.value;
+            // 同時記錄到已知圖片路徑
+            _knownImagePaths.add(entry.key);
           }
         });
       }
+      debugPrint('批量獲取聊天圖片 URL 完成: ${images.length} 張');
     } catch (e) {
       debugPrint('重新批量獲取聊天圖片失敗: $e');
+    } finally {
+      _isRefreshingImageUrls = false;
     }
   }
 
@@ -1325,8 +1382,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       return;
     }
 
-    // 如果批量加載已完成但仍無此圖片，重新批量獲取
-    _refreshBatchImageUrls();
+    // 如果正在請求中，跳過
+    if (_isRefreshingImageUrls) {
+      return;
+    }
+
+    // 如果批量加載已完成但仍無此圖片，使用防抖方式重新批量獲取
+    _debouncedRefreshImageUrls([imagePath]);
   }
 
   /// 異步載入頭像 URL 並緩存（使用批量 API 結果）
