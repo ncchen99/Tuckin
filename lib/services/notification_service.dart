@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:tuckin/services/supabase_service.dart';
+import 'package:tuckin/services/chat_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:tuckin/services/time_service.dart';
@@ -481,7 +482,10 @@ class NotificationService {
     if (notificationType == 'chat_message' && diningEventId != null) {
       if (_activeChatRoomId == diningEventId) {
         debugPrint('用戶正在聊天室 $diningEventId，跳過通知顯示和導航');
-        // 不顯示通知，Realtime 會自動更新聊天內容
+        // 不顯示通知，但仍觸發訊息同步
+        // 這是 Realtime 的備援機制，確保即使 Realtime 失效也能透過 FCM 更新訊息
+        debugPrint('透過 FCM 觸發訊息同步（Realtime 備援）');
+        ChatService().syncMessages(diningEventId);
         return;
       }
 

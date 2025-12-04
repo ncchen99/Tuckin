@@ -5,6 +5,7 @@ import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/user_service.dart';
 import 'package:tuckin/services/image_cache_service.dart';
 import 'package:tuckin/services/notification_service.dart';
+import 'package:tuckin/services/time_service.dart';
 import 'package:tuckin/models/chat_message.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -337,7 +338,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 檢查是否有「真正的新圖片」需要獲取 URL
         // 只有當 imagePath 不在 _knownImagePaths 中時才算新圖片
         final newImagePaths = <String>[];
-        final nowUtc = DateTime.now().toUtc(); // 使用 UTC 時間進行比較
+        // 使用 TimeService 校正後的 UTC 時間進行比較，確保與樂觀訊息時間一致
+        final nowUtc = TimeService().now().toUtc();
 
         // 確保有當前用戶 ID（如果還沒載入，嘗試獲取）
         String? currentUserId = _currentUserId;
@@ -406,13 +408,15 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
             for (final pendingMessage in pendingMessages) {
               for (final remoteMessage in reversedMessages) {
                 // 如果是同一個用戶，且時間差在 30 秒內，且類型相同
+                // 使用 UTC 時間比較，避免時區不一致導致的匹配失敗
+                final remoteTimeUtc = remoteMessage.createdAt.toUtc();
+                final pendingTimeUtc = pendingMessage.createdAt.toUtc();
+                final timeDiffSeconds =
+                    remoteTimeUtc.difference(pendingTimeUtc).abs().inSeconds;
+
                 if (remoteMessage.userId == pendingMessage.userId &&
                     remoteMessage.messageType == pendingMessage.messageType &&
-                    remoteMessage.createdAt
-                            .difference(pendingMessage.createdAt)
-                            .abs()
-                            .inSeconds <
-                        30) {
+                    timeDiffSeconds < 30) {
                   // 如果是文字訊息，比較內容
                   if (remoteMessage.messageType == 'text' &&
                       remoteMessage.content == pendingMessage.content) {
@@ -695,6 +699,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _messageController.clear();
 
     // 樂觀UI更新：立即顯示訊息（傳送中狀態）
+    // 使用 TimeService 校正後的 UTC 時間，確保與伺服器時間一致
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final optimisticMessage = ChatMessage(
       id: tempId,
@@ -702,7 +707,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       userId: _currentUserId!,
       content: content,
       messageType: 'text',
-      createdAt: DateTime.now(),
+      createdAt: TimeService().now().toUtc(),
       sendStatus: 'pending',
     );
 
@@ -768,6 +773,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     final imageHeight = imageData['height'] as int;
 
     // 2. 樂觀UI更新：立即顯示本地圖片預覽（傳送中狀態）
+    // 使用 TimeService 校正後的 UTC 時間，確保與伺服器時間一致
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
 
     // 儲存本地圖片資訊以便顯示預覽
@@ -783,7 +789,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       diningEventId: widget.diningEventId,
       userId: _currentUserId!,
       messageType: 'image',
-      createdAt: DateTime.now(),
+      createdAt: TimeService().now().toUtc(),
       sendStatus: 'pending',
       imageWidth: imageWidth,
       imageHeight: imageHeight,
