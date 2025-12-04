@@ -178,6 +178,36 @@ class ImageCacheService {
     }
   }
 
+  /// 直接將 bytes 數據寫入緩存
+  ///
+  /// [bytes] 圖片的二進制數據
+  /// [key] 緩存的 key（例如 imagePath）
+  /// [type] 緩存類型
+  /// [fileExtension] 文件擴展名（默認 webp）
+  ///
+  /// 返回緩存的文件，如果失敗返回 null
+  Future<File?> putBytes(
+    List<int> bytes,
+    String key,
+    CacheType type, {
+    String fileExtension = 'webp',
+  }) async {
+    try {
+      final cacheManager = getCacheManager(type);
+      final file = await cacheManager.putFile(
+        key, // 使用 key 作為 URL（實際上不會請求這個 URL）
+        bytes as dynamic,
+        key: key,
+        fileExtension: fileExtension,
+      );
+      debugPrint('已將圖片直接寫入緩存 (key: $key)');
+      return file;
+    } catch (e) {
+      debugPrint('寫入緩存失敗: $e');
+      return null;
+    }
+  }
+
   // 注意：flutter_cache_manager 會自動管理緩存大小和過期時間
   // 根據配置，頭像和餐廳圖片都會在 7 天後自動刪除
   // 當文件數量超過上限時，會使用 LRU 策略自動清理最舊的文件

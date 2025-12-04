@@ -397,8 +397,13 @@ class ChatService {
   }
 
   /// 上傳並發送已選擇的圖片訊息
-  /// 返回 true 表示成功，false 表示失敗
-  Future<bool> uploadAndSendImage(
+  ///
+  /// 返回 Map 包含:
+  /// - 'success': bool 是否成功
+  /// - 'imagePath': String? 圖片路徑（成功時有值）
+  /// - 'messageId': String? 訊息 ID（成功時有值）
+  /// - 'imageUrl': String? 圖片讀取 URL（成功時有值，可用於樂觀更新）
+  Future<Map<String, dynamic>> uploadAndSendImage(
     String diningEventId,
     Uint8List imageBytes,
     int imageWidth,
@@ -408,7 +413,7 @@ class ChatService {
       final currentUser = await _authService.getCurrentUser();
       if (currentUser == null) {
         debugPrint('用戶未登入');
-        return false;
+        return {'success': false};
       }
 
       // 生成訊息 ID
@@ -418,7 +423,7 @@ class ChatService {
       final uploadData = await _getImageUploadUrl(diningEventId, messageId);
       if (uploadData == null) {
         debugPrint('獲取上傳 URL 失敗');
-        return false;
+        return {'success': false};
       }
 
       final uploadUrl = uploadData['upload_url'] as String;
@@ -428,7 +433,7 @@ class ChatService {
       final uploadSuccess = await _uploadImageToR2(uploadUrl, imageBytes);
       if (!uploadSuccess) {
         debugPrint('上傳圖片失敗');
-        return false;
+        return {'success': false};
       }
 
       // 插入訊息到 Supabase
@@ -442,14 +447,18 @@ class ChatService {
         'image_height': imageHeight,
       });
 
+      // 注意：不需要調用 getImageUrl 獲取讀取 URL
+      // 因為發送者本地已經有 imageBytes，會直接寫入本地緩存
+      // 這樣可以避免一次不必要的 API 請求
+
       // 發送通知
       await _sendChatNotification(diningEventId, '[圖片]', 'image');
 
       debugPrint('圖片訊息已發送');
-      return true;
+      return {'success': true, 'imagePath': imagePath, 'messageId': messageId};
     } catch (e) {
       debugPrint('發送圖片訊息失敗: $e');
-      return false;
+      return {'success': false};
     }
   }
 
@@ -458,12 +467,13 @@ class ChatService {
     final imageData = await pickImageFromCamera();
     if (imageData == null) return false;
 
-    return await uploadAndSendImage(
+    final result = await uploadAndSendImage(
       diningEventId,
       imageData['imageBytes'] as Uint8List,
       imageData['width'] as int,
       imageData['height'] as int,
     );
+    return result['success'] as bool;
   }
 
   /// 獲取圖片上傳 URL
@@ -588,11 +598,13 @@ class ChatService {
   }
 
   /// 批量獲取群組成員頭像 URL
-  /// 
+  ///
   /// [diningEventId] 聚餐事件 ID
-  /// 
+  ///
   /// 返回 Map<userId, url>，沒有自訂頭像的用戶值為 null
-  Future<Map<String, String?>> getGroupMemberAvatars(String diningEventId) async {
+  Future<Map<String, String?>> getGroupMemberAvatars(
+    String diningEventId,
+  ) async {
     try {
       final session = Supabase.instance.client.auth.currentSession;
       final token = session?.accessToken;
@@ -615,15 +627,15 @@ class ChatService {
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         final avatarsRaw = data['avatars'] as Map<String, dynamic>? ?? {};
-        
+
         // 轉換為 Map<String, String?>
         final avatars = <String, String?>{};
         for (final entry in avatarsRaw.entries) {
           avatars[entry.key] = entry.value as String?;
         }
-        
+
         debugPrint('批量獲取群組成員頭像成功: ${avatars.length} 個用戶');
-        
+
         // 緩存頭像 URL
         final prefs = await SharedPreferences.getInstance();
         final now = DateTime.now().millisecondsSinceEpoch;
@@ -634,7 +646,7 @@ class ChatService {
             await prefs.setInt('${cacheKey}_time', now);
           }
         }
-        
+
         return avatars;
       } else {
         debugPrint('批量獲取群組成員頭像失敗: ${response.body}');
@@ -647,11 +659,11 @@ class ChatService {
   }
 
   /// 批量獲取聊天圖片 URL
-  /// 
+  ///
   /// [diningEventId] 聚餐事件 ID
   /// [limit] 每次請求的圖片數量上限（預設 200，最大 200）
   /// [offset] 從第幾張圖片開始（預設 0）
-  /// 
+  ///
   /// 返回 Map，包含:
   /// - 'images': Map<imagePath, url>
   /// - 'total': 總圖片數量
@@ -689,7 +701,7 @@ class ChatService {
         final imagesRaw = data['images'] as Map<String, dynamic>? ?? {};
         final total = data['total'] as int? ?? 0;
         final hasMore = data['has_more'] as bool? ?? false;
-        
+
         // 轉換為 Map<String, String>
         final images = <String, String>{};
         for (final entry in imagesRaw.entries) {
@@ -697,9 +709,11 @@ class ChatService {
             images[entry.key] = entry.value as String;
           }
         }
-        
-        debugPrint('批量獲取聊天圖片成功: ${images.length} 張 (total: $total, hasMore: $hasMore)');
-        
+
+        debugPrint(
+          '批量獲取聊天圖片成功: ${images.length} 張 (total: $total, hasMore: $hasMore)',
+        );
+
         // 緩存圖片 URL
         final prefs = await SharedPreferences.getInstance();
         final now = DateTime.now().millisecondsSinceEpoch;
@@ -708,12 +722,8 @@ class ChatService {
           await prefs.setString(cacheKey, entry.value);
           await prefs.setInt('${cacheKey}_time', now);
         }
-        
-        return {
-          'images': images,
-          'total': total,
-          'hasMore': hasMore,
-        };
+
+        return {'images': images, 'total': total, 'hasMore': hasMore};
       } else {
         debugPrint('批量獲取聊天圖片失敗: ${response.body}');
         return {'images': <String, String>{}, 'total': 0, 'hasMore': false};

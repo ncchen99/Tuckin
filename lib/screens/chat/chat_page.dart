@@ -337,9 +337,35 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         // 檢查是否有「真正的新圖片」需要獲取 URL
         // 只有當 imagePath 不在 _knownImagePaths 中時才算新圖片
         final newImagePaths = <String>[];
+        final nowUtc = DateTime.now().toUtc(); // 使用 UTC 時間進行比較
+
+        // 確保有當前用戶 ID（如果還沒載入，嘗試獲取）
+        String? currentUserId = _currentUserId;
+        if (currentUserId == null) {
+          final user = await _authService.getCurrentUser();
+          currentUserId = user?.id;
+          if (currentUserId != null && mounted) {
+            _currentUserId = currentUserId;
+          }
+        }
+
         for (final message in sortedMessages) {
           if (message.isImage && message.imagePath != null) {
             final imagePath = message.imagePath!;
+
+            // 跳過自己最近發送的圖片（30 秒內）
+            // 這些圖片會通過樂觀更新處理，不需要額外請求
+            // 使用 UTC 時間比較，避免時區問題
+            final messageTimeUtc = message.createdAt.toUtc();
+            if (currentUserId != null &&
+                message.userId == currentUserId &&
+                nowUtc.difference(messageTimeUtc).abs().inSeconds < 30) {
+              // 仍然記錄為已知路徑，但不發起請求
+              _knownImagePaths.add(imagePath);
+              debugPrint('跳過自己發送的圖片請求（樂觀更新處理）: $imagePath');
+              continue;
+            }
+
             // 記錄所有已知的圖片路徑
             if (!_knownImagePaths.contains(imagePath)) {
               _knownImagePaths.add(imagePath);
@@ -770,12 +796,14 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _scrollToBottom();
 
     // 3. 異步上傳圖片（不阻塞 UI，可以繼續發送其他訊息）
-    final success = await _chatService.uploadAndSendImage(
+    final result = await _chatService.uploadAndSendImage(
       widget.diningEventId,
       imageBytes,
       imageWidth,
       imageHeight,
     );
+
+    final success = result['success'] as bool;
 
     if (mounted) {
       if (!success) {
@@ -786,6 +814,37 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         _pendingImageData.remove(tempId);
 
         _showErrorSnackBar('發送圖片失敗');
+      } else {
+        // 上傳成功，直接將圖片緩存到本地（不需要再從網路下載）
+        final imagePath = result['imagePath'] as String?;
+
+        if (imagePath != null) {
+          // 將 imageBytes 直接寫入本地緩存
+          // 這樣就不需要請求讀取 URL 了，因為本地已有圖片數據
+          final cachedFile = await ImageCacheService().putBytes(
+            imageBytes,
+            imagePath,
+            CacheType.chat,
+          );
+
+          if (mounted) {
+            setState(() {
+              // 更新本地檔案緩存路徑（避免再次從網路下載）
+              if (cachedFile != null) {
+                _cachedFilePaths[imagePath] = cachedFile.path;
+              }
+
+              // 使用 'local_cached' 作為佔位符標記
+              // 表示這張圖片已在本地緩存，不需要請求 URL
+              // 顯示時會優先使用 _cachedFilePaths
+              _chatImageUrlCache[imagePath] = 'local_cached';
+
+              // 記錄到已知圖片路徑（避免觸發批量請求）
+              _knownImagePaths.add(imagePath);
+            });
+            debugPrint('已將自己發送的圖片直接緩存到本地: $imagePath');
+          }
+        }
       }
       // 成功後不要立即移除 _pendingImageData
       // 讓圖片顯示元件在網路圖片載入完成後再清理
@@ -1330,13 +1389,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 設置 500ms 防抖
     _refreshImageUrlsDebounceTimer = Timer(
       const Duration(milliseconds: 500),
-      () => _refreshBatchImageUrls(newImagePaths),
+      () => _fetchImageUrls(newImagePaths),
     );
   }
 
-  /// 重新批量獲取聊天圖片 URL（用於有新圖片時）
-  /// [newImagePaths] 如果提供，只請求這些新圖片；否則請求所有圖片
-  Future<void> _refreshBatchImageUrls([List<String>? newImagePaths]) async {
+  /// 獲取圖片 URL（智能選擇單張或批量請求）
+  Future<void> _fetchImageUrls(List<String> imagePaths) async {
     // 標記正在請求中
     if (_isRefreshingImageUrls) {
       debugPrint('圖片 URL 請求已在進行中，跳過重複請求');
@@ -1345,10 +1403,45 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _isRefreshingImageUrls = true;
 
     try {
-      // 如果只有少數新圖片（<= 3 張），可以考慮單獨請求
-      // 但目前 API 只支持批量請求，所以還是用批量方式
-      // 未來可以添加單圖片 URL API 來優化
+      // 再次過濾：移除已有緩存的圖片路徑（防抖期間可能已被樂觀更新）
+      final pathsToFetch =
+          imagePaths
+              .where((path) => !_chatImageUrlCache.containsKey(path))
+              .toList();
 
+      // 如果所有圖片都已有緩存，跳過請求
+      if (pathsToFetch.isEmpty) {
+        debugPrint('所有圖片已有緩存，跳過請求');
+        return;
+      }
+
+      // 如果只有 1-2 張新圖片，使用單張請求（減少後端負載）
+      if (pathsToFetch.length <= 2) {
+        debugPrint('使用單張請求獲取 ${pathsToFetch.length} 張圖片 URL');
+        for (final imagePath in pathsToFetch) {
+          final url = await _chatService.getImageUrl(imagePath);
+          if (url != null && mounted) {
+            setState(() {
+              _chatImageUrlCache[imagePath] = url;
+              _knownImagePaths.add(imagePath);
+            });
+            debugPrint('單張獲取圖片 URL 成功: $imagePath');
+          }
+        }
+      } else {
+        // 超過 2 張時使用批量請求
+        await _refreshBatchImageUrls();
+      }
+    } catch (e) {
+      debugPrint('獲取圖片 URL 失敗: $e');
+    } finally {
+      _isRefreshingImageUrls = false;
+    }
+  }
+
+  /// 重新批量獲取聊天圖片 URL（用於有多張新圖片時）
+  Future<void> _refreshBatchImageUrls() async {
+    try {
       final result = await _chatService.getBatchChatImageUrls(
         widget.diningEventId,
       );
@@ -1365,8 +1458,6 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       debugPrint('批量獲取聊天圖片 URL 完成: ${images.length} 張');
     } catch (e) {
       debugPrint('重新批量獲取聊天圖片失敗: $e');
-    } finally {
-      _isRefreshingImageUrls = false;
     }
   }
 
