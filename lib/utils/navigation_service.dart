@@ -410,4 +410,14 @@ class NavigationService {
   void navigateToLowAttendance(BuildContext context) {
     Navigator.of(context).pushReplacementNamed('/low_attendance');
   }
+
+  /// 導航到聊天室頁面
+  ///
+  /// [diningEventId] 聚餐事件 ID
+  void navigateToChatRoom(BuildContext context, String diningEventId) {
+    debugPrint('NavigationService: 導航到聊天室 $diningEventId');
+    Navigator.of(
+      context,
+    ).pushNamed('/chat', arguments: {'diningEventId': diningEventId});
+  }
 }

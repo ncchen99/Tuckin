@@ -23,6 +23,53 @@ class NotificationService {
   // 註冊全局導航上下文
   GlobalKey<NavigatorState>? _navigatorKey;
 
+  // 追蹤當前正在查看的聊天室 ID（用於抑制該聊天室的通知）
+  String? _activeChatRoomId;
+
+  // 儲存待處理的聊天通知導航（用於 APP 冷啟動時）
+  String? _pendingChatNavigation;
+
+  /// 設置當前正在查看的聊天室 ID
+  /// 同時在 iOS 上動態調整前台通知設置，防止在聊天室內收到通知
+  Future<void> setActiveChatRoom(String? diningEventId) async {
+    _activeChatRoomId = diningEventId;
+    debugPrint('NotificationService: 當前聊天室設置為 $diningEventId');
+
+    // 在 iOS 上動態調整前台通知顯示設置
+    // 當用戶在聊天室時，關閉自動顯示；離開時恢復
+    try {
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      if (androidPlugin == null) {
+        // iOS 平台：根據是否在聊天室調整通知顯示
+        final bool shouldShowNotifications = diningEventId == null;
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: shouldShowNotifications,
+              badge: shouldShowNotifications,
+              sound: shouldShowNotifications,
+            );
+        debugPrint('iOS 平台：前台通知顯示已${shouldShowNotifications ? '開啟' : '關閉'}');
+      }
+    } catch (e) {
+      debugPrint('調整 iOS 前台通知設置失敗: $e');
+    }
+  }
+
+  /// 獲取當前正在查看的聊天室 ID
+  String? get activeChatRoomId => _activeChatRoomId;
+
+  /// 獲取並清除待處理的聊天導航
+  String? consumePendingChatNavigation() {
+    final pending = _pendingChatNavigation;
+    _pendingChatNavigation = null;
+    return pending;
+  }
+
   // 定義通知頻道
   static const AndroidNotificationChannel _reservationChannel =
       AndroidNotificationChannel(
@@ -254,11 +301,22 @@ class NotificationService {
     }
   }
 
-  // 處理點擊通知
+  // 處理點擊通知（Firebase 通知，用於後台/關閉時收到的通知）
   void _handleNotificationClick(RemoteMessage message) {
-    debugPrint('點擊了通知: ${message.data}');
+    debugPrint('點擊了 Firebase 通知: ${message.data}');
 
-    // 點擊通知後，根據使用者狀態進行導航
+    // 檢查是否為聊天通知
+    final notificationType = message.data['type'] as String?;
+    final diningEventId = message.data['dining_event_id'] as String?;
+
+    if (notificationType == 'chat_message' && diningEventId != null) {
+      // 聊天通知：導航到對應的聊天室
+      debugPrint('點擊聊天通知，導航到聊天室: $diningEventId');
+      _navigateToChatRoom(diningEventId);
+      return;
+    }
+
+    // 非聊天通知：根據使用者狀態進行導航
     _handleNotificationNavigation();
   }
 
@@ -293,6 +351,64 @@ class NotificationService {
     }
   }
 
+  // 導航到聊天室頁面
+  Future<void> _navigateToChatRoom(String diningEventId) async {
+    try {
+      // 檢查是否有有效的導航鍵和上下文
+      if (_navigatorKey?.currentState == null ||
+          _navigatorKey!.currentContext == null) {
+        debugPrint('NotificationService: 無有效的導航上下文，儲存待處理導航');
+        // 儲存待處理的導航，等 APP 初始化完成後處理
+        _pendingChatNavigation = diningEventId;
+        return;
+      }
+
+      final context = _navigatorKey!.currentContext!;
+
+      // 檢查上下文是否仍然掛載
+      if (!context.mounted) {
+        debugPrint('NotificationService: 上下文已不再掛載，儲存待處理導航');
+        _pendingChatNavigation = diningEventId;
+        return;
+      }
+
+      debugPrint('NotificationService: 導航到聊天室 $diningEventId');
+
+      // 使用 NavigationService 導航到聊天室
+      _navigationService.navigateToChatRoom(context, diningEventId);
+
+      debugPrint('NotificationService: 聊天室導航完成');
+    } catch (e) {
+      debugPrint('NotificationService: 導航到聊天室時發生錯誤: $e');
+      // 儲存待處理的導航
+      _pendingChatNavigation = diningEventId;
+    }
+  }
+
+  /// 處理 APP 啟動時的初始通知（冷啟動時點擊通知打開 APP）
+  Future<void> checkInitialMessage() async {
+    try {
+      // 獲取 APP 從終止狀態啟動時點擊的通知
+      final RemoteMessage? initialMessage =
+          await FirebaseMessaging.instance.getInitialMessage();
+
+      if (initialMessage != null) {
+        debugPrint('APP 冷啟動時的通知: ${initialMessage.data}');
+
+        // 檢查是否為聊天通知
+        final notificationType = initialMessage.data['type'] as String?;
+        final diningEventId = initialMessage.data['dining_event_id'] as String?;
+
+        if (notificationType == 'chat_message' && diningEventId != null) {
+          debugPrint('冷啟動聊天通知，儲存待處理導航: $diningEventId');
+          _pendingChatNavigation = diningEventId;
+        }
+      }
+    } catch (e) {
+      debugPrint('檢查初始通知時發生錯誤: $e');
+    }
+  }
+
   // iOS 舊版本本地通知處理（iOS 10 以下）
   static Future<void> _onDidReceiveLocalNotification(
     int id,
@@ -304,21 +420,79 @@ class NotificationService {
     // 可以在這裡處理舊版本 iOS 的通知邏輯
   }
 
-  // 通知響應處理（點擊通知時觸發）
+  // 通知響應處理（點擊本地通知時觸發）
   static void _onDidReceiveNotificationResponse(NotificationResponse response) {
     final String? payload = response.payload;
-    debugPrint('點擊了通知，payload: $payload');
+    debugPrint('點擊了本地通知，payload: $payload');
 
     if (payload != null) {
-      // 透過單例實例處理導航
+      // 嘗試解析 payload 來判斷通知類型
+      // payload 格式類似: {type: chat_message, dining_event_id: xxx}
+      if (payload.contains('type: chat_message') ||
+          payload.contains("'type': 'chat_message'")) {
+        // 嘗試從 payload 中提取 dining_event_id
+        final diningEventId = _extractDiningEventId(payload);
+        if (diningEventId != null) {
+          debugPrint('點擊聊天本地通知，導航到聊天室: $diningEventId');
+          NotificationService()._navigateToChatRoom(diningEventId);
+          return;
+        }
+      }
+
+      // 非聊天通知：透過單例實例處理導航
       NotificationService()._handleNotificationNavigation();
+    }
+  }
+
+  // 從 payload 字串中提取 dining_event_id
+  static String? _extractDiningEventId(String payload) {
+    try {
+      // 嘗試匹配 dining_event_id: xxx 或 'dining_event_id': 'xxx'
+      final patterns = [
+        RegExp(r"dining_event_id:\s*([a-zA-Z0-9\-]+)"),
+        RegExp(r"'dining_event_id':\s*'([a-zA-Z0-9\-]+)'"),
+        RegExp(r'"dining_event_id":\s*"([a-zA-Z0-9\-]+)"'),
+      ];
+
+      for (final pattern in patterns) {
+        final match = pattern.firstMatch(payload);
+        if (match != null && match.groupCount >= 1) {
+          return match.group(1);
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('解析 dining_event_id 失敗: $e');
+      return null;
     }
   }
 
   // 處理前台消息
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('收到前台消息: ${message.notification?.title}');
+    debugPrint('消息數據: ${message.data}');
 
+    // 檢查是否為聊天訊息通知
+    final notificationType = message.data['type'] as String?;
+    final diningEventId = message.data['dining_event_id'] as String?;
+
+    // 如果是聊天通知，且用戶當前正在該聊天室中，則不顯示通知也不導航
+    if (notificationType == 'chat_message' && diningEventId != null) {
+      if (_activeChatRoomId == diningEventId) {
+        debugPrint('用戶正在聊天室 $diningEventId，跳過通知顯示和導航');
+        // 不顯示通知，Realtime 會自動更新聊天內容
+        return;
+      }
+
+      // 用戶不在該聊天室，顯示通知但不自動導航到其他頁面
+      debugPrint('收到聊天通知，用戶不在該聊天室，顯示通知');
+      await _showChatNotification(message, diningEventId);
+      // 不要調用 _handleNotificationNavigation()，避免頁面跳轉
+      return;
+    }
+
+    // 非聊天通知的處理邏輯（保持原有行為）
     // 在 iOS 上，Firebase 已經會自動顯示通知，所以我們不需要再手動顯示
     // 在 Android 上，我們需要手動顯示通知
     if (message.notification != null) {
@@ -368,8 +542,58 @@ class NotificationService {
       }
     }
 
-    // 收到前台通知後，根據使用者狀態進行導航
+    // 收到非聊天通知後，根據使用者狀態進行導航
     await _handleNotificationNavigation();
+  }
+
+  // 顯示聊天通知（不觸發頁面導航）
+  Future<void> _showChatNotification(
+    RemoteMessage message,
+    String diningEventId,
+  ) async {
+    if (message.notification == null) return;
+
+    try {
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
+      // 準備 payload，包含聊天室 ID 以便點擊時導航
+      final Map<String, dynamic> payload = {
+        'type': 'chat_message',
+        'dining_event_id': diningEventId,
+      };
+
+      if (androidPlugin != null) {
+        // Android 平台：手動顯示通知
+        debugPrint('Android 平台：手動顯示聊天通知');
+
+        await _localNotifications.show(
+          message.hashCode,
+          message.notification!.title,
+          message.notification!.body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'chat_notification_channel',
+              '聊天訊息',
+              channelDescription: '用於接收群組聊天訊息通知',
+              importance: Importance.high,
+              priority: Priority.high,
+              icon: '@drawable/notification_icon',
+              color: const Color(0xFFB33D1C),
+            ),
+          ),
+          payload: payload.toString(),
+        );
+      } else {
+        // iOS 平台：Firebase 已經自動顯示通知
+        debugPrint('iOS 平台：Firebase 自動顯示聊天通知');
+      }
+    } catch (e) {
+      debugPrint('顯示聊天通知時發生錯誤: $e');
+    }
   }
 
   // 清除所有通知

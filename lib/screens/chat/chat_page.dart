@@ -4,6 +4,7 @@ import 'package:tuckin/services/chat_service.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/user_service.dart';
 import 'package:tuckin/services/image_cache_service.dart';
+import 'package:tuckin/services/notification_service.dart';
 import 'package:tuckin/models/chat_message.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -57,6 +58,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     _initializeCache(); // 先檢查本地快取，再決定是否請求 API
     _subscribeToMessages();
 
+    // 註冊當前聊天室到 NotificationService（用於抑制該聊天室的通知）
+    _registerChatRoom();
+
     // 註冊生命週期監聽
     WidgetsBinding.instance.addObserver(this);
 
@@ -69,6 +73,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         });
       }
     });
+  }
+
+  /// 註冊當前聊天室到 NotificationService
+  Future<void> _registerChatRoom() async {
+    await NotificationService().setActiveChatRoom(widget.diningEventId);
   }
 
   /// 初始化快取：先檢查本地快取，再決定是否請求 API
@@ -215,12 +224,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    // 清除當前聊天室註冊（恢復通知顯示）
+    // 使用 unawaited 因為 dispose 不能是 async
+    _unregisterChatRoom();
+
     _chatService.unsubscribeFromMessages(widget.diningEventId);
     _messageController.dispose();
     _scrollController.dispose();
     _messageFocusNode.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// 取消註冊當前聊天室
+  void _unregisterChatRoom() {
+    // 異步執行，但不等待完成
+    NotificationService().setActiveChatRoom(null);
   }
 
   @override

@@ -46,6 +46,8 @@ import 'screens/profile/profile_page.dart';
 // 導入新增狀態頁面
 import 'screens/status/confirmation_timeout_page.dart';
 import 'screens/status/low_attendance_page.dart';
+// 導入聊天頁面
+import 'screens/chat/chat_page.dart';
 
 import 'utils/index.dart'; // 導入工具類
 
@@ -176,6 +178,10 @@ Future<void> _initializeNotificationService() async {
     debugPrint('開始初始化通知服務...');
     await NotificationService().initialize(navigatorKey);
     debugPrint('通知服務初始化成功');
+
+    // 檢查 APP 冷啟動時是否有待處理的通知
+    await NotificationService().checkInitialMessage();
+    debugPrint('已檢查初始通知');
 
     // 獲取 FCM token 並輸出（僅用於調試）
     final token = await FirebaseMessaging.instance.getToken();
@@ -359,12 +365,39 @@ class _MyAppState extends State<MyApp> {
     _clearNotificationsOnLaunch();
   }
 
-  // 清除啟動時的通知
+  // 清除啟動時的通知並處理待處理的聊天導航
   Future<void> _clearNotificationsOnLaunch() async {
     try {
       await NotificationService().clearDisplayedNotifications();
     } catch (e) {
       debugPrint('清除啟動時通知錯誤: $e');
+    }
+
+    // 延遲檢查待處理的聊天導航（確保 Navigator 已經準備好）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingChatNavigation();
+    });
+  }
+
+  // 檢查並處理待處理的聊天導航
+  void _checkPendingChatNavigation() {
+    final pendingChatId = NotificationService().consumePendingChatNavigation();
+    if (pendingChatId != null) {
+      debugPrint('處理待處理的聊天導航: $pendingChatId');
+
+      // 確保 Navigator 已經準備好
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.pushNamed(
+          '/chat',
+          arguments: {'diningEventId': pendingChatId},
+        );
+      } else {
+        debugPrint('Navigator 尚未準備好，稍後重試');
+        // 如果 Navigator 還沒準備好，稍後重試
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _checkPendingChatNavigation();
+        });
+      }
     }
   }
 
@@ -764,8 +797,27 @@ class _MyAppState extends State<MyApp> {
           onGenerateRoute: (settings) {
             debugPrint('正在產生路由: ${settings.name}');
 
-            // 保留參數化路由佔位，當前未使用
+            // 處理聊天室路由（帶參數）
+            if (settings.name == '/chat') {
+              final args = settings.arguments as Map<String, dynamic>?;
+              final diningEventId = args?['diningEventId'] as String?;
 
+              if (diningEventId != null) {
+                return MaterialPageRoute(
+                  builder: (context) => ChatPage(diningEventId: diningEventId),
+                  settings: settings,
+                );
+              }
+
+              // 如果沒有 diningEventId，返回 404 頁面
+              return MaterialPageRoute(
+                builder:
+                    (context) =>
+                        const Scaffold(body: Center(child: Text('無效的聊天室參數'))),
+              );
+            }
+
+            // 其他未定義的路由返回 404
             return MaterialPageRoute(
               builder:
                   (context) =>
