@@ -2057,8 +2057,9 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
                             : Padding(
                               padding: EdgeInsets.symmetric(horizontal: 8.w),
                               child: ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
+                                physics: const BouncingScrollPhysics(
+                                  parent: AlwaysScrollableScrollPhysics(),
+                                ),
                                 itemCount: _members!.length,
                                 itemBuilder: (context, index) {
                                   final member = _members![index];

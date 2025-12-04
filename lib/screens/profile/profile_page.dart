@@ -354,6 +354,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     horizontal: 20.w,
                     vertical: 10.h,
                   ),
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
                   child: Column(
                     children: [
                       // 更改基本資料
