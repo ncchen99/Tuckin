@@ -860,40 +860,59 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // 使用 resizeToAvoidBottomInset: true 讓鍵盤出現時推動內容
-      resizeToAvoidBottomInset: true,
-      body: GestureDetector(
-        // 點擊空白區域時收起鍵盤
-        onTap: () {
-          FocusScope.of(context).unfocus();
-        },
-        // 使用 translucent 確保不會攔截子組件的點擊事件
-        behavior: HitTestBehavior.translucent,
-        child: Container(
-          decoration: const BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('assets/images/background/bg2.jpg'),
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
+    return PopScope(
+      // 攔截系統的 back 按鈕
+      canPop: false, // 禁止默認的 pop 行為
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // 如果沒有 pop，執行自定義返回邏輯
+          _handleBack();
+        }
+      },
+      child: Scaffold(
+        // 使用 resizeToAvoidBottomInset: true 讓鍵盤出現時推動內容
+        resizeToAvoidBottomInset: true,
+        body: GestureDetector(
+          // 點擊空白區域時收起鍵盤
+          onTap: () {
+            FocusScope.of(context).unfocus();
+          },
+          // 使用 translucent 確保不會攔截子組件的點擊事件
+          behavior: HitTestBehavior.translucent,
+          child: Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/background/bg2.jpg'),
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+              ),
             ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                // Header - 固定在頂部
-                _buildHeader(),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // Header - 固定在頂部
+                  _buildHeader(),
 
-                // 訊息區域 - 可滾動
-                Expanded(child: _buildMessageList()),
+                  // 訊息區域 - 可滾動
+                  Expanded(child: _buildMessageList()),
 
-                // 輸入區域 - 固定在底部
-                _buildInputArea(),
-              ],
+                  // 輸入區域 - 固定在底部
+                  _buildInputArea(),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// 處理返回邏輯：直接導航到聚餐資訊頁面
+  void _handleBack() {
+    // 移除當前路由並導航到聚餐資訊頁面
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/dinner_info',
+      (route) => false, // 移除所有之前的路由
     );
   }
 
@@ -908,13 +927,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       child: Row(
         children: [
           // 左側返回按鈕
-          BackIconButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            width: 35.w,
-            height: 35.h,
-          ),
+          BackIconButton(onPressed: _handleBack, width: 35.w, height: 35.h),
 
           // 中央標題
           Expanded(
