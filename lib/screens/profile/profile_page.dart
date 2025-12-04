@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/realtime_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:tuckin/screens/onboarding/profile_setup_page.dart';
 import 'package:tuckin/screens/onboarding/food_preference_page.dart';
@@ -18,16 +19,29 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final RealtimeService _realtimeService = RealtimeService();
   bool _isLoading = false;
   bool _isLoggingOut = false;
   bool _isDeletingAccount = false;
   Map<String, dynamic> _userProfile = {};
   String _nickname = '';
 
+  // 導航保護頁面 ID
+  static const String _pageId = 'profile';
+
   @override
   void initState() {
     super.initState();
+    // 暫停 Realtime 導航（防止設定時被自動導航）
+    _realtimeService.pauseNavigation(_pageId);
     _loadUserProfile();
+  }
+
+  @override
+  void dispose() {
+    // 恢復 Realtime 導航
+    _realtimeService.resumeNavigation(_pageId);
+    super.dispose();
   }
 
   Future<void> _loadUserProfile() async {

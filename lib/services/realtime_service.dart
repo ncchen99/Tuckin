@@ -37,6 +37,12 @@ class RealtimeService with WidgetsBindingObserver {
   // 保存上一個用戶狀態
   String? _lastUserStatus;
 
+  // 導航保護機制
+  // 記錄正在保護導航的頁面 ID（例如 'chat', 'profile', 'profile_setup' 等）
+  final Set<String> _protectedPages = {};
+  // 待處理的狀態變更（當頁面被保護時，保存狀態變更，離開頁面後執行導航）
+  String? _pendingStatus;
+
   // 初始化實時服務
   Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
     _navigatorKey = navigatorKey;
@@ -367,10 +373,64 @@ class RealtimeService with WidgetsBindingObserver {
     }
   }
 
+  // ==================== 導航保護機制 ====================
+
+  /// 暫停導航（當用戶進入特定頁面時調用）
+  ///
+  /// [pageId] 頁面標識符，例如 'chat', 'profile', 'profile_setup' 等
+  void pauseNavigation(String pageId) {
+    _protectedPages.add(pageId);
+    debugPrint(
+      'RealtimeService: 暫停導航 - 保護頁面: $pageId，當前保護頁面數量: ${_protectedPages.length}',
+    );
+  }
+
+  /// 恢復導航（當用戶離開特定頁面時調用）
+  ///
+  /// [pageId] 頁面標識符
+  /// 如果有待處理的狀態變更，將在此時執行導航
+  void resumeNavigation(String pageId) {
+    _protectedPages.remove(pageId);
+    debugPrint(
+      'RealtimeService: 恢復導航 - 移除保護頁面: $pageId，當前保護頁面數量: ${_protectedPages.length}',
+    );
+
+    // 如果沒有其他保護頁面，且有待處理的狀態變更，執行導航
+    if (_protectedPages.isEmpty && _pendingStatus != null) {
+      debugPrint('RealtimeService: 發現待處理的狀態變更: $_pendingStatus，現在執行導航');
+      final statusToNavigate = _pendingStatus!;
+      _pendingStatus = null;
+      _navigateBasedOnStatus(statusToNavigate);
+    }
+  }
+
+  /// 檢查當前是否有頁面正在保護導航
+  bool get isNavigationPaused => _protectedPages.isNotEmpty;
+
+  /// 獲取待處理的狀態（用於頁面離開時檢查）
+  String? get pendingStatus => _pendingStatus;
+
+  /// 清除待處理的狀態（如果頁面自行處理了狀態變更）
+  void clearPendingStatus() {
+    debugPrint('RealtimeService: 清除待處理的狀態變更: $_pendingStatus');
+    _pendingStatus = null;
+  }
+
+  // ==================== 導航保護機制結束 ====================
+
   // 根據用戶狀態導航到對應頁面
   void _navigateBasedOnStatus(String status) {
     if (_navigatorKey?.currentState == null) {
       debugPrint('RealtimeService: 導航器無效，無法導航');
+      return;
+    }
+
+    // 檢查是否有頁面正在保護導航
+    if (_protectedPages.isNotEmpty) {
+      debugPrint(
+        'RealtimeService: 導航被保護中（保護頁面: $_protectedPages），將狀態 $status 保存為待處理',
+      );
+      _pendingStatus = status;
       return;
     }
 

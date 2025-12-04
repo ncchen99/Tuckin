@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/realtime_service.dart';
 import 'package:tuckin/utils/index.dart';
 // 導入轉場動畫
 // 下一個頁面
@@ -18,10 +19,14 @@ class FoodPreferencePage extends StatefulWidget {
 class _FoodPreferencePageState extends State<FoodPreferencePage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final RealtimeService _realtimeService = RealtimeService();
   final Set<int> _selectedFoods = {}; // 用於存儲選中的食物ID
   bool _isLoading = false;
   bool _isDataLoaded = false;
   final bool _hasBackPressed = false; // 追蹤是否已按過返回鍵
+
+  // 導航保護頁面 ID
+  static const String _pageId = 'food_preference';
 
   // 食物類型列表 - 更新為目錄中提供的圖片
   final List<Map<String, dynamic>> _foodTypes = [
@@ -49,7 +54,16 @@ class _FoodPreferencePageState extends State<FoodPreferencePage> {
   @override
   void initState() {
     super.initState();
+    // 暫停 Realtime 導航（防止設定時被自動導航）
+    _realtimeService.pauseNavigation(_pageId);
     _loadUserFoodPreferences();
+  }
+
+  @override
+  void dispose() {
+    // 恢復 Realtime 導航
+    _realtimeService.resumeNavigation(_pageId);
+    super.dispose();
   }
 
   // 加載用戶的飲食偏好

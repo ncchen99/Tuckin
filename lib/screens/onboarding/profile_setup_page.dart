@@ -4,6 +4,7 @@ import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/user_service.dart';
 import 'package:tuckin/services/image_cache_service.dart';
+import 'package:tuckin/services/realtime_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -24,10 +25,14 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   final UserService _userService = UserService();
+  final RealtimeService _realtimeService = RealtimeService();
   final TextEditingController _nicknameController = TextEditingController();
   final TextEditingController _personalDescController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _personalDescFocusNode = FocusNode();
+
+  // 導航保護頁面 ID
+  static const String _pageId = 'profile_setup';
 
   // 性別選擇，0-未選擇，1-男，2-女，3-不設定（儲存為non_binary）
   int _selectedGender = 0;
@@ -50,8 +55,10 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   @override
   void initState() {
     super.initState();
+    // 暫停 Realtime 導航（防止設定時被自動導航）
+    _realtimeService.pauseNavigation(_pageId);
     _loadUserProfile();
-    // 添加監聽器，當暱稱輸入框變更時重新渲染頁面
+    // 添加監聯器，當暱稱輸入框變更時重新渲染頁面
     _nicknameController.addListener(_updateButtonState);
     // 初始化預設頭像
     _updateDefaultAvatar();
@@ -560,6 +567,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   @override
   void dispose() {
+    // 恢復 Realtime 導航
+    _realtimeService.resumeNavigation(_pageId);
     _nicknameController.removeListener(_updateButtonState);
     _nicknameController.dispose();
     _personalDescController.dispose();

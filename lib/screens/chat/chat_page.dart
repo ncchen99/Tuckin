@@ -5,6 +5,7 @@ import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/user_service.dart';
 import 'package:tuckin/services/image_cache_service.dart';
 import 'package:tuckin/services/notification_service.dart';
+import 'package:tuckin/services/realtime_service.dart';
 import 'package:tuckin/services/time_service.dart';
 import 'package:tuckin/models/chat_message.dart';
 import 'package:tuckin/utils/index.dart';
@@ -27,7 +28,11 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
+  final RealtimeService _realtimeService = RealtimeService();
   final TextEditingController _messageController = TextEditingController();
+
+  // 導航保護頁面 ID
+  static const String _pageId = 'chat';
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
 
@@ -62,6 +67,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // 暫停 Realtime 導航（防止聊天時被自動導航）
+    _realtimeService.pauseNavigation(_pageId);
+
     _loadCurrentUser();
     _initializeCache(); // 先檢查本地快取，再決定是否請求 API
     _subscribeToMessages();
@@ -238,6 +246,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    // 恢復 Realtime 導航（離開聊天室時恢復自動導航）
+    _realtimeService.resumeNavigation(_pageId);
+
     // 清除當前聊天室註冊（恢復通知顯示）
     // 使用 unawaited 因為 dispose 不能是 async
     _unregisterChatRoom();

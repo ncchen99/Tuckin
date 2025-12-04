@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/realtime_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +18,7 @@ class PersonalityTestPage extends StatefulWidget {
 class _PersonalityTestPageState extends State<PersonalityTestPage> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final RealtimeService _realtimeService = RealtimeService();
   String? _questionOneAnswer; // 問題1的答案 (a or b)
   String? _questionTwoAnswer; // 問題2的答案 (a or b)
   bool _isLoading = false;
@@ -24,6 +26,9 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   final bool _hasBackPressed = false; // 追蹤是否已按過返回鍵
+
+  // 導航保護頁面 ID
+  static const String _pageId = 'personality_test';
 
   // 個性類型問題與選項
   final List<Map<String, dynamic>> _questions = [
@@ -68,6 +73,8 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
   @override
   void initState() {
     super.initState();
+    // 暫停 Realtime 導航（防止設定時被自動導航）
+    _realtimeService.pauseNavigation(_pageId);
     _loadUserPersonalityType();
   }
 
@@ -130,6 +137,8 @@ class _PersonalityTestPageState extends State<PersonalityTestPage> {
 
   @override
   void dispose() {
+    // 恢復 Realtime 導航
+    _realtimeService.resumeNavigation(_pageId);
     _pageController.dispose();
     super.dispose();
   }
