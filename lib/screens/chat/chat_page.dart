@@ -1565,16 +1565,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       cacheKey: avatarPath, // 使用 avatarPath 作為緩存 key
       fit: BoxFit.cover,
       memCacheWidth: 100, // 限制記憶體緩存尺寸
-      // 使用預設頭像作為 placeholder，避免 loading 閃爍
-      placeholder:
-          (context, url) => Container(
-            color: Colors.white,
-            child: Image.asset(
-              _getFixedDefaultAvatar(gender, fixedIndex),
-              fit: BoxFit.cover,
-              cacheWidth: 100,
-            ),
-          ),
+      // 使用深灰色 shimmer 效果作為 placeholder
+      placeholder: (context, url) => AvatarShimmerPlaceholder(size: 40.w),
       imageBuilder: (context, imageProvider) {
         // 圖片載入完成後，異步更新本地快取路徑
         _updateCachedFilePathForAvatar(avatarPath);
@@ -1800,12 +1792,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    // 如果沒有本地圖片資訊，顯示純載入狀態（備用）
+    // 如果沒有本地圖片資訊，顯示 shimmer 效果（備用）
     return Container(
       width: displayWidth,
       height: displayHeight,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
         borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
@@ -1815,11 +1806,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ),
         ],
       ),
-      child: Center(
-        child: LoadingImage(
-          width: 40.w,
-          height: 40.h,
-          color: const Color(0xFF23456B),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: ImageShimmerPlaceholder(
+          width: displayWidth,
+          height: displayHeight,
+          borderRadius: borderRadius,
         ),
       ),
     );
@@ -1840,7 +1832,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 檢查是否有本地預覽資訊（用於 placeholder）
     final pendingData = _pendingImageData[message.id];
 
-    // 構建本地預覽或灰色背景的 placeholder
+    // 構建本地預覽或 shimmer placeholder
     Widget buildPlaceholder({bool withDarkOverlay = true}) {
       if (pendingData != null) {
         final imageBytes = pendingData['imageBytes'] as Uint8List?;
@@ -1881,18 +1873,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         }
       }
 
-      // 沒有本地預覽，顯示灰色背景和載入動畫
-      return Container(
+      // 沒有本地預覽，顯示深灰色 shimmer 效果
+      return ImageShimmerPlaceholder(
         width: displayWidth,
         height: displayHeight,
-        color: Colors.grey[200],
-        child: Center(
-          child: LoadingImage(
-            width: 40.w,
-            height: 40.h,
-            color: const Color(0xFF23456B),
-          ),
-        ),
+        borderRadius: effectiveBorderRadius,
       );
     }
 
@@ -2064,7 +2049,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 檢查是否有本地預覽資訊（用於 placeholder）
     final pendingData = _pendingImageData[message.id];
 
-    // 構建本地預覽或灰色背景的 placeholder
+    // 構建本地預覽或 shimmer placeholder
     Widget buildPlaceholder({bool withDarkOverlay = true}) {
       if (pendingData != null) {
         final imageBytes = pendingData['imageBytes'] as Uint8List?;
@@ -2105,18 +2090,11 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         }
       }
 
-      // 沒有本地預覽，顯示灰色背景和載入動畫
-      return Container(
+      // 沒有本地預覽，顯示深灰色 shimmer 效果
+      return ImageShimmerPlaceholder(
         width: displayWidth,
         height: displayHeight,
-        color: Colors.grey[200],
-        child: Center(
-          child: LoadingImage(
-            width: 40.w,
-            height: 40.h,
-            color: const Color(0xFF23456B),
-          ),
-        ),
+        borderRadius: effectiveBorderRadius,
       );
     }
 

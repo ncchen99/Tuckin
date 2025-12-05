@@ -2274,12 +2274,9 @@ class _MemberListItem extends StatelessWidget {
           cacheManager: ImageCacheService().getCacheManager(CacheType.avatar),
           cacheKey: avatarPath, // 使用 avatar_path 作為快取 key
           fit: BoxFit.cover,
-          // 使用預設頭像作為 placeholder，避免 loading 閃爍
+          // 使用深灰色 shimmer 效果作為 placeholder
           placeholder:
-              (context, url) => Container(
-                color: Colors.white,
-                child: Image.asset(defaultAvatar, fit: BoxFit.cover),
-              ),
+              (context, url) => const AvatarShimmerPlaceholder(size: 55),
           errorWidget: (context, url, error) {
             // 載入失敗，根據性別顯示預設頭像
             debugPrint('載入其他用戶頭像失敗: $error');

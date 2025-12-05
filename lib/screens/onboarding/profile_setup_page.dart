@@ -991,18 +991,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                               child: ClipOval(
                                                 child:
                                                     _isLoadingAvatar
-                                                        ? Container(
-                                                          color: Colors.white,
-                                                          child: Center(
-                                                            child: LoadingImage(
-                                                              width: 40.w,
-                                                              height: 40.h,
-                                                              color:
-                                                                  const Color(
-                                                                    0xFFB33D1C,
-                                                                  ),
-                                                            ),
-                                                          ),
+                                                        ? AvatarShimmerPlaceholder(
+                                                          size: 120.h,
                                                         )
                                                         : _hasCustomAvatar &&
                                                             _localAvatarBytes !=
@@ -1061,21 +1051,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                                                 context,
                                                                 url,
                                                               ) {
-                                                                return Container(
-                                                                  color:
-                                                                      Colors
-                                                                          .white,
-                                                                  child: Center(
-                                                                    child: LoadingImage(
-                                                                      width:
-                                                                          40.w,
-                                                                      height:
-                                                                          40.h,
-                                                                      color: const Color(
-                                                                        0xFFB33D1C,
-                                                                      ),
-                                                                    ),
-                                                                  ),
+                                                                return AvatarShimmerPlaceholder(
+                                                                  size: 120.h,
                                                                 );
                                                               },
                                                               errorWidget: (
