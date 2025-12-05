@@ -1177,14 +1177,12 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                                   height: 150.h,
                                   fit: BoxFit.cover,
                                   placeholder: (context, url) {
-                                    return Container(
+                                    return ImageShimmerPlaceholder(
                                       width: double.infinity,
                                       height: 150.h,
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: CircularProgressIndicator(
-                                          color: Color(0xFF23456B),
-                                        ),
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: Radius.circular(15.r),
+                                        topRight: Radius.circular(15.r),
                                       ),
                                     );
                                   },

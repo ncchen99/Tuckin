@@ -16,7 +16,7 @@ class ShimmerPlaceholder extends StatefulWidget {
   /// 圓角半徑（僅在 isCircle 為 false 時有效）
   final BorderRadius? borderRadius;
 
-  /// 基底顏色（深灰色）
+  /// 基底顏色（灰色）
   final Color baseColor;
 
   /// 高亮顏色（眩光顏色）
@@ -28,8 +28,8 @@ class ShimmerPlaceholder extends StatefulWidget {
     this.height,
     this.isCircle = false,
     this.borderRadius,
-    this.baseColor = const Color(0xFF424242), // 深灰色
-    this.highlightColor = const Color(0xFF616161), // 較亮的灰色
+    this.baseColor = const Color(0xFF9E9E9E), // 中灰色
+    this.highlightColor = const Color(0xFFBDBDBD), // 較亮的灰色
   });
 
   @override
@@ -49,9 +49,10 @@ class _ShimmerPlaceholderState extends State<ShimmerPlaceholder>
       duration: const Duration(milliseconds: 1500),
     )..repeat();
 
-    _animation = Tween<double>(begin: -2, end: 2).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: -2,
+      end: 2,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -109,8 +110,8 @@ class AvatarShimmerPlaceholder extends StatelessWidget {
   const AvatarShimmerPlaceholder({
     super.key,
     required this.size,
-    this.baseColor = const Color(0xFF424242),
-    this.highlightColor = const Color(0xFF616161),
+    this.baseColor = const Color(0xFF9E9E9E),
+    this.highlightColor = const Color(0xFFBDBDBD),
   });
 
   @override
@@ -147,8 +148,8 @@ class ImageShimmerPlaceholder extends StatelessWidget {
     required this.width,
     required this.height,
     this.borderRadius,
-    this.baseColor = const Color(0xFF424242),
-    this.highlightColor = const Color(0xFF616161),
+    this.baseColor = const Color(0xFF9E9E9E),
+    this.highlightColor = const Color(0xFFBDBDBD),
   });
 
   @override
@@ -163,4 +164,3 @@ class ImageShimmerPlaceholder extends StatelessWidget {
     );
   }
 }
-

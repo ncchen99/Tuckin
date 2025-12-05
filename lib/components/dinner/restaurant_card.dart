@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:tuckin/services/image_cache_service.dart';
+import 'package:tuckin/components/components.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -318,13 +319,10 @@ class _RestaurantCardState extends State<RestaurantCard>
         height: 100.h,
         fit: BoxFit.cover,
         placeholder: (context, url) {
-          return Container(
+          return ImageShimmerPlaceholder(
             width: 100.w,
             height: 100.h,
-            color: Colors.grey[200],
-            child: const Center(
-              child: CircularProgressIndicator(color: Color(0xFF23456B)),
-            ),
+            borderRadius: BorderRadius.circular(10.r),
           );
         },
         errorWidget: (context, url, error) {
