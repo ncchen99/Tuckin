@@ -197,7 +197,7 @@
 - [x] 修正real time狀態如果有更新狀態在setting page(包含3個setting page)或者是聊天室頁面則不導航 
 - [x] 將晚餐資訊頁面的背景圖片移到聊天室頁面 
 - [x] 為什麼圖片的快取都不到 24 小時就沒了
-- [ ] profile_setup_page 的 avatar_url 為空時 自動推薦的照片不會依照性別
+- [x] profile_setup_page 的 avatar_url 為空時 自動推薦的照片不會依照性別
 - [x] [新功能][考慮] 下滑到底的提示 fail.webp 不做
 - [x] [新功能] 聚餐群組行程後新增群組資料也就是用戶的暱稱和介紹以及頭貼
 - [x] [新功能] 新增用戶的頭貼上傳選項
