@@ -10,6 +10,8 @@ import 'api_service.dart';
 import 'error_handler.dart';
 import 'notification_service.dart';
 import 'user_status_service.dart';
+import 'chat_service.dart';
+import 'image_cache_service.dart';
 
 /// 認證服務，處理用戶登入、登出等認證相關功能
 class AuthService {
@@ -235,6 +237,9 @@ class AuthService {
       // 清除所有通知（包括排程通知）
       await notificationService.clearAllNotificationsOnLogout();
 
+      // 完全清除本地緩存（SQLite 和圖片緩存）
+      await _clearAllLocalCache();
+
       // 登出 Google 賬號
       if (_googleSignIn != null) {
         try {
@@ -261,6 +266,29 @@ class AuthService {
         () => signOut(context),
       );
       rethrow;
+    }
+  }
+
+  /// 完全清除本地緩存（SQLite 和圖片緩存）
+  /// 用於用戶登出時清理所有本地數據
+  Future<void> _clearAllLocalCache() async {
+    try {
+      debugPrint('AuthService: 開始清除所有本地緩存...');
+
+      // 清除 SQLite 聊天數據庫
+      final chatService = ChatService();
+      await chatService.deleteChatDatabase();
+      debugPrint('AuthService: 已清除 SQLite 聊天數據庫');
+
+      // 清除所有圖片緩存
+      final imageCacheService = ImageCacheService();
+      await imageCacheService.clearAllCache();
+      debugPrint('AuthService: 已清除所有圖片緩存');
+
+      debugPrint('AuthService: 本地緩存清理完成');
+    } catch (e) {
+      debugPrint('AuthService: 清除本地緩存時發生錯誤 - $e');
+      // 即使清除緩存失敗，也不影響登出流程
     }
   }
 

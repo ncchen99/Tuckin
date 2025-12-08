@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:tuckin/services/time_service.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/chat_service.dart';
+import 'package:tuckin/services/image_cache_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:tuckin/utils/dinner_time_utils.dart';
@@ -320,6 +322,11 @@ class UserStatusService with ChangeNotifier {
       if (!_initCompleter.isCompleted) {
         _initCompleter.complete();
       }
+
+      // App 啟動時檢查並清理緩存（根據當前狀態，背景執行不阻塞）
+      if (_userStatus != null) {
+        _handleStatusCacheCleanup(_userStatus!);
+      }
     } catch (e) {
       debugPrint('載入 UserStatusService 資料時出錯: $e');
       if (!_initCompleter.isCompleted) {
@@ -455,6 +462,97 @@ class UserStatusService with ChangeNotifier {
       _userStatus = status;
       _saveToPrefs();
       notifyListeners();
+
+      // 根據當前狀態清除緩存
+      _handleStatusCacheCleanup(status);
+    }
+  }
+
+  /// 根據當前狀態清除對應的緩存（背景執行，不阻塞主線程）
+  /// 使用 SharedPreferences 記錄上次清除緩存時的狀態，避免重複清除
+  /// - rating 狀態：清除群組訊息、聊天圖片、餐廳圖片
+  /// - booking 狀態：清除群組使用者頭貼緩存（如果跳過 rating，也會清除 rating 的緩存）
+  void _handleStatusCacheCleanup(String currentStatus) {
+    // 使用 Future.microtask 在背景執行，不阻塞 UI
+    Future.microtask(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final lastCacheClearedStatus = prefs.getString(
+          'last_cache_cleared_status',
+        );
+
+        // 如果上次清除緩存時的狀態與當前狀態相同，則跳過
+        if (lastCacheClearedStatus == currentStatus) {
+          debugPrint('UserStatusService: 狀態 $currentStatus 已清除過緩存，跳過');
+          return;
+        }
+
+        final chatService = ChatService();
+        final imageCacheService = ImageCacheService();
+
+        // rating 狀態：清除群組訊息、聊天圖片、餐廳圖片
+        if (currentStatus == 'rating') {
+          debugPrint('UserStatusService: [背景] 進入 rating 狀態，開始清除緩存');
+
+          // 清除 SQLite 群組訊息
+          await chatService.clearAllLocalMessages();
+          debugPrint('UserStatusService: [背景] 已清除 SQLite 群組訊息');
+
+          // 清除聊天圖片緩存
+          await imageCacheService.clearCache(CacheType.chat);
+          debugPrint('UserStatusService: [背景] 已清除聊天圖片緩存');
+
+          // 清除餐廳圖片緩存
+          await imageCacheService.clearCache(CacheType.restaurant);
+          debugPrint('UserStatusService: [背景] 已清除餐廳圖片緩存');
+
+          // 記錄已清除緩存的狀態
+          await prefs.setString('last_cache_cleared_status', currentStatus);
+          debugPrint('UserStatusService: [背景] rating 狀態緩存清理完成');
+        }
+
+        // booking 狀態：清除群組使用者頭貼緩存
+        if (currentStatus == 'booking') {
+          debugPrint('UserStatusService: [背景] 進入 booking 狀態，開始清除緩存');
+
+          // 檢查是否跳過了 rating 狀態（用戶沒有在 rating 時打開 app）
+          // 如果跳過了，需要同時清除 rating 狀態的緩存
+          final needCleanupRatingCache = lastCacheClearedStatus != 'rating';
+
+          if (needCleanupRatingCache) {
+            debugPrint('UserStatusService: [背景] 檢測到跳過 rating 狀態，補充清除聊天和餐廳緩存');
+
+            // 清除 SQLite 群組訊息
+            await chatService.clearAllLocalMessages();
+            debugPrint('UserStatusService: [背景] 已清除 SQLite 群組訊息');
+
+            // 清除聊天圖片緩存
+            await imageCacheService.clearCache(CacheType.chat);
+            debugPrint('UserStatusService: [背景] 已清除聊天圖片緩存');
+
+            // 清除餐廳圖片緩存
+            await imageCacheService.clearCache(CacheType.restaurant);
+            debugPrint('UserStatusService: [背景] 已清除餐廳圖片緩存');
+          }
+
+          // 清除群組使用者頭貼緩存
+          await imageCacheService.clearCache(CacheType.avatar);
+          debugPrint('UserStatusService: [背景] 已清除群組使用者頭貼緩存');
+
+          // 記錄已清除緩存的狀態
+          await prefs.setString('last_cache_cleared_status', currentStatus);
+          debugPrint('UserStatusService: [背景] booking 狀態緩存清理完成');
+        }
+      } catch (e) {
+        debugPrint('UserStatusService: [背景] 清除緩存時發生錯誤: $e');
+      }
+    });
+  }
+
+  /// 檢查並執行狀態對應的緩存清理（供外部調用）
+  void checkAndCleanupCacheForCurrentStatus() {
+    if (_userStatus != null) {
+      _handleStatusCacheCleanup(_userStatus!);
     }
   }
 

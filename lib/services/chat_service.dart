@@ -850,4 +850,84 @@ class ChatService {
     await _database?.close();
     _database = null;
   }
+
+  /// 清除所有本地聊天訊息（SQLite 數據庫）
+  /// 用於用戶狀態變化或登出時清理緩存
+  Future<void> clearAllLocalMessages() async {
+    try {
+      final db = await database;
+
+      // 刪除所有聊天訊息
+      await db.delete('chat_messages');
+      debugPrint('ChatService: 已清除所有本地聊天訊息');
+
+      // 刪除所有固定頭像記錄
+      await db.delete('user_fixed_avatars');
+      debugPrint('ChatService: 已清除所有固定頭像記錄');
+
+      // 清除所有聊天圖片 URL 緩存（SharedPreferences）
+      final prefs = await SharedPreferences.getInstance();
+      final keysToRemove = prefs.getKeys().where(
+        (key) => key.startsWith('chat_image_url_'),
+      );
+      for (final key in keysToRemove) {
+        await prefs.remove(key);
+      }
+
+      // 清除其他用戶頭像 URL 緩存
+      final avatarKeysToRemove = prefs.getKeys().where(
+        (key) => key.startsWith('other_avatar_url_'),
+      );
+      for (final key in avatarKeysToRemove) {
+        await prefs.remove(key);
+      }
+
+      debugPrint('ChatService: 已清除所有聊天圖片和頭像 URL 緩存');
+    } catch (e) {
+      debugPrint('ChatService: 清除本地訊息時發生錯誤: $e');
+    }
+  }
+
+  /// 完全刪除並重建 SQLite 數據庫
+  /// 用於用戶登出時完全清理數據
+  Future<void> deleteChatDatabase() async {
+    try {
+      // 先取消所有訂閱
+      for (final subscription in _realtimeSubscriptions.values) {
+        await subscription.cancel();
+      }
+      _realtimeSubscriptions.clear();
+
+      for (final controller in _messageControllers.values) {
+        await controller.close();
+      }
+      _messageControllers.clear();
+
+      // 關閉數據庫
+      await _database?.close();
+      _database = null;
+
+      // 刪除數據庫文件
+      final databasesPath = await getDatabasesPath();
+      final path = join(databasesPath, 'chat_messages.db');
+      await databaseFactory.deleteDatabase(path);
+
+      debugPrint('ChatService: 已刪除 SQLite 數據庫');
+
+      // 清除所有聊天相關的 SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final keysToRemove = prefs.getKeys().where(
+        (key) =>
+            key.startsWith('chat_image_url_') ||
+            key.startsWith('other_avatar_url_'),
+      );
+      for (final key in keysToRemove) {
+        await prefs.remove(key);
+      }
+
+      debugPrint('ChatService: 已清除所有聊天相關緩存');
+    } catch (e) {
+      debugPrint('ChatService: 刪除數據庫時發生錯誤: $e');
+    }
+  }
 }
