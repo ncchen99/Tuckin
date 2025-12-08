@@ -35,6 +35,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   bool _isLoading = true;
   String _userStatus = ''; // 用戶當前狀態（Provider 為主，本地作為回退）
   bool _hasShownBookingDialog = false; // 追蹤是否已顯示過訂位對話框
+  bool _hasLoadedInitialData = false; // 追蹤是否已成功載入初始資料（避免重複載入）
 
   // Provider 監聽
   UserStatusService? _userStatusService; // 供監聽狀態變更
@@ -52,15 +53,28 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   String? _reservationPhone;
   String? _diningEventId; // 新增: 保存聚餐事件ID用於訂閱
   String? _diningEventDescription; // 新增: 保存聚餐事件描述（密語）
+  bool _isSubscribed = false; // 追蹤是否已訂閱聚餐事件
+  late final String _listenerId; // 唯一的監聽器ID，避免新舊頁面衝突
 
   @override
   void initState() {
     super.initState();
-    _loadUserAndDinnerInfo();
+    // 生成唯一的監聽器ID，避免新舊頁面實例衝突
+    _listenerId =
+        'dinner_info_page_${hashCode}_${DateTime.now().millisecondsSinceEpoch}';
+    debugPrint('DinnerInfoPage: 創建頁面實例，監聽器ID: $_listenerId');
+
     // 建立 Provider 監聽，偵測用戶狀態變更
     _userStatusService = Provider.of<UserStatusService>(context, listen: false);
     _lastUserStatus = _userStatusService!.userStatus;
     _userStatusService!.addListener(_onUserStatusChanged);
+
+    // 先嘗試從 Provider 中載入已緩存的資料，避免顯示 loading 動畫
+    _initializeFromCachedData();
+
+    // 在背景載入完整資料和處理訂閱
+    _loadUserAndDinnerInfo();
+
     // 在頁面掛載完成後檢查餐廳確認狀態
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -70,6 +84,55 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     });
   }
 
+  /// 從 Provider 中載入已緩存的資料，用於快速渲染頁面（避免 loading 動畫）
+  void _initializeFromCachedData() {
+    final userStatusService = _userStatusService;
+    if (userStatusService == null) return;
+
+    // 檢查 Provider 中是否有已緩存的餐廳資訊
+    final cachedRestaurantInfo = userStatusService.restaurantInfo;
+    final cachedUserStatus = userStatusService.userStatus;
+    final cachedEventStatus = userStatusService.eventStatus;
+    final cachedDiningEventId = userStatusService.diningEventId;
+
+    // 如果有緩存的餐廳資訊，直接使用它來初始化頁面
+    if (cachedRestaurantInfo != null && cachedUserStatus != null) {
+      debugPrint('DinnerInfoPage: 從 Provider 緩存載入資料，跳過 loading 動畫');
+
+      final restaurantName = cachedRestaurantInfo['name'] as String?;
+      final restaurantAddress = cachedRestaurantInfo['address'] as String?;
+      final restaurantImageUrl = cachedRestaurantInfo['image_path'] as String?;
+      final restaurantCategory = cachedRestaurantInfo['category'] as String?;
+
+      // 構建地圖URL
+      String? restaurantMapUrl;
+      if (restaurantAddress != null && restaurantName != null) {
+        restaurantMapUrl =
+            "https://maps.google.com/?q=${Uri.encodeComponent(restaurantName)}+${Uri.encodeComponent(restaurantAddress)}";
+      }
+
+      // 設置本地狀態（同步，不使用 setState 因為還在 initState 中）
+      _userStatus = cachedUserStatus;
+      _restaurantName = restaurantName;
+      _restaurantAddress = restaurantAddress;
+      _restaurantImageUrl = restaurantImageUrl;
+      _restaurantCategory = restaurantCategory;
+      _restaurantMapUrl = restaurantMapUrl;
+      _dinnerEventStatus = cachedEventStatus;
+      _reservationName = userStatusService.reservationName;
+      _reservationPhone = userStatusService.reservationPhone;
+      _diningEventId = cachedDiningEventId;
+
+      // 標記資料已載入，跳過 loading 動畫
+      _isLoading = false;
+      _hasLoadedInitialData = true;
+
+      debugPrint(
+        'DinnerInfoPage: 已從緩存初始化 - 餐廳: $restaurantName, 狀態: $cachedUserStatus',
+      );
+    }
+  }
+
   // 當 Provider 的用戶狀態變更時呼叫
   void _onUserStatusChanged() {
     if (!mounted || _userStatusService == null) return;
@@ -77,9 +140,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     if (newStatus != _lastUserStatus) {
       debugPrint('DinnerInfoPage: 用戶狀態變更 -> $_lastUserStatus → $newStatus');
       _lastUserStatus = newStatus;
-      // 當進入顯示聚餐資訊的狀態時重新拉資料
+      // 當進入顯示聚餐資訊的狀態時強制重新拉資料
       if (newStatus == 'waiting_attendance' || newStatus == 'waiting_dinner') {
-        _loadUserAndDinnerInfo();
+        _loadUserAndDinnerInfo(forceRefresh: true);
       }
       setState(() {
         _userStatus = newStatus ?? _userStatus;
@@ -241,9 +304,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 _dinnerEventStatus = latestStatus;
               });
 
-              // 重新加載頁面數據
+              // 重新加載頁面數據（狀態變更，需強制刷新）
               if (mounted) {
-                await _loadUserAndDinnerInfo();
+                await _loadUserAndDinnerInfo(forceRefresh: true);
               }
               break;
 
@@ -268,9 +331,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 _dinnerEventStatus = latestStatus;
               });
 
-              // 重新加載頁面數據
+              // 重新加載頁面數據（狀態變更，需強制刷新）
               if (mounted) {
-                await _loadUserAndDinnerInfo();
+                await _loadUserAndDinnerInfo(forceRefresh: true);
               }
               break;
 
@@ -283,9 +346,9 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
                 _dinnerEventStatus = latestStatus;
               });
 
-              // 重新加載用戶數據
+              // 重新加載用戶數據（狀態變更，需強制刷新）
               if (mounted) {
-                await _loadUserAndDinnerInfo();
+                await _loadUserAndDinnerInfo(forceRefresh: true);
               }
               break;
           }
@@ -324,9 +387,10 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
 
   @override
   void dispose() {
-    // 移除聚餐事件監聽器
+    debugPrint('DinnerInfoPage: 銷毀頁面實例，監聽器ID: $_listenerId');
+    // 移除聚餐事件監聽器（使用唯一ID，避免移除其他頁面實例的監聽器）
     if (_diningEventId != null) {
-      _realtimeService.removeDiningEventListener('dinner_info_page');
+      _realtimeService.removeDiningEventListener(_listenerId);
     }
     // 解除 Provider 監聽
     _userStatusService?.removeListener(_onUserStatusChanged);
@@ -343,15 +407,32 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     // 保存聚餐事件ID
     _diningEventId = diningEventId;
 
-    // 添加監聽器
-    _realtimeService.addDiningEventListener(
-      'dinner_info_page',
-      _onDiningEventChange,
-    );
+    // 使用唯一的監聽器ID添加監聽器（避免新舊頁面實例衝突）
+    _realtimeService.addDiningEventListener(_listenerId, _onDiningEventChange);
 
-    // 訂閱聚餐事件
-    _realtimeService.subscribeToDiningEvent(diningEventId);
-    debugPrint('已訂閱聚餐事件：$diningEventId');
+    // 只有在尚未訂閱時才調用 subscribeToDiningEvent（避免重複訂閱 Supabase 頻道）
+    if (!_isSubscribed) {
+      _realtimeService.subscribeToDiningEvent(diningEventId);
+      _isSubscribed = true;
+      debugPrint('已訂閱聚餐事件：$diningEventId（監聽器ID: $_listenerId）');
+    } else {
+      debugPrint('已更新聚餐事件監聽器：$diningEventId（監聽器ID: $_listenerId）');
+    }
+  }
+
+  /// 確保訂閱已建立（用於從緩存載入資料後的背景處理）
+  Future<void> _ensureSubscriptions() async {
+    try {
+      // 如果已經有聚餐事件ID，確保訂閱已建立
+      final diningEventId = _diningEventId ?? _userStatusService?.diningEventId;
+      if (diningEventId != null && diningEventId.isNotEmpty) {
+        // 直接調用訂閱方法（它會處理重複訂閱的情況）
+        _subscribeToDiningEvent(diningEventId);
+      }
+      debugPrint('_ensureSubscriptions: 訂閱檢查完成');
+    } catch (e) {
+      debugPrint('_ensureSubscriptions: 確保訂閱時發生錯誤: $e');
+    }
   }
 
   // 處理聚餐事件變更
@@ -437,10 +518,10 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         _diningEventDescription = newDescription ?? _diningEventDescription;
       });
 
-      // 如果餐廳ID變更或需要重新載入數據，則重新載入完整頁面數據
+      // 如果餐廳ID變更或需要重新載入數據，則重新載入完整頁面數據（強制刷新）
       if (needsReloadData) {
         debugPrint('餐廳資訊變更，重新載入頁面數據');
-        _loadUserAndDinnerInfo();
+        _loadUserAndDinnerInfo(forceRefresh: true);
       }
 
       // 根據新狀態可能需要顯示相關對話框
@@ -450,10 +531,19 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
     }
   }
 
-  Future<void> _loadUserAndDinnerInfo() async {
+  Future<void> _loadUserAndDinnerInfo({bool forceRefresh = false}) async {
     try {
       if (!mounted) {
         debugPrint('_loadUserAndDinnerInfo: Widget已卸載，取消加載');
+        return;
+      }
+
+      // 如果資料已經載入且不是強制刷新，只處理訂閱但跳過資料載入
+      final bool skipDataFetch = _hasLoadedInitialData && !forceRefresh;
+      if (skipDataFetch) {
+        debugPrint('_loadUserAndDinnerInfo: 資料已從緩存載入，只處理訂閱');
+        // 處理訂閱（如果還沒訂閱的話）
+        await _ensureSubscriptions();
         return;
       }
 
@@ -647,6 +737,7 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
           _diningEventId = diningEventId; // 新增: 保存聚餐事件ID
           _diningEventDescription = diningEventDescription; // 新增: 保存聚餐事件描述
           _isLoading = false;
+          _hasLoadedInitialData = true; // 標記資料已成功載入
         });
 
         debugPrint('餐廳資訊已更新: $_restaurantName, $_restaurantCategory');

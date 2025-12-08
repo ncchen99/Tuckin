@@ -660,8 +660,12 @@ class RealtimeService with WidgetsBindingObserver {
 
   // 新增: 通知所有聚餐事件監聽器
   void _notifyDiningEventListeners(Map<String, dynamic> eventData) {
-    for (var callback in _diningEventListeners.values) {
-      callback(eventData);
+    debugPrint(
+      'RealtimeService: 通知聚餐事件監聽器 - 監聽器數量: ${_diningEventListeners.length}, IDs: ${_diningEventListeners.keys.toList()}',
+    );
+    for (var entry in _diningEventListeners.entries) {
+      debugPrint('RealtimeService: 調用監聽器 - ID: ${entry.key}');
+      entry.value(eventData);
     }
   }
 

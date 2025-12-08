@@ -511,7 +511,7 @@ class UserStatusService with ChangeNotifier {
           debugPrint('UserStatusService: [背景] rating 狀態緩存清理完成');
         }
 
-        // booking 狀態：清除群組使用者頭貼緩存
+        // booking 狀態：清除群組使用者頭貼緩存（保留自己的頭貼）
         if (currentStatus == 'booking') {
           debugPrint('UserStatusService: [背景] 進入 booking 狀態，開始清除緩存');
 
@@ -535,9 +535,8 @@ class UserStatusService with ChangeNotifier {
             debugPrint('UserStatusService: [背景] 已清除餐廳圖片緩存');
           }
 
-          // 清除群組使用者頭貼緩存
-          await imageCacheService.clearCache(CacheType.avatar);
-          debugPrint('UserStatusService: [背景] 已清除群組使用者頭貼緩存');
+          // 清除群組使用者頭貼緩存（保留自己的頭貼）
+          await _clearOtherUsersAvatarCache(imageCacheService);
 
           // 記錄已清除緩存的狀態
           await prefs.setString('last_cache_cleared_status', currentStatus);
@@ -553,6 +552,72 @@ class UserStatusService with ChangeNotifier {
   void checkAndCleanupCacheForCurrentStatus() {
     if (_userStatus != null) {
       _handleStatusCacheCleanup(_userStatus!);
+    }
+  }
+
+  /// 清除其他用戶的頭貼緩存，保留自己的頭貼
+  Future<void> _clearOtherUsersAvatarCache(
+    ImageCacheService imageCacheService,
+  ) async {
+    try {
+      // 1. 獲取當前用戶的頭貼路徑
+      final authService = AuthService();
+      final databaseService = DatabaseService();
+      final currentUser = await authService.getCurrentUser();
+
+      if (currentUser == null) {
+        debugPrint('UserStatusService: [背景] 無法獲取當前用戶，直接清除所有頭貼緩存');
+        await imageCacheService.clearCache(CacheType.avatar);
+        return;
+      }
+
+      // 從資料庫獲取用戶的頭貼路徑
+      final userProfile = await databaseService.getUserProfile(currentUser.id);
+      final myAvatarPath = userProfile?['avatar_path'] as String?;
+
+      // 2. 如果沒有自定義頭貼或是預設頭貼，直接清除所有頭貼緩存
+      if (myAvatarPath == null ||
+          myAvatarPath.isEmpty ||
+          myAvatarPath.startsWith('assets/')) {
+        debugPrint('UserStatusService: [背景] 用戶使用預設頭貼，直接清除所有頭貼緩存');
+        await imageCacheService.clearCache(CacheType.avatar);
+        return;
+      }
+
+      // 3. 用戶有自定義頭貼（avatars/xxx.webp），需要保留
+      debugPrint('UserStatusService: [背景] 用戶有自定義頭貼: $myAvatarPath，需要保留');
+
+      // 先讀取自己的頭貼緩存
+      final cachedFile = await imageCacheService.getCachedImageByKey(
+        myAvatarPath,
+        CacheType.avatar,
+      );
+
+      List<int>? myAvatarBytes;
+      if (cachedFile != null && await cachedFile.exists()) {
+        myAvatarBytes = await cachedFile.readAsBytes();
+        debugPrint('UserStatusService: [背景] 已備份自己的頭貼緩存');
+      }
+
+      // 4. 清除所有頭貼緩存
+      await imageCacheService.clearCache(CacheType.avatar);
+      debugPrint('UserStatusService: [背景] 已清除所有頭貼緩存');
+
+      // 5. 恢復自己的頭貼緩存
+      if (myAvatarBytes != null) {
+        await imageCacheService.putBytes(
+          myAvatarBytes,
+          myAvatarPath,
+          CacheType.avatar,
+        );
+        debugPrint('UserStatusService: [背景] 已恢復自己的頭貼緩存: $myAvatarPath');
+      }
+
+      debugPrint('UserStatusService: [背景] 已清除其他用戶頭貼緩存（保留自己的）');
+    } catch (e) {
+      debugPrint('UserStatusService: [背景] 清除其他用戶頭貼緩存時發生錯誤: $e');
+      // 發生錯誤時，fallback 到清除所有頭貼緩存
+      await imageCacheService.clearCache(CacheType.avatar);
     }
   }
 
