@@ -31,7 +31,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
   final DatabaseService _databaseService = DatabaseService();
   final NavigationService _navigationService = NavigationService();
   final RealtimeService _realtimeService = RealtimeService();
-  final Random _random = Random();
   bool _isLoading = true;
   String _userStatus = ''; // 用戶當前狀態（Provider 為主，本地作為回退）
   bool _hasShownBookingDialog = false; // 追蹤是否已顯示過訂位對話框
@@ -955,12 +954,8 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
             _reservationPhone!.isNotEmpty) {
           message = '$_reservationName幫忙訂位了！ 手機號碼：$_reservationPhone';
         } else {
-          // 優先使用資料庫中的描述（統一密語），如果沒有才隨機生成
-          String passphrase =
-              _diningEventDescription?.isNotEmpty == true
-                  ? _diningEventDescription!
-                  : _getRandomPassphrase();
-          message = '餐廳無法訂位，可能需要候位，\n使用密語找到夥伴：\n\n$passphrase';
+          // 餐廳無法訂位時，提示使用聊天室找到夥伴
+          message = '餐廳無法訂位，可能需要候位，\n請使用聊天室找到彼此';
         }
 
         return Container(
@@ -1098,18 +1093,6 @@ class _DinnerInfoPageState extends State<DinnerInfoPage> {
         ),
       ),
     );
-  }
-
-  String _getRandomPassphrase() {
-    final List<String> passphrases = [
-      '不好意思，你可以幫我拍照嗎',
-      '不好意思，可以跟你借衛生紙嗎',
-      '不好意思，請問火車站怎麼走',
-      '不好意思，你有在排隊嗎',
-      '想問你有吃過這家店嗎',
-      '你好，你也在等朋友嗎',
-    ];
-    return passphrases[_random.nextInt(passphrases.length)];
   }
 
   /// 顯示參加名單對話框
