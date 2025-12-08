@@ -1344,14 +1344,26 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       );
     }
 
-    // 本地快取不存在且沒有 URL，觸發異步載入
+    // 檢查是否已嘗試載入過（key 存在但值為 null 表示載入失敗）
+    if (_avatarUrlCache.containsKey(userId)) {
+      // 載入失敗，顯示預設頭像作為 fallback
+      final fixedIndex = _fixedAvatars[userId] ?? 1;
+      return Container(
+        key: ValueKey(avatarCacheKey),
+        color: Colors.white,
+        child: Image.asset(
+          _getFixedDefaultAvatar(gender, fixedIndex),
+          fit: BoxFit.cover,
+          cacheWidth: 100,
+        ),
+      );
+    }
+
+    // 本地快取不存在且尚未嘗試載入，觸發異步載入
     _loadAvatarUrlIfNeeded(userId, avatarPath, gender);
 
     // 顯示 shimmer placeholder（表示有自訂頭像正在載入中）
-    return AvatarShimmerPlaceholder(
-      key: ValueKey(avatarCacheKey),
-      size: 40.w,
-    );
+    return AvatarShimmerPlaceholder(key: ValueKey(avatarCacheKey), size: 40.w);
   }
 
   /// 預先載入所有需要的頭像和圖片的本地快取路徑
