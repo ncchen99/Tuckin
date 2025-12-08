@@ -1347,16 +1347,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     // 本地快取不存在且沒有 URL，觸發異步載入
     _loadAvatarUrlIfNeeded(userId, avatarPath, gender);
 
-    // 顯示預設頭像（不顯示 loading，避免閃爍）
-    final fixedIndex = _fixedAvatars[userId] ?? 1;
-    return Container(
+    // 顯示 shimmer placeholder（表示有自訂頭像正在載入中）
+    return AvatarShimmerPlaceholder(
       key: ValueKey(avatarCacheKey),
-      color: Colors.white,
-      child: Image.asset(
-        _getFixedDefaultAvatar(gender, fixedIndex),
-        fit: BoxFit.cover,
-        cacheWidth: 100,
-      ),
+      size: 40.w,
     );
   }
 
