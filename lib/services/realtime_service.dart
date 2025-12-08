@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tuckin/services/supabase_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/auth_service.dart';
+import 'package:tuckin/services/user_status_service.dart';
 
 /// RealtimeService 用於訂閱 Supabase 的實時數據庫變更
 /// 主要功能：監聽 user_status 資料表的變更，自動導航至對應頁面
@@ -117,6 +118,10 @@ class RealtimeService with WidgetsBindingObserver {
             'RealtimeService: 用戶狀態已改變，從 $_lastUserStatus 變為 $currentStatus',
           );
           _lastUserStatus = currentStatus;
+
+          // 觸發 UserStatusService 的狀態更新和緩存清理
+          _triggerUserStatusCacheCleanup(currentStatus);
+
           _navigateBasedOnStatus(currentStatus);
         } else {
           debugPrint('RealtimeService: 用戶狀態未改變，保持當前頁面');
@@ -310,6 +315,9 @@ class RealtimeService with WidgetsBindingObserver {
           );
           _lastUserStatus = actualStatus;
 
+          // 觸發 UserStatusService 的狀態更新和緩存清理
+          _triggerUserStatusCacheCleanup(actualStatus);
+
           // 異步檢查用戶是否已登入，只有登入狀態才導航
           _checkLoginAndNavigate(actualStatus);
         } else {
@@ -322,6 +330,19 @@ class RealtimeService with WidgetsBindingObserver {
       }
     } catch (e) {
       debugPrint('RealtimeService: 驗證狀態時發生錯誤 - $e');
+    }
+  }
+
+  // 觸發 UserStatusService 的狀態更新和緩存清理
+  void _triggerUserStatusCacheCleanup(String status) {
+    try {
+      // 創建 UserStatusService 實例來觸發緩存清理
+      // 緩存清理邏輯使用 SharedPreferences 記錄狀態，所以即使是不同實例也能正確運作
+      final userStatusService = UserStatusService();
+      userStatusService.setUserStatus(status);
+      debugPrint('RealtimeService: 已觸發 UserStatusService 狀態更新和緩存清理');
+    } catch (e) {
+      debugPrint('RealtimeService: 觸發緩存清理時發生錯誤 - $e');
     }
   }
 
@@ -364,6 +385,10 @@ class RealtimeService with WidgetsBindingObserver {
           'RealtimeService: 用戶狀態已改變，從 $_lastUserStatus 變為 $currentStatus',
         );
         _lastUserStatus = currentStatus;
+
+        // 觸發 UserStatusService 的狀態更新和緩存清理
+        _triggerUserStatusCacheCleanup(currentStatus);
+
         _navigateBasedOnStatus(currentStatus);
       } else {
         debugPrint('RealtimeService: 用戶狀態未改變，保持當前頁面');
