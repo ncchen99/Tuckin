@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/user_status_service.dart';
 
 /// 集中管理應用程式的導航邏輯
 ///
@@ -18,6 +19,17 @@ class NavigationService {
   // 保存當前用戶狀態
   String _currentUserStatus = 'initial';
   String get currentUserStatus => _currentUserStatus;
+
+  /// 觸發 UserStatusService 的狀態更新和緩存清理
+  void _triggerUserStatusCacheCleanup(String status) {
+    try {
+      final userStatusService = UserStatusService();
+      userStatusService.setUserStatus(status);
+      debugPrint('NavigationService: 已觸發 UserStatusService 狀態更新和緩存清理');
+    } catch (e) {
+      debugPrint('NavigationService: 觸發緩存清理時發生錯誤 - $e');
+    }
+  }
 
   /// 初始化導航服務
   ///
@@ -42,6 +54,9 @@ class NavigationService {
             _currentUserStatus = userStatus;
 
             debugPrint('NavigationService: 用戶狀態為 $_currentUserStatus');
+
+            // 觸發 UserStatusService 的狀態更新和緩存清理
+            _triggerUserStatusCacheCleanup(userStatus);
 
             // 檢查用戶是否已完成設置
             bool hasCompletedSetup = false;
@@ -213,6 +228,9 @@ class NavigationService {
         userStatus = await _databaseService.getUserStatus(currentUser.id);
         _currentUserStatus = userStatus;
         debugPrint('NavigationService: 獲取到用戶狀態: $_currentUserStatus');
+
+        // 觸發 UserStatusService 的狀態更新和緩存清理
+        _triggerUserStatusCacheCleanup(userStatus);
       } catch (e) {
         debugPrint('NavigationService: 獲取用戶狀態失敗: $e，使用默認狀態initial');
         userStatus = 'initial';
