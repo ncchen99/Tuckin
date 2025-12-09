@@ -563,7 +563,9 @@ async def get_rating_form(
                     "index": item["index"], 
                     "nickname": item["nickname"],
                     "gender": item.get("gender", "male"),
-                    "avatar_index": item.get("avatar_index", 1)
+                    "avatar_index": item.get("avatar_index", 1),
+                    "avatar_path": item.get("avatar_path"),
+                    "user_id": item.get("user_id")
                 } 
                 for item in user_sequence
             ]
@@ -604,26 +606,28 @@ async def get_rating_form(
                 "participants": []
             }
         
-        # 獲取參與者暱稱與性別
+        # 獲取參與者暱稱、性別和頭像路徑
         profiles = supabase.table("user_profiles") \
-            .select("user_id, nickname, gender") \
+            .select("user_id, nickname, gender, avatar_path") \
             .in_("user_id", participant_ids) \
             .execute()
         
-        # 建立用戶映射
-        id_to_profile = {p["user_id"]: {"nickname": p["nickname"], "gender": p["gender"]} for p in profiles.data}
+        # 建立用戶映射（包含頭像路徑）
+        id_to_profile = {p["user_id"]: {"nickname": p["nickname"], "gender": p["gender"], "avatar_path": p.get("avatar_path")} for p in profiles.data}
         
         # 生成隨機順序的參與者列表
         random_order = participant_ids.copy()
         random.shuffle(random_order)
         
-        # 創建前端顯示用的序列（包含索引、暱稱和性別）
+        # 創建前端顯示用的序列（包含索引、暱稱、性別、頭像路徑和用戶ID）
         user_sequence = [
             {
                 "index": i, 
                 "nickname": id_to_profile.get(uid, {}).get("nickname", "未知用戶"),
                 "gender": id_to_profile.get(uid, {}).get("gender", "male"),
-                "avatar_index": (i % 6) + 1  # 可選：生成1-6範圍的隨機頭像索引
+                "avatar_index": (i % 6) + 1,  # 預設頭像索引（作為備用）
+                "avatar_path": id_to_profile.get(uid, {}).get("avatar_path"),
+                "user_id": uid
             }
             for i, uid in enumerate(random_order)
         ]
@@ -649,13 +653,15 @@ async def get_rating_form(
             "expires_at": expires_at.isoformat()
         }).execute()
         
-        # 轉換為API響應格式 - 包含必要的性別資訊和頭像索引
+        # 轉換為API響應格式 - 包含必要的性別資訊、頭像路徑和用戶ID
         participants_response = [
             {
                 "index": item["index"], 
                 "nickname": item["nickname"],
                 "gender": item["gender"],
-                "avatar_index": item["avatar_index"]
+                "avatar_index": item["avatar_index"],
+                "avatar_path": item["avatar_path"],
+                "user_id": item["user_id"]
             } 
             for item in user_sequence
         ]

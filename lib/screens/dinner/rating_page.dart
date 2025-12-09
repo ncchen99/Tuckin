@@ -5,10 +5,15 @@ import 'package:tuckin/components/common/stroke_text_widget.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/services/dining_service.dart';
+import 'package:tuckin/services/image_cache_service.dart';
+import 'package:tuckin/services/chat_service.dart';
+import 'package:tuckin/services/user_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:tuckin/services/user_status_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RatingPage extends StatefulWidget {
   const RatingPage({super.key});
@@ -22,6 +27,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
   final DatabaseService _databaseService = DatabaseService();
   final DiningService _diningService = DiningService();
   final NavigationService _navigationService = NavigationService();
+  final ChatService _chatService = ChatService();
   bool _isLoading = true;
   bool _isSubmitting = false;
   String? _diningEventId;
@@ -33,6 +39,10 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
 
   // 參與者資料，將從API獲取
   List<Map<String, dynamic>> _participants = [];
+
+  // 頭像相關變數
+  Map<String, String?> _avatarUrls = {}; // 批量獲取的頭像 URL
+  Map<String, String> _cachedFilePaths = {}; // 已快取的本地檔案路徑
 
   // 為每個參與者的每個選項創建動畫控制器
   late List<List<AnimationController>> _animationControllers;
@@ -185,28 +195,34 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
       final response = await _diningService.getRatingForm(_diningEventId!);
 
       if (mounted) {
-        setState(() {
-          // 存儲session_token用於後續提交評分
-          _sessionToken = response['session_token'] ?? '';
+        // 存儲session_token用於後續提交評分
+        _sessionToken = response['session_token'] ?? '';
 
-          // 解析API回傳的參與者資料
-          if (response.containsKey('participants')) {
-            _participants = List<Map<String, dynamic>>.from(
-              response['participants'],
-            );
-          } else {
-            _participants = [];
-          }
+        // 解析API回傳的參與者資料
+        List<Map<String, dynamic>> participants = [];
+        if (response.containsKey('participants')) {
+          participants = List<Map<String, dynamic>>.from(
+            response['participants'],
+          );
+        }
 
-          // 初始化動畫
-          _initAnimations();
+        // 載入頭像
+        await _loadParticipantAvatars(participants);
 
-          // 最後一步設置加載完成
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _participants = participants;
 
-        debugPrint('成功載入評分表單，參與者數量: ${_participants.length}');
-        debugPrint('參與者資料: $_participants');
+            // 初始化動畫
+            _initAnimations();
+
+            // 最後一步設置加載完成
+            _isLoading = false;
+          });
+
+          debugPrint('成功載入評分表單，參與者數量: ${_participants.length}');
+          debugPrint('參與者資料: $_participants');
+        }
       }
     } catch (e) {
       debugPrint('載入評分表單時出錯: $e');
@@ -223,6 +239,98 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
           ),
         );
       }
+    }
+  }
+
+  /// 載入參與者頭像
+  Future<void> _loadParticipantAvatars(
+    List<Map<String, dynamic>> participants,
+  ) async {
+    if (participants.isEmpty || _diningEventId == null) return;
+
+    try {
+      setState(() {
+        _loadingStatus = '正在載入參與者頭像...';
+      });
+
+      // 預先載入所有成員頭像的本地快取路徑
+      final imageCacheService = ImageCacheService();
+      final cachedPaths = <String, String>{};
+      final usersNeedingUrl = <String>[];
+
+      for (final participant in participants) {
+        final avatarPath = participant['avatar_path'] as String?;
+        final userId = participant['user_id'] as String?;
+
+        if (avatarPath != null &&
+            avatarPath.isNotEmpty &&
+            avatarPath.startsWith('avatars/') &&
+            userId != null) {
+          try {
+            final cachedFile = await imageCacheService.getCachedImageByKey(
+              avatarPath,
+              CacheType.avatar,
+            );
+            if (cachedFile != null && cachedFile.existsSync()) {
+              cachedPaths[avatarPath] = cachedFile.path;
+            } else {
+              // 本地快取不存在，需要獲取 URL
+              usersNeedingUrl.add(userId);
+            }
+          } catch (e) {
+            debugPrint('檢查頭像快取失敗: $e');
+            usersNeedingUrl.add(userId);
+          }
+        }
+      }
+
+      // 只有在需要時才請求 API 獲取頭像 URL
+      Map<String, String?> avatars = {};
+      if (usersNeedingUrl.isNotEmpty) {
+        // 先嘗試從本地緩存讀取 URL
+        final prefs = await SharedPreferences.getInstance();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        bool needFetchFromApi = false;
+
+        for (final userId in usersNeedingUrl) {
+          final cacheKey = 'other_avatar_url_$userId';
+          final cachedUrl = prefs.getString(cacheKey);
+          final cacheTimeKey = '${cacheKey}_time';
+          final cacheTime = prefs.getInt(cacheTimeKey);
+
+          if (cachedUrl != null &&
+              cacheTime != null &&
+              (now - cacheTime) < 50 * 60 * 1000) {
+            avatars[userId] = cachedUrl;
+          } else {
+            needFetchFromApi = true;
+          }
+        }
+
+        // 如果有任何 URL 緩存過期或不存在，則從 API 獲取
+        if (needFetchFromApi) {
+          final apiAvatars = await _chatService.getGroupMemberAvatars(
+            _diningEventId!,
+          );
+          avatars.addAll(apiAvatars);
+          // 更新 UserService 緩存
+          await UserService().updateAvatarUrlCache(apiAvatars);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _avatarUrls = avatars;
+          _cachedFilePaths = cachedPaths;
+        });
+      }
+
+      debugPrint(
+        '頭像載入完成 - 快取路徑: ${cachedPaths.length}, URL: ${avatars.length}',
+      );
+    } catch (e) {
+      debugPrint('載入參與者頭像時出錯: $e');
+      // 頭像載入失敗不影響評分功能，繼續使用預設頭像
     }
   }
 
@@ -358,10 +466,103 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
     }
   }
 
-  // 獲取頭像路徑
-  String _getAvatarPath(String gender, int index) {
+  // 獲取預設頭像路徑
+  String _getDefaultAvatarPath(String gender, int index) {
     final normalizedGender = (gender == 'non_binary') ? 'male' : gender;
     return 'assets/images/avatar/profile/${normalizedGender}_$index.webp';
+  }
+
+  /// 構建頭像 Widget
+  Widget _buildAvatar(Map<String, dynamic> participant) {
+    final avatarPath = participant['avatar_path'] as String?;
+    final gender = participant['gender'] as String?;
+    final avatarIndex = participant['avatar_index'] as int? ?? 1;
+    final userId = participant['user_id'] as String?;
+
+    // 如果沒有頭像路徑或是空字串，使用預設頭像
+    if (avatarPath == null || avatarPath.isEmpty) {
+      return Container(
+        color: Colors.white,
+        child: Image.asset(
+          _getDefaultAvatarPath(gender ?? 'male', avatarIndex),
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    // 如果是本地資源頭像（assets/）
+    if (avatarPath.startsWith('assets/')) {
+      return Container(
+        color: Colors.white,
+        child: Image.asset(avatarPath, fit: BoxFit.cover),
+      );
+    }
+
+    // 如果是 R2 上的自訂頭像（avatars/）
+    if (avatarPath.startsWith('avatars/')) {
+      // 優先使用預先載入的本地快取路徑（同步方式，避免閃爍）
+      final cachedFilePath = _cachedFilePaths[avatarPath];
+      if (cachedFilePath != null) {
+        return Image.file(
+          File(cachedFilePath),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            // 本地檔案損壞，顯示預設頭像
+            debugPrint('本地快取檔案損壞: $avatarPath, 錯誤: $error');
+            return Container(
+              color: Colors.white,
+              child: Image.asset(
+                _getDefaultAvatarPath(gender ?? 'male', avatarIndex),
+                fit: BoxFit.cover,
+              ),
+            );
+          },
+        );
+      }
+
+      // 使用批量 API 獲取的 URL
+      final avatarUrl = userId != null ? _avatarUrls[userId] : null;
+      if (avatarUrl != null) {
+        return CachedNetworkImage(
+          imageUrl: avatarUrl,
+          cacheManager: ImageCacheService().getCacheManager(CacheType.avatar),
+          cacheKey: avatarPath, // 使用 avatar_path 作為快取 key
+          fit: BoxFit.cover,
+          // 使用 shimmer 效果作為 placeholder
+          placeholder:
+              (context, url) => const AvatarShimmerPlaceholder(size: 60),
+          errorWidget: (context, url, error) {
+            // 載入失敗，顯示預設頭像
+            debugPrint('載入頭像失敗: $error');
+            return Container(
+              color: Colors.white,
+              child: Image.asset(
+                _getDefaultAvatarPath(gender ?? 'male', avatarIndex),
+                fit: BoxFit.cover,
+              ),
+            );
+          },
+        );
+      }
+
+      // 沒有快取也沒有 URL，顯示預設頭像
+      return Container(
+        color: Colors.white,
+        child: Image.asset(
+          _getDefaultAvatarPath(gender ?? 'male', avatarIndex),
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    // 未知格式，顯示預設頭像
+    return Container(
+      color: Colors.white,
+      child: Image.asset(
+        _getDefaultAvatarPath(gender ?? 'male', avatarIndex),
+        fit: BoxFit.cover,
+      ),
+    );
   }
 
   // 開啟郵件應用
@@ -502,13 +703,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(30.w), // 使用寬度的一半作為圓角
-                    child: Image.asset(
-                      _getAvatarPath(
-                        participant['gender'],
-                        participant['avatar_index'],
-                      ),
-                      fit: BoxFit.cover,
-                    ),
+                    child: _buildAvatar(participant),
                   ),
                 ),
                 SizedBox(height: 6.h),
