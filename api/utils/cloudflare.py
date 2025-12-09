@@ -299,4 +299,93 @@ async def delete_file_from_private_r2(file_key: str) -> bool:
         return True
     except Exception as e:
         logger.error(f"從私有 R2 刪除檔案時發生錯誤: {e}")
-        return False 
+        return False
+
+
+# 刪除私有 R2 資料夾內的所有檔案
+def delete_folder_from_private_r2_sync(folder_prefix: str) -> dict:
+    """
+    從 Cloudflare R2 私有 Bucket 中刪除指定資料夾（前綴）內的所有檔案（同步版本）
+    
+    Args:
+        folder_prefix: 資料夾前綴，例如 "chat_images/"
+        
+    Returns:
+        包含刪除結果的字典 {"deleted_count": int, "errors": list}
+    """
+    result = {"deleted_count": 0, "errors": []}
+    
+    try:
+        if not R2_PRIVATE_BUCKET_NAME:
+            logger.error("未設置私有 Bucket 名稱")
+            result["errors"].append("未設置私有 Bucket 名稱")
+            return result
+            
+        client = get_r2_client()
+        
+        # 列出資料夾內的所有物件
+        paginator = client.get_paginator('list_objects_v2')
+        pages = paginator.paginate(
+            Bucket=R2_PRIVATE_BUCKET_NAME,
+            Prefix=folder_prefix
+        )
+        
+        objects_to_delete = []
+        
+        for page in pages:
+            if 'Contents' in page:
+                for obj in page['Contents']:
+                    objects_to_delete.append({'Key': obj['Key']})
+        
+        if not objects_to_delete:
+            logger.info(f"資料夾 '{folder_prefix}' 內沒有檔案需要刪除")
+            return result
+        
+        # 批量刪除（每次最多 1000 個）
+        batch_size = 1000
+        for i in range(0, len(objects_to_delete), batch_size):
+            batch = objects_to_delete[i:i + batch_size]
+            
+            try:
+                delete_response = client.delete_objects(
+                    Bucket=R2_PRIVATE_BUCKET_NAME,
+                    Delete={'Objects': batch}
+                )
+                
+                # 統計成功刪除的數量
+                if 'Deleted' in delete_response:
+                    result["deleted_count"] += len(delete_response['Deleted'])
+                
+                # 記錄錯誤
+                if 'Errors' in delete_response:
+                    for error in delete_response['Errors']:
+                        result["errors"].append(f"{error['Key']}: {error['Message']}")
+                        
+            except Exception as batch_error:
+                result["errors"].append(f"批量刪除錯誤: {str(batch_error)}")
+        
+        logger.info(f"已從私有 R2 刪除資料夾 '{folder_prefix}' 內的 {result['deleted_count']} 個檔案")
+        
+        if result["errors"]:
+            logger.warning(f"刪除過程中發生 {len(result['errors'])} 個錯誤")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"從私有 R2 刪除資料夾時發生錯誤: {e}")
+        result["errors"].append(str(e))
+        return result
+
+
+# 刪除私有 R2 資料夾內的所有檔案 - 非同步版本
+async def delete_folder_from_private_r2(folder_prefix: str) -> dict:
+    """
+    從 Cloudflare R2 私有 Bucket 中刪除指定資料夾（前綴）內的所有檔案（非同步版本）
+    
+    Args:
+        folder_prefix: 資料夾前綴，例如 "chat_images/"
+        
+    Returns:
+        包含刪除結果的字典 {"deleted_count": int, "errors": list}
+    """
+    return await asyncio.to_thread(delete_folder_from_private_r2_sync, folder_prefix)

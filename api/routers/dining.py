@@ -18,6 +18,7 @@ from schemas.dining import (
 )
 from dependencies import get_supabase_service, get_current_user, verify_cron_api_key
 from services.notification_service import NotificationService
+from utils.cloudflare import delete_folder_from_private_r2
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1012,19 +1013,36 @@ async def finalize_dining_events(supabase: Client):
             .in_("matching_group_id", group_ids) \
             .execute()
         
-        # 4. 刪除dining_events
+        # 4. 刪除 chat_messages（會自動清除因為有外鍵約束，但先主動刪除以確保完整性）
+        supabase.table("chat_messages") \
+            .delete() \
+            .in_("dining_event_id", event_ids) \
+            .execute()
+        logger.info(f"已清空 {len(event_ids)} 個聚餐事件的聊天訊息")
+        
+        # 5. 刪除 R2 上的聊天圖片資料夾
+        # 由於聚餐周期是固定的，所有用戶同時開始並同時結束，直接刪除整個 chat_images/ 資料夾
+        try:
+            r2_result = await delete_folder_from_private_r2("chat_images/")
+            logger.info(f"已刪除 R2 聊天圖片: 刪除 {r2_result['deleted_count']} 個檔案")
+            if r2_result["errors"]:
+                logger.warning(f"刪除 R2 聊天圖片時有錯誤: {r2_result['errors']}")
+        except Exception as r2_error:
+            logger.error(f"刪除 R2 聊天圖片時發生錯誤: {str(r2_error)}")
+        
+        # 6. 刪除dining_events
         supabase.table("dining_events") \
             .delete() \
             .in_("id", event_ids) \
             .execute()
         
-        # 5. 最後刪除matching_groups
+        # 7. 最後刪除matching_groups
         supabase.table("matching_groups") \
             .delete() \
             .in_("id", group_ids) \
             .execute()
         
-        logger.info(f"已清理與 {len(event_ids)} 個聚餐事件相關的週期性數據")
+        logger.info(f"已清理與 {len(event_ids)} 個聚餐事件相關的週期性數據（包含聊天訊息和圖片）")
         
     except Exception as e:
         logger.error(f"結束聚餐事件時出錯: {str(e)}")
