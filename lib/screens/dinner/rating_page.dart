@@ -602,14 +602,8 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
         );
       }
 
-      // 沒有快取也沒有 URL，顯示預設頭像
-      return Container(
-        color: Colors.white,
-        child: Image.asset(
-          _getDefaultAvatarPath(gender ?? 'male', avatarIndex),
-          fit: BoxFit.cover,
-        ),
-      );
+      // 沒有快取也沒有 URL，顯示 loading 動畫（正在載入中）
+      return const AvatarShimmerPlaceholder(size: 60);
     }
 
     // 未知格式，顯示預設頭像
@@ -742,12 +736,13 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
           children: [
             // 左側頭像和暱稱
             Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                SizedBox(height: 6.h),
                 // 頭像
                 Container(
-                  width: 60.w,
-                  height: 60.w, // 使用相同的寬度值確保圓形
+                  width: 55.w,
+                  height: 55.w, // 使用相同的寬度值確保圓形
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     boxShadow: [
