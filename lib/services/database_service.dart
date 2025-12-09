@@ -606,4 +606,132 @@ class DatabaseService {
       },
     );
   }
+
+  /// 獲取群組成員資訊（排除當前用戶）
+  ///
+  /// [matchingGroupId] 配對組ID
+  /// [currentUserId] 當前用戶ID，將被排除
+  Future<List<Map<String, dynamic>>> getOtherGroupMembersInfo(
+    String matchingGroupId,
+    String currentUserId,
+  ) async {
+    return _apiService.handleRequest(
+      request: () async {
+        // 1. 從 user_matching_info 獲取所有該組的 user_id
+        final matchingInfoList = await _supabaseService.client
+            .from('user_matching_info')
+            .select('user_id')
+            .eq('matching_group_id', matchingGroupId);
+
+        if (matchingInfoList.isEmpty) {
+          debugPrint('未找到配對組成員: $matchingGroupId');
+          return [];
+        }
+
+        // 提取所有 user_id，排除當前用戶
+        final userIds =
+            matchingInfoList
+                .map<String>((item) => item['user_id'] as String)
+                .where((userId) => userId != currentUserId)
+                .toList();
+
+        if (userIds.isEmpty) {
+          debugPrint('排除當前用戶後無其他成員');
+          return [];
+        }
+
+        debugPrint('配對組 $matchingGroupId 的其他成員數量: ${userIds.length}');
+
+        // 2. 從 user_profiles 獲取所有成員的資訊
+        final userProfiles = await _supabaseService.client
+            .from(_userProfilesTable)
+            .select('user_id, nickname, personal_desc, avatar_path, gender')
+            .inFilter('user_id', userIds);
+
+        if (userProfiles.isEmpty) {
+          debugPrint('未找到任何用戶資料');
+          return [];
+        }
+
+        debugPrint('成功獲取 ${userProfiles.length} 位其他群組成員資料');
+        return List<Map<String, dynamic>>.from(userProfiles);
+      },
+    );
+  }
+
+  /// 提交用戶評分到資料庫
+  ///
+  /// [diningEventId] 聚餐事件ID
+  /// [fromUserId] 評分者ID（當前用戶）
+  /// [ratings] 評分列表，每個評分包含 to_user_id 和 rating_type
+  ///
+  /// 注意：created_at 和 updated_at 由資料庫自動處理（DEFAULT NOW()）
+  Future<void> submitUserRatings(
+    String diningEventId,
+    String fromUserId,
+    List<Map<String, dynamic>> ratings,
+  ) async {
+    return _apiService.handleRequest(
+      request: () async {
+        // 先驗證聚餐事件狀態是否為 completed
+        final diningEvent =
+            await _supabaseService.client
+                .from('dining_events')
+                .select('status')
+                .eq('id', diningEventId)
+                .maybeSingle();
+
+        if (diningEvent == null) {
+          throw Exception('找不到指定的聚餐事件');
+        }
+
+        if (diningEvent['status'] != 'completed') {
+          throw Exception('只有在聚餐事件完成後才能進行評分');
+        }
+
+        for (final rating in ratings) {
+          final toUserId = rating['to_user_id'] as String;
+          final ratingType = rating['rating_type'] as String;
+
+          // 驗證評分類型
+          if (!['like', 'dislike', 'no_show'].contains(ratingType)) {
+            debugPrint('無效的評分類型: $ratingType，跳過');
+            continue;
+          }
+
+          // 使用 upsert 來插入或更新評分
+          // 不手動設置 created_at 和 updated_at，讓資料庫自動處理
+          await _supabaseService.client.from('user_ratings').upsert({
+            'dining_event_id': diningEventId,
+            'from_user_id': fromUserId,
+            'to_user_id': toUserId,
+            'rating_type': ratingType,
+          }, onConflict: 'dining_event_id,from_user_id,to_user_id');
+
+          debugPrint('已提交評分: $fromUserId -> $toUserId: $ratingType');
+        }
+
+        debugPrint('用戶評分提交完成，共 ${ratings.length} 筆');
+      },
+    );
+  }
+
+  /// 檢查聚餐事件狀態
+  ///
+  /// [diningEventId] 聚餐事件ID
+  /// 返回聚餐事件狀態，如果找不到則返回 null
+  Future<String?> getDiningEventStatus(String diningEventId) async {
+    return _apiService.handleRequest(
+      request: () async {
+        final diningEvent =
+            await _supabaseService.client
+                .from('dining_events')
+                .select('status')
+                .eq('id', diningEventId)
+                .maybeSingle();
+
+        return diningEvent?['status'] as String?;
+      },
+    );
+  }
 }

@@ -213,6 +213,16 @@ CREATE TABLE IF NOT EXISTS user_ratings (
     UNIQUE(dining_event_id, from_user_id, to_user_id)
 );
 
+-- 用戶只能新增自己發出的評價
+CREATE POLICY ratings_insert_own ON user_ratings 
+FOR INSERT TO authenticated 
+WITH CHECK (from_user_id = auth.uid());
+
+-- 用戶只能更新自己發出的評價（因為使用 upsert）
+CREATE POLICY ratings_update_own ON user_ratings 
+FOR UPDATE TO authenticated 
+USING (from_user_id = auth.uid());
+
 -- 創建聚餐歷史紀錄表
 CREATE TABLE IF NOT EXISTS dining_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

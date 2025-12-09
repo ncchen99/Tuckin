@@ -464,7 +464,7 @@ async def change_restaurant(
             detail=f"更換餐廳時發生錯誤: {str(e)}"
         )
 
-# 獲取評分表單API
+# [棄用] 獲取評分表單API
 @router.post("/ratings/form", response_model=GetRatingFormResponse, status_code=status.HTTP_200_OK)
 async def get_rating_form(
     request: GetRatingFormRequest,
@@ -472,7 +472,7 @@ async def get_rating_form(
     current_user = Depends(get_current_user)
 ):
     """
-    獲取評分表單，返回需要評分的參與者列表（不含用戶ID）
+    [棄用] 獲取評分表單，返回需要評分的參與者列表（不含用戶ID）
     只有聚餐事件狀態為 completed 時才允許評分
     """
     try:
@@ -681,7 +681,7 @@ async def get_rating_form(
             detail=f"獲取評分表單時出錯: {str(e)}"
         )
 
-# 提交評分API
+# [棄用] 提交評分API
 @router.post("/ratings/submit", response_model=RatingResponse, status_code=status.HTTP_200_OK)
 async def submit_rating(
     request: SubmitRatingRequest,
@@ -689,7 +689,7 @@ async def submit_rating(
     current_user = Depends(get_current_user)
 ):
     """
-    活動結束後用戶提交評分
+    [棄用] 活動結束後用戶提交評分
     只有聚餐事件狀態為 completed 時才允許評分
     """
     try:

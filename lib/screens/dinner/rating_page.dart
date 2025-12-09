@@ -4,7 +4,6 @@ import 'package:tuckin/components/components.dart';
 import 'package:tuckin/components/common/stroke_text_widget.dart';
 import 'package:tuckin/services/auth_service.dart';
 import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/dining_service.dart';
 import 'package:tuckin/services/image_cache_service.dart';
 import 'package:tuckin/services/chat_service.dart';
 import 'package:tuckin/services/user_service.dart';
@@ -25,13 +24,12 @@ class RatingPage extends StatefulWidget {
 class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
-  final DiningService _diningService = DiningService();
   final NavigationService _navigationService = NavigationService();
   final ChatService _chatService = ChatService();
   bool _isLoading = true;
   bool _isSubmitting = false;
   String? _diningEventId;
-  String _sessionToken = ''; // 存儲API返回的session_token
+  String? _matchingGroupId; // 配對組ID
   String _loadingStatus = '正在載入評分資料...'; // 加載狀態文字
 
   // 評分選項
@@ -124,8 +122,9 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
           );
 
           _diningEventId = userStatusService.diningEventId;
+          _matchingGroupId = userStatusService.matchingGroupId;
 
-          if (_diningEventId == null) {
+          if (_diningEventId == null || _matchingGroupId == null) {
             setState(() {
               _loadingStatus = '正在查詢聚餐事件...';
             });
@@ -137,6 +136,7 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
 
             if (diningEvent != null) {
               _diningEventId = diningEvent['id'];
+              _matchingGroupId = diningEvent['matching_group_id'];
 
               // 檢查聚餐事件狀態
               final eventStatus = diningEvent['status'];
@@ -188,41 +188,74 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
 
   Future<void> _loadRatingForm() async {
     try {
-      if (_diningEventId == null) {
-        throw Exception('聚餐事件ID為空，無法獲取評分表單');
+      if (_diningEventId == null || _matchingGroupId == null) {
+        throw Exception('聚餐事件ID或配對組ID為空，無法獲取評分表單');
       }
 
-      final response = await _diningService.getRatingForm(_diningEventId!);
+      // 獲取當前用戶ID
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null) {
+        throw Exception('用戶未登入');
+      }
+
+      setState(() {
+        _loadingStatus = '正在驗證聚餐事件狀態...';
+      });
+
+      // 驗證聚餐事件狀態是否為 completed
+      final eventStatus = await _databaseService.getDiningEventStatus(
+        _diningEventId!,
+      );
+
+      if (eventStatus != 'completed') {
+        throw Exception('只有在聚餐事件完成後才能進行評分');
+      }
+
+      setState(() {
+        _loadingStatus = '正在獲取群組成員資訊...';
+      });
+
+      // 直接從資料庫獲取群組成員資訊（排除當前用戶）
+      final members = await _databaseService.getOtherGroupMembersInfo(
+        _matchingGroupId!,
+        currentUser.id,
+      );
+
+      if (members.isEmpty) {
+        debugPrint('沒有其他群組成員需要評分');
+      }
+
+      // 轉換成前端需要的格式
+      List<Map<String, dynamic>> participants = [];
+      for (int i = 0; i < members.length; i++) {
+        final member = members[i];
+        participants.add({
+          'user_id': member['user_id'],
+          'nickname': member['nickname'] ?? '未命名',
+          'gender': member['gender'] ?? 'male',
+          'avatar_path': member['avatar_path'],
+          'avatar_index': 1, // 預設頭像索引
+          'selectedRating': null,
+          'index': i, // 用於動畫索引
+        });
+      }
 
       if (mounted) {
-        // 存儲session_token用於後續提交評分
-        _sessionToken = response['session_token'] ?? '';
+        setState(() {
+          _participants = participants;
 
-        // 解析API回傳的參與者資料
-        List<Map<String, dynamic>> participants = [];
-        if (response.containsKey('participants')) {
-          participants = List<Map<String, dynamic>>.from(
-            response['participants'],
-          );
-        }
+          // 初始化動畫
+          _initAnimations();
 
-        // 載入頭像
-        await _loadParticipantAvatars(participants);
+          // 先設置加載完成，讓頁面可以顯示
+          _isLoading = false;
+        });
 
-        if (mounted) {
-          setState(() {
-            _participants = participants;
+        debugPrint('成功載入評分表單，參與者數量: ${_participants.length}');
+        debugPrint('參與者資料: $_participants');
 
-            // 初始化動畫
-            _initAnimations();
-
-            // 最後一步設置加載完成
-            _isLoading = false;
-          });
-
-          debugPrint('成功載入評分表單，參與者數量: ${_participants.length}');
-          debugPrint('參與者資料: $_participants');
-        }
+        // 非同步載入頭像（不阻塞頁面顯示）
+        _loadParticipantAvatarsAsync(participants);
       }
     } catch (e) {
       debugPrint('載入評分表單時出錯: $e');
@@ -242,96 +275,118 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
     }
   }
 
-  /// 載入參與者頭像
-  Future<void> _loadParticipantAvatars(
-    List<Map<String, dynamic>> participants,
-  ) async {
+  /// 非同步載入參與者頭像（不阻塞頁面顯示）
+  ///
+  /// 載入順序：
+  /// 1. 先檢查本地快取檔案是否存在
+  /// 2. 如果本地快取不存在，檢查 SharedPreferences 中的 URL 緩存
+  /// 3. 如果 URL 緩存過期或不存在，才從 API 獲取
+  void _loadParticipantAvatarsAsync(List<Map<String, dynamic>> participants) {
     if (participants.isEmpty || _diningEventId == null) return;
 
-    try {
-      setState(() {
-        _loadingStatus = '正在載入參與者頭像...';
-      });
+    // 使用 Future 在背景執行，不阻塞 UI
+    Future(() async {
+      try {
+        final imageCacheService = ImageCacheService();
+        final cachedPaths = <String, String>{};
+        final usersNeedingUrl = <String>[];
 
-      // 預先載入所有成員頭像的本地快取路徑
-      final imageCacheService = ImageCacheService();
-      final cachedPaths = <String, String>{};
-      final usersNeedingUrl = <String>[];
+        // 第一步：檢查本地快取檔案
+        for (final participant in participants) {
+          final avatarPath = participant['avatar_path'] as String?;
+          final userId = participant['user_id'] as String?;
 
-      for (final participant in participants) {
-        final avatarPath = participant['avatar_path'] as String?;
-        final userId = participant['user_id'] as String?;
-
-        if (avatarPath != null &&
-            avatarPath.isNotEmpty &&
-            avatarPath.startsWith('avatars/') &&
-            userId != null) {
-          try {
-            final cachedFile = await imageCacheService.getCachedImageByKey(
-              avatarPath,
-              CacheType.avatar,
-            );
-            if (cachedFile != null && cachedFile.existsSync()) {
-              cachedPaths[avatarPath] = cachedFile.path;
-            } else {
-              // 本地快取不存在，需要獲取 URL
+          if (avatarPath != null &&
+              avatarPath.isNotEmpty &&
+              avatarPath.startsWith('avatars/') &&
+              userId != null) {
+            try {
+              final cachedFile = await imageCacheService.getCachedImageByKey(
+                avatarPath,
+                CacheType.avatar,
+              );
+              if (cachedFile != null && cachedFile.existsSync()) {
+                cachedPaths[avatarPath] = cachedFile.path;
+              } else {
+                // 本地快取不存在，需要獲取 URL
+                usersNeedingUrl.add(userId);
+              }
+            } catch (e) {
+              debugPrint('檢查頭像快取失敗: $e');
               usersNeedingUrl.add(userId);
             }
-          } catch (e) {
-            debugPrint('檢查頭像快取失敗: $e');
-            usersNeedingUrl.add(userId);
-          }
-        }
-      }
-
-      // 只有在需要時才請求 API 獲取頭像 URL
-      Map<String, String?> avatars = {};
-      if (usersNeedingUrl.isNotEmpty) {
-        // 先嘗試從本地緩存讀取 URL
-        final prefs = await SharedPreferences.getInstance();
-        final now = DateTime.now().millisecondsSinceEpoch;
-        bool needFetchFromApi = false;
-
-        for (final userId in usersNeedingUrl) {
-          final cacheKey = 'other_avatar_url_$userId';
-          final cachedUrl = prefs.getString(cacheKey);
-          final cacheTimeKey = '${cacheKey}_time';
-          final cacheTime = prefs.getInt(cacheTimeKey);
-
-          if (cachedUrl != null &&
-              cacheTime != null &&
-              (now - cacheTime) < 50 * 60 * 1000) {
-            avatars[userId] = cachedUrl;
-          } else {
-            needFetchFromApi = true;
           }
         }
 
-        // 如果有任何 URL 緩存過期或不存在，則從 API 獲取
-        if (needFetchFromApi) {
-          final apiAvatars = await _chatService.getGroupMemberAvatars(
-            _diningEventId!,
-          );
-          avatars.addAll(apiAvatars);
-          // 更新 UserService 緩存
-          await UserService().updateAvatarUrlCache(apiAvatars);
+        // 如果有本地快取，先更新 UI
+        if (cachedPaths.isNotEmpty && mounted) {
+          setState(() {
+            _cachedFilePaths = cachedPaths;
+          });
         }
-      }
 
-      if (mounted) {
-        setState(() {
-          _avatarUrls = avatars;
-          _cachedFilePaths = cachedPaths;
-        });
-      }
+        // 第二步：只有在需要時才請求 URL
+        Map<String, String?> avatars = {};
+        if (usersNeedingUrl.isNotEmpty) {
+          // 先嘗試從 SharedPreferences 讀取 URL 緩存
+          final prefs = await SharedPreferences.getInstance();
+          final now = DateTime.now().millisecondsSinceEpoch;
+          final usersStillNeedingApi = <String>[];
 
-      debugPrint(
-        '頭像載入完成 - 快取路徑: ${cachedPaths.length}, URL: ${avatars.length}',
-      );
-    } catch (e) {
-      debugPrint('載入參與者頭像時出錯: $e');
-      // 頭像載入失敗不影響評分功能，繼續使用預設頭像
-    }
+          for (final userId in usersNeedingUrl) {
+            final cacheKey = 'other_avatar_url_$userId';
+            final cachedUrl = prefs.getString(cacheKey);
+            final cacheTimeKey = '${cacheKey}_time';
+            final cacheTime = prefs.getInt(cacheTimeKey);
+
+            if (cachedUrl != null &&
+                cacheTime != null &&
+                (now - cacheTime) < 50 * 60 * 1000) {
+              // URL 緩存有效
+              avatars[userId] = cachedUrl;
+            } else {
+              // URL 緩存過期或不存在
+              usersStillNeedingApi.add(userId);
+            }
+          }
+
+          // 如果有從 SharedPreferences 取得的 URL，先更新 UI
+          if (avatars.isNotEmpty && mounted) {
+            setState(() {
+              _avatarUrls = {..._avatarUrls, ...avatars};
+            });
+          }
+
+          // 第三步：如果仍有用戶需要從 API 獲取，則請求 API
+          if (usersStillNeedingApi.isNotEmpty) {
+            try {
+              final apiAvatars = await _chatService.getGroupMemberAvatars(
+                _diningEventId!,
+              );
+              avatars.addAll(apiAvatars);
+              // 更新 UserService 緩存
+              await UserService().updateAvatarUrlCache(apiAvatars);
+
+              // 更新 UI
+              if (mounted) {
+                setState(() {
+                  _avatarUrls = {..._avatarUrls, ...apiAvatars};
+                });
+              }
+            } catch (e) {
+              debugPrint('從 API 獲取頭像 URL 失敗: $e');
+            }
+          }
+        }
+
+        debugPrint(
+          '頭像載入完成 - 快取路徑: ${cachedPaths.length}, URL: ${avatars.length}',
+        );
+      } catch (e) {
+        debugPrint('載入參與者頭像時出錯: $e');
+        // 頭像載入失敗不影響評分功能，繼續使用預設頭像
+      }
+    });
   }
 
   // 計算是否所有參與者都已評分
@@ -382,21 +437,6 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
       return;
     }
 
-    // 檢查session_token是否有效
-    if (_sessionToken.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              '評分會話無效，請重新進入評分頁面',
-              style: TextStyle(fontFamily: 'OtsutomeFont'),
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
     setState(() {
       _isSubmitting = true;
     });
@@ -406,47 +446,64 @@ class _RatingPageState extends State<RatingPage> with TickerProviderStateMixin {
         throw Exception('聚餐事件ID為空，無法提交評分');
       }
 
-      // 準備評分數據
-      final ratings =
-          _participants
-              .map(
-                (participant) => {
-                  'participant_id': participant['index'], // 使用後端返回的index作為參與者ID
-                  'rating': participant['selectedRating'],
-                },
-              )
-              .toList();
+      // 獲取當前用戶
+      final currentUser = await _authService.getCurrentUser();
+      if (currentUser == null) {
+        throw Exception('用戶未登入');
+      }
 
-      // 提交評分
-      await _diningService.submitRating(
+      // 準備評分數據，轉換為資料庫需要的格式
+      final ratings =
+          _participants.map((participant) {
+            // 轉換評分類型
+            String ratingType;
+            switch (participant['selectedRating']) {
+              case '喜歡':
+                ratingType = 'like';
+                break;
+              case '不喜歡':
+                ratingType = 'dislike';
+                break;
+              case '未出席':
+                ratingType = 'no_show';
+                break;
+              default:
+                ratingType = 'like'; // 默認值
+            }
+
+            return {
+              'to_user_id': participant['user_id'],
+              'rating_type': ratingType,
+            };
+          }).toList();
+
+      // 直接提交評分到資料庫
+      await _databaseService.submitUserRatings(
         _diningEventId!,
+        currentUser.id,
         ratings,
-        _sessionToken,
       );
 
       // 更新用戶狀態
-      final currentUser = await _authService.getCurrentUser();
-      if (currentUser != null) {
-        await _databaseService.updateUserStatus(currentUser.id, 'booking');
+      await _databaseService.updateUserStatus(currentUser.id, 'booking');
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '評分成功！！',
-                style: const TextStyle(fontFamily: 'OtsutomeFont'),
-              ),
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '評分成功！！',
+              style: const TextStyle(fontFamily: 'OtsutomeFont'),
             ),
-          );
-          // 更新UserStatusService
-          final userStatusService = Provider.of<UserStatusService>(
-            context,
-            listen: false,
-          );
-          userStatusService.setUserStatus('booking');
+          ),
+        );
+        // 更新UserStatusService
+        final userStatusService = Provider.of<UserStatusService>(
+          context,
+          listen: false,
+        );
+        userStatusService.setUserStatus('booking');
 
-          _navigationService.navigateToHome(context);
-        }
+        _navigationService.navigateToHome(context);
       }
     } catch (e) {
       debugPrint('提交評分時出錯: $e');
