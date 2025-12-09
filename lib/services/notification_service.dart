@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:tuckin/services/supabase_service.dart';
 import 'package:tuckin/services/chat_service.dart';
+import 'package:tuckin/services/database_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:tuckin/services/time_service.dart';
@@ -370,6 +371,27 @@ class NotificationService {
       if (!context.mounted) {
         debugPrint('NotificationService: 上下文已不再掛載，儲存待處理導航');
         _pendingChatNavigation = diningEventId;
+        return;
+      }
+
+      // 檢查使用者狀態是否為 waiting_attendance
+      final currentUser = _supabaseService.auth.currentUser;
+      if (currentUser != null) {
+        final databaseService = DatabaseService();
+        final userStatus = await databaseService.getUserStatus(currentUser.id);
+        debugPrint('NotificationService: 當前使用者狀態為 $userStatus');
+
+        // 只有 waiting_attendance 狀態才能進入聊天室
+        if (userStatus != 'waiting_attendance') {
+          debugPrint(
+            'NotificationService: 使用者狀態不是 waiting_attendance，導航到狀態對應頁面',
+          );
+          await _handleNotificationNavigation();
+          return;
+        }
+      } else {
+        debugPrint('NotificationService: 無法獲取當前使用者，導航到狀態對應頁面');
+        await _handleNotificationNavigation();
         return;
       }
 
