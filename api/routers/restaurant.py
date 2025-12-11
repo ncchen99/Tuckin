@@ -677,40 +677,41 @@ async def process_group_voting(
                 .execute()
         
         # 8. 發送通知
-        # 格式化聚餐時間顯示 - 跨平台解決方案
-        try:
-            # 嘗試使用Linux格式（沒有前導零）
-            formatted_dinner_time = next_dinner_time.strftime("%-m月%-d日")
-        except ValueError:
-            # Windows平台回退方案
-            month = next_dinner_time.month
-            day = next_dinner_time.day
-            formatted_dinner_time = f"{month}月{day}日"
-        
-        # 通知消息
-        notification_title = "餐廳出爐！"
-        if is_forced:
-            notification_body = f"投票時間到！這次的餐廳是{restaurant_name}，期待{formatted_dinner_time}的聚餐歐！"
-        else:
-            notification_body = f"這次的餐廳是{restaurant_name}，期待{formatted_dinner_time}的聚餐歐！"
-        
-        notification_service = NotificationService(use_service_role=True)
-        for member_id in group_members:
+        # - 如果是自然完成（所有人都投票），立即發送通知
+        # - 如果是強制結束（投票時間到），由 reminder_vote_result 在 10:00 發送通知
+        if not is_forced:
+            # 格式化聚餐時間顯示 - 跨平台解決方案
             try:
-                await notification_service.send_notification(
-                    user_id=member_id,
-                    title=notification_title,
-                    body=notification_body,
-                    data={
-                        "type": "dining_event_created",
-                        "event_id": event_id,
-                        "restaurant_id": restaurant_id
-                    }
-                )
-            except Exception as ne:
-                logger.error(f"發送通知給用戶 {member_id} 失敗: {str(ne)}")
-        
-        logger.info(f"群組 {group_id} 的聚餐事件 {event_id} 已成功創建")
+                # 嘗試使用Linux格式（沒有前導零）
+                formatted_dinner_time = next_dinner_time.strftime("%-m月%-d日")
+            except ValueError:
+                # Windows平台回退方案
+                month = next_dinner_time.month
+                day = next_dinner_time.day
+                formatted_dinner_time = f"{month}月{day}日"
+            
+            notification_title = "餐廳出爐！"
+            notification_body = f"這次的餐廳是{restaurant_name}，期待{formatted_dinner_time}的聚餐歐！"
+            
+            notification_service = NotificationService(use_service_role=True)
+            for member_id in group_members:
+                try:
+                    await notification_service.send_notification(
+                        user_id=member_id,
+                        title=notification_title,
+                        body=notification_body,
+                        data={
+                            "type": "dining_event_created",
+                            "event_id": event_id,
+                            "restaurant_id": restaurant_id
+                        }
+                    )
+                except Exception as ne:
+                    logger.error(f"發送通知給用戶 {member_id} 失敗: {str(ne)}")
+            
+            logger.info(f"群組 {group_id} 的聚餐事件 {event_id} 已成功創建，已發送即時通知")
+        else:
+            logger.info(f"群組 {group_id} 的聚餐事件 {event_id} 已成功創建（強制結束），通知將由 reminder_vote_result 排程發送")
         
         return {
             "success": True,

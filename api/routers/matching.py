@@ -690,16 +690,16 @@ async def _save_matching_groups_to_db(
     
     logger.info("階段 2 完成: 所有群組餐廳推薦處理完成")
     
-    # 第三階段：更新用戶狀態並發送通知
-    logger.info("階段 3: 更新用戶狀態並發送通知")
-    successful_notifications = 0
-    failed_notifications = 0
+    # 第三階段：更新用戶狀態（通知由排程任務 reminder_matching 在 10:00 發送）
+    logger.info("階段 3: 更新用戶狀態")
+    successful_updates = 0
+    failed_updates = 0
     
     for group_info in group_processing_info:
         group_id = group_info["group_id"]
         user_ids = group_info["user_ids"]
         
-        # 更新每個用戶的狀態並發送通知
+        # 更新每個用戶的狀態
         for user_id in user_ids:
             try:
                 # 更新用戶狀態
@@ -708,26 +708,17 @@ async def _save_matching_groups_to_db(
                 )
                 
                 if update_success:
-                    # 發送通知
-                    notification_success = await send_matching_notification(
-                        notification_service, user_id, group_id, confirm_deadline
-                    )
-                    
-                    if notification_success:
-                        successful_notifications += 1
-                        logger.info(f"成功更新用戶 {user_id} 狀態並發送通知")
-                    else:
-                        failed_notifications += 1
-                        logger.warning(f"用戶 {user_id} 狀態更新成功，但通知發送失敗")
+                    successful_updates += 1
+                    logger.info(f"成功更新用戶 {user_id} 狀態為 waiting_restaurant")
                 else:
-                    failed_notifications += 1
+                    failed_updates += 1
                     logger.warning(f"更新用戶 {user_id} 加入組別 {group_id} 的狀態失敗")
                     
             except Exception as e:
-                failed_notifications += 1
-                logger.error(f"處理用戶 {user_id} 狀態更新和通知時出錯: {str(e)}")
+                failed_updates += 1
+                logger.error(f"處理用戶 {user_id} 狀態更新時出錯: {str(e)}")
     
-    logger.info(f"階段 3 完成: 成功處理 {successful_notifications} 個用戶通知，失敗 {failed_notifications} 個")
+    logger.info(f"階段 3 完成: 成功更新 {successful_updates} 個用戶狀態，失敗 {failed_updates} 個")
     logger.info(f"配對處理總結: 創建 {created_groups} 個群組，處理 {total_matched_users} 個用戶")
     
     return created_groups, total_matched_users

@@ -310,20 +310,6 @@ async def confirm_restaurant(
             "reservation_phone": request.reservation_phone,
             "updated_at": datetime.utcnow().isoformat()
         }
-        
-        # 如果預訂姓名和電話都是空值，表示餐廳無法訂位，生成密語
-        if not request.reservation_name.strip() and not request.reservation_phone.strip():
-            import random
-            passphrases = [
-                '不好意思，你可以幫我拍照嗎',
-                '不好意思，可以跟你借衛生紙嗎',
-                '不好意思，請問火車站怎麼走',
-                '不好意思，你有在排隊嗎',
-                '想問你有吃過這家店嗎',
-                '你好，你也在等朋友嗎',
-            ]
-            passphrase = random.choice(passphrases)
-            update_data["description"] = passphrase
             
         # 更新狀態為confirmed並保存訂位人資訊
         updated_event = supabase.table("dining_events") \

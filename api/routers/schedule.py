@@ -11,7 +11,12 @@ from dependencies import get_supabase_service, verify_cron_api_key
 from routers.matching import process_batch_matching
 from routers.restaurant import process_finalize_votes
 from routers.dining import update_completed_dining_events, finalize_dining_events
-from services.reminder_service import process_reminder_booking, process_reminder_attendance
+from services.reminder_service import (
+    process_reminder_booking, 
+    process_reminder_attendance,
+    process_reminder_matching,
+    process_reminder_vote_result
+)
 
 
 router = APIRouter()
@@ -58,12 +63,12 @@ def _to_utc_iso(dt_local: datetime) -> str:
     return dt_local.astimezone(timezone.utc).isoformat()
 
 
-def _compute_week_times(current_dt_local: datetime) -> Tuple[datetime, datetime, datetime, datetime, datetime, datetime, datetime]:
+def _compute_week_times(current_dt_local: datetime) -> Tuple[datetime, datetime, datetime, datetime, datetime, datetime, datetime, datetime, datetime]:
     """
     給定某個當地日期時間（台北），計算該「週」的任務時間與聚餐時間：
     回傳順序：
         match_local, vote_local, event_end_local, rating_end_local, dinner_time_local,
-        reminder_booking_local, reminder_attendance_local
+        reminder_booking_local, reminder_attendance_local, reminder_matching_local, reminder_vote_result_local
     """
     target_weekday = _target_dinner_weekday(current_dt_local)  # 1=Mon, 4=Thu
     weekday = current_dt_local.isoweekday()
@@ -88,14 +93,20 @@ def _compute_week_times(current_dt_local: datetime) -> Tuple[datetime, datetime,
     rating_base = event_end_local + timedelta(hours=48)
     rating_end_local = _localize(rating_base.year, rating_base.month, rating_base.day, 22, 0)
 
-    # reminder_booking = match 前一天 09:00（提醒用戶預約聚餐）
+    # reminder_booking = match 前一天 10:00（提醒用戶預約聚餐）
     reminder_booking_day = match_day - timedelta(days=1)
-    reminder_booking_local = _localize(reminder_booking_day.year, reminder_booking_day.month, reminder_booking_day.day, 9, 0)
+    reminder_booking_local = _localize(reminder_booking_day.year, reminder_booking_day.month, reminder_booking_day.day, 10, 0)
 
-    # reminder_attendance = 聚餐當天 09:00（提醒用戶參加聚餐）
-    reminder_attendance_local = _localize(dinner_time_local.year, dinner_time_local.month, dinner_time_local.day, 9, 0)
+    # reminder_attendance = 聚餐當天 10:00（提醒用戶參加聚餐）
+    reminder_attendance_local = _localize(dinner_time_local.year, dinner_time_local.month, dinner_time_local.day, 10, 0)
 
-    return match_local, vote_local, event_end_local, rating_end_local, dinner_time_local, reminder_booking_local, reminder_attendance_local
+    # reminder_matching = match 當天 10:00（配對完成後發送通知）
+    reminder_matching_local = _localize(match_day.year, match_day.month, match_day.day, 10, 0)
+
+    # reminder_vote_result = vote_end 當天 10:00（投票結束後發送通知）
+    reminder_vote_result_local = _localize(vote_day.year, vote_day.month, vote_day.day, 10, 0)
+
+    return match_local, vote_local, event_end_local, rating_end_local, dinner_time_local, reminder_booking_local, reminder_attendance_local, reminder_matching_local, reminder_vote_result_local
 
 
 @router.post("/generate", dependencies=[Depends(verify_cron_api_key)])
@@ -172,7 +183,7 @@ async def generate_schedule(
             next_match_found = False
             # 最多往後找 12 週，理論上很快就會找到
             for _ in range(12):
-                match_local, vote_local, event_end_local, rating_end_local, dinner_local, _, _ = _compute_week_times(probe_monday)
+                match_local, vote_local, event_end_local, rating_end_local, dinner_local, _, _, _, _ = _compute_week_times(probe_monday)
                 if match_local > now_local:
                     min_allowed_time_utc = match_local.astimezone(timezone.utc)
                     # 以 match 所在的週一為第一週
@@ -191,16 +202,19 @@ async def generate_schedule(
         while week_monday <= last_week_monday_local:
             (
                 match_local, vote_local, event_end_local, rating_end_local, _,
-                reminder_booking_local, reminder_attendance_local
+                reminder_booking_local, reminder_attendance_local,
+                reminder_matching_local, reminder_vote_result_local
             ) = _compute_week_times(week_monday)
 
             for task_type, dt_local in [
-                ("reminder_booking", reminder_booking_local),      # match 前一天 09:00
-                ("match", match_local),                            # 聚餐日 - 2 天 06:00
-                ("restaurant_vote_end", vote_local),               # 聚餐日 - 1 天 06:00
-                ("reminder_attendance", reminder_attendance_local),# 聚餐當天 09:00
-                ("event_end", event_end_local),                    # 聚餐當天 22:00
-                ("rating_end", rating_end_local),                  # 聚餐後 2 天 22:00
+                ("reminder_booking", reminder_booking_local),        # match 前一天 10:00
+                ("match", match_local),                              # 聚餐日 - 2 天 06:00
+                ("reminder_matching", reminder_matching_local),      # 聚餐日 - 2 天 10:00（配對完成通知）
+                ("restaurant_vote_end", vote_local),                 # 聚餐日 - 1 天 06:00
+                ("reminder_vote_result", reminder_vote_result_local),# 聚餐日 - 1 天 10:00（投票結果通知）
+                ("reminder_attendance", reminder_attendance_local),  # 聚餐當天 10:00
+                ("event_end", event_end_local),                      # 聚餐當天 22:00
+                ("rating_end", rating_end_local),                    # 聚餐後 2 天 22:00
             ]:
                 dt_utc = dt_local.astimezone(timezone.utc)
                 if dt_utc > now_utc and dt_utc >= min_allowed_time_utc and dt_utc <= generate_until_utc:
@@ -249,10 +263,16 @@ async def generate_schedule(
 
 # 需要背景執行的任務類型（這些任務會發送通知，可能耗時較長）
 BACKGROUND_TASK_TYPES = [
-    "match",                 # 配對任務，會發送通知
-    "restaurant_vote_end",   # 投票結束，會發送通知
     "reminder_booking",      # 預約提醒
     "reminder_attendance",   # 出席提醒
+    "reminder_matching",     # 配對完成通知（match 後 4 小時）
+    "reminder_vote_result",  # 投票結果通知（vote_end 後 4 小時，僅針對強制結束的群組）
+]
+
+# 同步執行的任務類型（不發送通知，快速完成）
+SYNC_TASK_TYPES = [
+    "match",                 # 配對任務（通知由 reminder_matching 發送）
+    "restaurant_vote_end",   # 投票結束（即時通知由 vote_restaurant 發送，強制結束由 reminder_vote_result 發送）
 ]
 
 
@@ -267,14 +287,14 @@ async def _execute_task_in_background(
     try:
         now_utc = datetime.now(timezone.utc)
         
-        if task_type == "match":
-            result = await process_batch_matching(supabase)
-        elif task_type == "restaurant_vote_end":
-            result = await process_finalize_votes(supabase)
-        elif task_type == "reminder_booking":
+        if task_type == "reminder_booking":
             result = await process_reminder_booking(supabase)
         elif task_type == "reminder_attendance":
             result = await process_reminder_attendance(supabase)
+        elif task_type == "reminder_matching":
+            result = await process_reminder_matching(supabase)
+        elif task_type == "reminder_vote_result":
+            result = await process_reminder_vote_result(supabase)
         else:
             logger.error(f"[背景任務] 未知的任務類型: {task_type}")
             return
@@ -306,13 +326,15 @@ async def execute_scheduled_tasks(
     supabase: Client = Depends(get_supabase_service)
 ) -> Dict[str, Any]:
     """
-    執行當前時間應執行的任務（預設使用背景執行）：
+    執行當前時間應執行的任務：
     - 從 schedule_table 取出 status=pending 且 scheduled_time 落在 [now-10min, now+10min]
     - 依 task_type 呼叫對應的業務邏輯：
-      * match -> process_batch_matching（背景執行，會發送通知）
-      * restaurant_vote_end -> process_finalize_votes（背景執行，會發送通知）
+      * match -> process_batch_matching（同步執行，不發送通知）
+      * restaurant_vote_end -> process_finalize_votes（同步執行，不發送通知）
       * reminder_booking -> process_reminder_booking（背景執行）
       * reminder_attendance -> process_reminder_attendance（背景執行）
+      * reminder_matching -> process_reminder_matching（背景執行）
+      * reminder_vote_result -> process_reminder_vote_result（背景執行，僅處理強制結束的群組）
       * event_end -> update_completed_dining_events（同步執行）
       * rating_end -> finalize_dining_events（同步執行）
     - 背景任務會立即回傳，避免請求超時
@@ -362,12 +384,16 @@ async def execute_scheduled_tasks(
                     "success": True,
                 })
             else:
-                # 其他任務同步執行（event_end, rating_end）
+                # 其他任務同步執行（match, restaurant_vote_end, event_end, rating_end）
                 ok = True
                 err_msg = None
                 
                 try:
-                    if task_type == "event_end":
+                    if task_type == "match":
+                        await process_batch_matching(supabase)
+                    elif task_type == "restaurant_vote_end":
+                        await process_finalize_votes(supabase)
+                    elif task_type == "event_end":
                         await update_completed_dining_events(supabase)
                     elif task_type == "rating_end":
                         await finalize_dining_events(supabase)
