@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from supabase import Client
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, Set
 import random
 from datetime import datetime, timedelta
 import logging
@@ -176,6 +176,7 @@ async def _match_users_into_groups(user_data: Dict[str, Dict[str, Any]], supabas
     """
     根據用戶資料將用戶分組配對，確保所有用戶都被分配，優先4人組，
     剩餘分配至5人組，僅在 N=6,7,11 時允許3人組。
+    新增：考慮用戶的聚餐歷史，盡量避免曾經一起聚餐過的用戶再次配對。
 
     Args:
         user_data: 格式 {user_id: {"gender": gender, "personality_type": personality_type, "prefer_school_only": bool}}
@@ -189,26 +190,36 @@ async def _match_users_into_groups(user_data: Dict[str, Dict[str, Any]], supabas
     if total_users == 0:
         return []
 
+    # 獲取所有用戶的聚餐歷史配對
+    all_user_ids = list(user_data.keys())
+    dining_history_pairs = await get_user_dining_history_pairs(supabase, all_user_ids)
+    logger.info(f"已獲取聚餐歷史數據，共 {sum(len(v) for v in dining_history_pairs.values()) // 2} 對歷史配對")
+
     # 按校內偏好分組
     school_only_users = {uid: data for uid, data in user_data.items() if data.get("prefer_school_only", False)}
     mixed_users = {uid: data for uid, data in user_data.items() if not data.get("prefer_school_only", False)}
 
     # 處理校內專屬用戶
     logger.info(f"處理校內專屬用戶: {len(school_only_users)} 人")
-    school_only_groups = await _form_groups_for_subset(school_only_users, is_school_only=True, supabase=supabase)
+    school_only_groups = await _form_groups_for_subset(school_only_users, is_school_only=True, supabase=supabase, dining_history_pairs=dining_history_pairs)
 
     # 處理混合配對用戶
     logger.info(f"處理混合配對用戶: {len(mixed_users)} 人")
-    mixed_groups = await _form_groups_for_subset(mixed_users, is_school_only=False, supabase=supabase)
+    mixed_groups = await _form_groups_for_subset(mixed_users, is_school_only=False, supabase=supabase, dining_history_pairs=dining_history_pairs)
 
     # 合併結果
     all_groups = school_only_groups + mixed_groups
     logger.info(f"總共形成 {len(all_groups)} 個組別")
     return all_groups
 
-async def _form_groups_for_subset(user_data: Dict[str, Dict[str, Any]], is_school_only: bool, supabase: Client) -> List[Dict]:
+async def _form_groups_for_subset(
+    user_data: Dict[str, Dict[str, Any]], 
+    is_school_only: bool, 
+    supabase: Client,
+    dining_history_pairs: Dict[str, Set[str]] = None
+) -> List[Dict]:
     """
-    為特定子集（校內專屬或混合）的用戶進行分組，加入個性類型匹配。
+    為特定子集（校內專屬或混合）的用戶進行分組，加入個性類型匹配和聚餐歷史考量。
     """
     if not user_data:
         return []
@@ -248,23 +259,23 @@ async def _form_groups_for_subset(user_data: Dict[str, Dict[str, Any]], is_schoo
     # 特殊情況處理 N=6, 7, 11
     if total_users == 6:
         logger.info(f"處理特殊情況 N=6：組成兩個 3 人組")
-        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
-        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
+        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
         if group1: result_groups.append(_create_group_dict(group1, user_data, is_school_only))
         if group2: result_groups.append(_create_group_dict(group2, user_data, is_school_only))
         return result_groups
     elif total_users == 7:
         logger.info(f"處理特殊情況 N=7：組成一個 4 人組和一個 3 人組")
-        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
-        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4, dining_history_pairs)
+        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
         if group4: result_groups.append(_create_group_dict(group4, user_data, is_school_only))
         if group3: result_groups.append(_create_group_dict(group3, user_data, is_school_only))
         return result_groups
     elif total_users == 11:
         logger.info(f"處理特殊情況 N=11：組成兩個 4 人組和一個 3 人組")
-        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
-        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
-        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4, dining_history_pairs)
+        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4, dining_history_pairs)
+        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
         if group1: result_groups.append(_create_group_dict(group1, user_data, is_school_only))
         if group2: result_groups.append(_create_group_dict(group2, user_data, is_school_only))
         if group3: result_groups.append(_create_group_dict(group3, user_data, is_school_only))
@@ -297,7 +308,7 @@ async def _form_groups_for_subset(user_data: Dict[str, Dict[str, Any]], is_schoo
             elif total_users == 7: # 已處理
                 pass
             elif total_users == 3: # 如果總數恰好是3, 需要組成一個3人組 (雖然一般不期望走到這)
-                group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+                group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
                 if group3: result_groups.append(_create_group_dict(group3, user_data, is_school_only))
                 return result_groups
             else:
@@ -312,7 +323,7 @@ async def _form_groups_for_subset(user_data: Dict[str, Dict[str, Any]], is_schoo
         if len(remaining_user_ids) < 4:
             logger.error("邏輯錯誤：剩餘用戶不足以組成計劃的 4 人組")
             break
-        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
+        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4, dining_history_pairs)
         if group4:
             result_groups.append(_create_group_dict(group4, user_data, is_school_only))
         else:
@@ -331,7 +342,7 @@ async def _form_groups_for_subset(user_data: Dict[str, Dict[str, Any]], is_schoo
         if len(remaining_user_ids) < 5:
             logger.error("邏輯錯誤：剩餘用戶不足以組成計劃的 5 人組")
             break
-        group5, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 5)
+        group5, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 5, dining_history_pairs)
         if group5:
             result_groups.append(_create_group_dict(group5, user_data, is_school_only))
         else:
@@ -350,16 +361,21 @@ async def _form_groups_for_subset(user_data: Dict[str, Dict[str, Any]], is_schoo
 
     return result_groups
 
-def _calculate_group_score(group_ids: List[str], user_data: Dict[str, Dict[str, Any]]) -> Tuple[int, int, int]:
+def _calculate_group_score(
+    group_ids: List[str], 
+    user_data: Dict[str, Dict[str, Any]], 
+    dining_history_pairs: Dict[str, Set[str]] = None
+) -> Tuple[int, int, int, int]:
     """
     計算組別的質量分數。
     分數越高越好。
-    返回 (性別平衡分數, 個性相似度分數, 總人數)
+    返回 (性別平衡分數, 個性相似度分數, 聚餐歷史懲罰分數, 總人數)
     性別平衡：2男2女最高(4人組), 3男2女/2男3女次之(5人組)
     個性相似度：相同個性類型越多越好
+    聚餐歷史：曾經一起聚餐過的配對會有懲罰分數
     """
     size = len(group_ids)
-    if size == 0: return (-1, -1, 0)
+    if size == 0: return (-1, -1, 0, 0)
 
     genders = [user_data[uid].get('gender') for uid in group_ids]
     p_types = [user_data[uid].get('personality_type') for uid in group_ids]
@@ -386,11 +402,20 @@ def _calculate_group_score(group_ids: List[str], user_data: Dict[str, Dict[str, 
     # 分數 = (相同個性人數)^2 的總和 (鼓勵大群體)
     personality_score = sum(count ** 2 for count in p_type_counts.values())
 
-    return (gender_score, personality_score, size)
+    # 聚餐歷史懲罰分數
+    history_penalty = calculate_history_penalty(group_ids, dining_history_pairs) if dining_history_pairs else 0
 
-def _find_best_group(remaining_ids_set: set, user_data: Dict[str, Dict[str, Any]], categorized_users: defaultdict, target_size: int) -> Tuple[Optional[List[str]], set]:
+    return (gender_score, personality_score, history_penalty, size)
+
+def _find_best_group(
+    remaining_ids_set: set, 
+    user_data: Dict[str, Dict[str, Any]], 
+    categorized_users: defaultdict, 
+    target_size: int,
+    dining_history_pairs: Dict[str, Set[str]] = None
+) -> Tuple[Optional[List[str]], set]:
     """
-    從剩餘用戶中找到最佳的組（基於性別和個性）
+    從剩餘用戶中找到最佳的組（基於性別、個性和聚餐歷史）
     返回 (找到的組ID列表 或 None, 更新後的剩餘用戶ID集合)
     """
     if len(remaining_ids_set) < target_size:
@@ -398,10 +423,10 @@ def _find_best_group(remaining_ids_set: set, user_data: Dict[str, Dict[str, Any]
 
     # 當用戶數量大於50時，使用啟發式算法
     if len(remaining_ids_set) > 50:
-        return _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, target_size)
+        return _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, target_size, dining_history_pairs)
 
     best_group = None
-    best_score = (-1, -1, -1) # (性別分, 個性分, size)
+    best_score = (-1, -1, -100, -1) # (性別分, 個性分, 歷史懲罰分, size)
 
     # 迭代所有可能的組合 (如果人數過多，這裡需要優化，例如使用啟發式搜索)
     # 注意：itertools.combinations 對於大數量級非常慢！
@@ -414,11 +439,13 @@ def _find_best_group(remaining_ids_set: set, user_data: Dict[str, Dict[str, Any]
     for current_group_tuple in potential_combinations:
         count += 1
         current_group = list(current_group_tuple)
-        current_score = _calculate_group_score(current_group, user_data)
+        current_score = _calculate_group_score(current_group, user_data, dining_history_pairs)
 
-        # 比較分數 (優先性別，其次個性)
-        if current_score[0] > best_score[0] or \
-           (current_score[0] == best_score[0] and current_score[1] > best_score[1]):
+        # 比較分數 (優先聚餐歷史懲罰，其次性別，再次個性)
+        # 歷史懲罰分數越高（越接近0）越好
+        if current_score[2] > best_score[2] or \
+           (current_score[2] == best_score[2] and current_score[0] > best_score[0]) or \
+           (current_score[2] == best_score[2] and current_score[0] == best_score[0] and current_score[1] > best_score[1]):
             best_score = current_score
             best_group = current_group
 
@@ -434,13 +461,20 @@ def _find_best_group(remaining_ids_set: set, user_data: Dict[str, Dict[str, Any]
         # 這理論上只在人數不足時發生
         return None, remaining_ids_set
 
-def _find_best_group_heuristic(remaining_ids_set: set, user_data: Dict[str, Dict[str, Any]], categorized_users: defaultdict, target_size: int) -> Tuple[Optional[List[str]], set]:
+def _find_best_group_heuristic(
+    remaining_ids_set: set, 
+    user_data: Dict[str, Dict[str, Any]], 
+    categorized_users: defaultdict, 
+    target_size: int,
+    dining_history_pairs: Dict[str, Set[str]] = None
+) -> Tuple[Optional[List[str]], set]:
     """
     大規模用戶的啟發式最佳組查找算法
     策略：
     1. 根據性別將用戶分組
     2. 根據個性類型進一步分組
     3. 優先從同一個性類型中選擇用戶，同時平衡性別比例
+    4. 盡量避免曾經一起聚餐過的用戶配對
     """
     remaining_ids = list(remaining_ids_set)
     
@@ -483,6 +517,23 @@ def _find_best_group_heuristic(remaining_ids_set: set, user_data: Dict[str, Dict
             female_by_type[p_type] = []
         female_by_type[p_type].append(uid)
     
+    # 輔助函數：計算候選用戶與已選用戶的歷史重複數
+    def count_history_overlap(candidate_id: str, selected_ids: List[str]) -> int:
+        if not dining_history_pairs or candidate_id not in dining_history_pairs:
+            return 0
+        return sum(1 for sid in selected_ids if sid in dining_history_pairs[candidate_id])
+    
+    # 輔助函數：從候選列表中選擇與已選用戶歷史重複最少的用戶
+    def select_best_candidate(candidates: List[str], selected_ids: List[str]) -> Optional[str]:
+        if not candidates:
+            return None
+        if not dining_history_pairs:
+            return candidates[0]
+        
+        # 按歷史重複數排序，選擇重複最少的
+        sorted_candidates = sorted(candidates, key=lambda c: count_history_overlap(c, selected_ids))
+        return sorted_candidates[0]
+    
     # 嘗試找到具有相同個性類型的用戶組
     best_group = []
     common_types = set(male_by_type.keys()).intersection(set(female_by_type.keys()))
@@ -497,15 +548,34 @@ def _find_best_group_heuristic(remaining_ids_set: set, user_data: Dict[str, Dict
         # 從最多的類型開始選擇
         selected_type = sorted_types[0]
         
-        # 選擇所需數量的男性和女性
-        selected_males = male_by_type[selected_type][:ideal_male_count]
-        selected_females = female_by_type[selected_type][:ideal_female_count]
+        # 選擇所需數量的男性和女性，考慮聚餐歷史
+        selected_males = []
+        available_males = male_by_type[selected_type].copy()
+        
+        while len(selected_males) < ideal_male_count and available_males:
+            best_candidate = select_best_candidate(available_males, selected_males + best_group)
+            if best_candidate:
+                selected_males.append(best_candidate)
+                available_males.remove(best_candidate)
+        
+        selected_females = []
+        available_females = female_by_type[selected_type].copy()
+        
+        while len(selected_females) < ideal_female_count and available_females:
+            best_candidate = select_best_candidate(available_females, selected_males + selected_females + best_group)
+            if best_candidate:
+                selected_females.append(best_candidate)
+                available_females.remove(best_candidate)
         
         # 如果選擇的用戶不足，從其他類型中補充
         while len(selected_males) < ideal_male_count and len(males) > len(selected_males):
             for t in sorted_types[1:]:
                 if t in male_by_type and male_by_type[t]:
-                    selected_males.append(male_by_type[t].pop(0))
+                    available = [m for m in male_by_type[t] if m not in selected_males]
+                    best_candidate = select_best_candidate(available, selected_males + selected_females)
+                    if best_candidate:
+                        selected_males.append(best_candidate)
+                        male_by_type[t].remove(best_candidate)
                     if len(selected_males) >= ideal_male_count:
                         break
             
@@ -513,7 +583,11 @@ def _find_best_group_heuristic(remaining_ids_set: set, user_data: Dict[str, Dict
             if len(selected_males) < ideal_male_count:
                 for t in set(male_by_type.keys()) - common_types:
                     if male_by_type[t]:
-                        selected_males.append(male_by_type[t].pop(0))
+                        available = [m for m in male_by_type[t] if m not in selected_males]
+                        best_candidate = select_best_candidate(available, selected_males + selected_females)
+                        if best_candidate:
+                            selected_males.append(best_candidate)
+                            male_by_type[t].remove(best_candidate)
                         if len(selected_males) >= ideal_male_count:
                             break
             
@@ -522,7 +596,9 @@ def _find_best_group_heuristic(remaining_ids_set: set, user_data: Dict[str, Dict
                 # 使用隨機選擇
                 remaining_males = list(set(males) - set(selected_males))
                 if remaining_males:
-                    selected_males.append(random.choice(remaining_males))
+                    best_candidate = select_best_candidate(remaining_males, selected_males + selected_females)
+                    if best_candidate:
+                        selected_males.append(best_candidate)
                 else:
                     break
         
@@ -530,30 +606,58 @@ def _find_best_group_heuristic(remaining_ids_set: set, user_data: Dict[str, Dict
         while len(selected_females) < ideal_female_count and len(females) > len(selected_females):
             for t in sorted_types[1:]:
                 if t in female_by_type and female_by_type[t]:
-                    selected_females.append(female_by_type[t].pop(0))
+                    available = [f for f in female_by_type[t] if f not in selected_females]
+                    best_candidate = select_best_candidate(available, selected_males + selected_females)
+                    if best_candidate:
+                        selected_females.append(best_candidate)
+                        female_by_type[t].remove(best_candidate)
                     if len(selected_females) >= ideal_female_count:
                         break
             
             if len(selected_females) < ideal_female_count:
                 for t in set(female_by_type.keys()) - common_types:
                     if female_by_type[t]:
-                        selected_females.append(female_by_type[t].pop(0))
+                        available = [f for f in female_by_type[t] if f not in selected_females]
+                        best_candidate = select_best_candidate(available, selected_males + selected_females)
+                        if best_candidate:
+                            selected_females.append(best_candidate)
+                            female_by_type[t].remove(best_candidate)
                         if len(selected_females) >= ideal_female_count:
                             break
             
             if len(selected_females) < ideal_female_count:
                 remaining_females = list(set(females) - set(selected_females))
                 if remaining_females:
-                    selected_females.append(random.choice(remaining_females))
+                    best_candidate = select_best_candidate(remaining_females, selected_males + selected_females)
+                    if best_candidate:
+                        selected_females.append(best_candidate)
                 else:
                     break
         
         best_group = selected_males + selected_females
     else:
-        # 如果沒有共同的類型，隨機選擇
-        random.shuffle(males)
-        random.shuffle(females)
-        best_group = males[:ideal_male_count] + females[:ideal_female_count]
+        # 如果沒有共同的類型，選擇時考慮聚餐歷史
+        selected_males = []
+        available_males = males.copy()
+        random.shuffle(available_males)
+        
+        while len(selected_males) < ideal_male_count and available_males:
+            best_candidate = select_best_candidate(available_males, selected_males)
+            if best_candidate:
+                selected_males.append(best_candidate)
+                available_males.remove(best_candidate)
+        
+        selected_females = []
+        available_females = females.copy()
+        random.shuffle(available_females)
+        
+        while len(selected_females) < ideal_female_count and available_females:
+            best_candidate = select_best_candidate(available_females, selected_males + selected_females)
+            if best_candidate:
+                selected_females.append(best_candidate)
+                available_females.remove(best_candidate)
+        
+        best_group = selected_males + selected_females
     
     # 如果人數不足，返回None
     if len(best_group) < target_size:
@@ -803,6 +907,84 @@ async def _get_waiting_users_data(supabase: Client, waiting_status: str = "waiti
     logger.info(f"有效用戶數: {len(valid_users)}/{len(waiting_user_ids)}")
     
     return waiting_user_ids, user_data, len(valid_users)
+
+async def get_user_dining_history_pairs(supabase: Client, user_ids: List[str]) -> Dict[str, Set[str]]:
+    """
+    從 dining_history 獲取用戶的聚餐歷史配對記錄
+    
+    Args:
+        supabase: Supabase客戶端
+        user_ids: 待配對的用戶ID列表
+        
+    Returns:
+        Dict[str, Set[str]]: 每個用戶曾經一起聚餐過的用戶ID集合
+        格式: {user_id: {曾經一起聚餐的user_id1, user_id2, ...}}
+    """
+    try:
+        if not user_ids:
+            return {}
+        
+        # 查詢 dining_history 表，找出包含這些用戶的歷史記錄
+        history_response = supabase.table("dining_history") \
+            .select("user_ids") \
+            .execute()
+        
+        if not history_response.data:
+            logger.info("沒有找到任何聚餐歷史記錄")
+            return {}
+        
+        # 建立用戶配對關係
+        user_history_pairs: Dict[str, Set[str]] = {uid: set() for uid in user_ids}
+        user_ids_set = set(user_ids)
+        
+        for record in history_response.data:
+            history_user_ids = record.get("user_ids", [])
+            if not history_user_ids:
+                continue
+            
+            # 找出這次歷史記錄中有哪些用戶在待配對列表中
+            relevant_users = [uid for uid in history_user_ids if uid in user_ids_set]
+            
+            # 對於這些相關用戶，互相記錄為曾經一起聚餐過
+            for i, uid1 in enumerate(relevant_users):
+                for uid2 in relevant_users[i+1:]:
+                    user_history_pairs[uid1].add(uid2)
+                    user_history_pairs[uid2].add(uid1)
+        
+        # 統計日誌
+        total_pairs = sum(len(pairs) for pairs in user_history_pairs.values()) // 2
+        logger.info(f"找到 {total_pairs} 對曾經一起聚餐過的用戶配對")
+        
+        return user_history_pairs
+        
+    except Exception as e:
+        logger.error(f"獲取用戶聚餐歷史配對時出錯: {str(e)}")
+        return {}
+
+
+def calculate_history_penalty(group_ids: List[str], dining_history_pairs: Dict[str, Set[str]]) -> int:
+    """
+    計算組內成員的聚餐歷史懲罰分數
+    
+    Args:
+        group_ids: 組內成員ID列表
+        dining_history_pairs: 用戶聚餐歷史配對字典
+        
+    Returns:
+        int: 懲罰分數（負數，曾經一起聚餐的配對越多，懲罰越重）
+    """
+    if not dining_history_pairs:
+        return 0
+    
+    penalty = 0
+    # 檢查組內每對用戶是否曾經一起聚餐過
+    for i, uid1 in enumerate(group_ids):
+        for uid2 in group_ids[i+1:]:
+            if uid1 in dining_history_pairs and uid2 in dining_history_pairs[uid1]:
+                penalty -= 10  # 每對曾經一起聚餐的用戶扣10分
+    
+    return penalty
+
 
 async def process_batch_matching(supabase: Client):
     """批量配對處理邏輯"""

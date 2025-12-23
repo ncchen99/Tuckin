@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+.eggs
+*.egg
+.mypy_cache
+.pytest_cache
+.coverage
+htmlcov
+
+# 虛擬環境
+venv
+.venv
+env
+.env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# 測試
+test/
+tests/
+
+# 文檔
+*.md
+!README.md
+
+# Heroku 配置（不再需要）
+Procfile
+
+# 本地開發配置
+.python-version
+

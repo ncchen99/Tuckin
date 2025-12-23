@@ -3,12 +3,13 @@ import sys
 import uuid
 import random
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from collections import Counter
 import time  # 添加計時功能
 import cProfile  # 添加性能分析功能
 from collections import defaultdict
+from typing import Dict, Set, List, Optional, Tuple
 
 # 添加父級目錄到路徑，以便導入模組
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -54,11 +55,23 @@ class MockDBGroup:
         self.status = "waiting_restaurant"
         self.created_at = datetime.now()
 
+
+class MockDiningHistory:
+    """模擬聚餐歷史記錄"""
+    
+    def __init__(self, history_id: str, user_ids: List[str], event_date: datetime = None):
+        self.id = history_id
+        self.user_ids = user_ids
+        self.event_date = event_date or datetime.now() - timedelta(days=7)
+        self.restaurant_name = "測試餐廳"
+        self.event_name = "測試聚餐"
+
 class MockDatabase:
     """模擬數據庫"""
     def __init__(self):
         self.users = {}  # user_id -> MockDBUser
         self.groups = []  # List[MockDBGroup]
+        self.dining_history = []  # List[MockDiningHistory]
         
     def add_user(self, user):
         """添加用戶"""
@@ -67,6 +80,10 @@ class MockDatabase:
     def add_group(self, group):
         """添加配對組"""
         self.groups.append(group)
+    
+    def add_dining_history(self, history: MockDiningHistory):
+        """添加聚餐歷史記錄"""
+        self.dining_history.append(history)
         
     def get_all_users(self):
         """獲取所有用戶"""
@@ -80,12 +97,48 @@ class MockDatabase:
         """獲取所有配對組"""
         return self.groups
     
+    def get_all_dining_history(self):
+        """獲取所有聚餐歷史"""
+        return self.dining_history
+    
     def update_user_status(self, user_id, new_status):
         """更新用戶狀態"""
         if user_id in self.users:
             self.users[user_id].status = new_status
             return True
         return False
+    
+    def get_dining_history_pairs(self, user_ids: List[str]) -> Dict[str, Set[str]]:
+        """
+        獲取用戶的聚餐歷史配對（模擬 get_user_dining_history_pairs 函數）
+        
+        Args:
+            user_ids: 待配對的用戶ID列表
+            
+        Returns:
+            Dict[str, Set[str]]: 每個用戶曾經一起聚餐過的用戶ID集合
+        """
+        if not user_ids:
+            return {}
+        
+        user_history_pairs: Dict[str, Set[str]] = {uid: set() for uid in user_ids}
+        user_ids_set = set(user_ids)
+        
+        for history in self.dining_history:
+            history_user_ids = history.user_ids
+            if not history_user_ids:
+                continue
+            
+            # 找出這次歷史記錄中有哪些用戶在待配對列表中
+            relevant_users = [uid for uid in history_user_ids if uid in user_ids_set]
+            
+            # 對於這些相關用戶，互相記錄為曾經一起聚餐過
+            for i, uid1 in enumerate(relevant_users):
+                for uid2 in relevant_users[i+1:]:
+                    user_history_pairs[uid1].add(uid2)
+                    user_history_pairs[uid2].add(uid1)
+        
+        return user_history_pairs
 
 # 創建模擬數據庫實例
 mock_db = MockDatabase()
@@ -178,8 +231,15 @@ def process_batch_matching():
     for p_type, count in personality_counts.items():
         logger.info(f"{p_type}: {count}人")
     
-    # 3. 執行新的配對算法
-    result_groups = _match_users_into_groups(user_data)
+    # 3. 獲取聚餐歷史配對
+    all_user_ids = list(user_data.keys())
+    dining_history_pairs = mock_db.get_dining_history_pairs(all_user_ids)
+    if dining_history_pairs:
+        total_pairs = sum(len(v) for v in dining_history_pairs.values()) // 2
+        logger.info(f"考慮聚餐歷史，共 {total_pairs} 對歷史配對")
+    
+    # 4. 執行新的配對算法
+    result_groups = _match_users_into_groups(user_data, dining_history_pairs)
     
     logger.info(f"配對結果: 共形成 {len(result_groups)} 個組別")
     
@@ -234,13 +294,15 @@ def process_batch_matching():
         "total_users_processed": matched_user_count
     }
 
-def _match_users_into_groups(user_data):
+def _match_users_into_groups(user_data, dining_history_pairs: Dict[str, Set[str]] = None):
     """
     根據用戶資料將用戶分組配對，確保所有用戶都被分配，優先4人組，
     剩餘分配至5人組，僅在 N=6,7,11 時允許3人組。
+    新增：考慮用戶的聚餐歷史，盡量避免曾經一起聚餐過的用戶再次配對。
     
     Args:
         user_data: 格式 {user_id: {"gender": gender, "personality_type": personality_type}}
+        dining_history_pairs: 用戶聚餐歷史配對字典
         
     Returns:
         List[Dict]: 結果組別列表
@@ -263,11 +325,16 @@ def _match_users_into_groups(user_data):
         if gender and p_type:
             categorized_users[gender][p_type].append(user_id)
     
+    # 記錄聚餐歷史信息
+    if dining_history_pairs:
+        total_pairs = sum(len(v) for v in dining_history_pairs.values()) // 2
+        logger.info(f"考慮聚餐歷史，共 {total_pairs} 對歷史配對")
+    
     # 特殊情況處理 N=6, 7, 11
     if total_users == 6:
         logger.info(f"處理特殊情況 N=6：組成兩個 3 人組")
-        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
-        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
+        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
         
         if group1: result_groups.append(_create_group_dict(group1, user_data))
         if group2: result_groups.append(_create_group_dict(group2, user_data))
@@ -275,8 +342,8 @@ def _match_users_into_groups(user_data):
         
     elif total_users == 7:
         logger.info(f"處理特殊情況 N=7：組成一個 4 人組和一個 3 人組")
-        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
-        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4, dining_history_pairs)
+        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
         
         if group4: result_groups.append(_create_group_dict(group4, user_data))
         if group3: result_groups.append(_create_group_dict(group3, user_data))
@@ -284,9 +351,9 @@ def _match_users_into_groups(user_data):
         
     elif total_users == 11:
         logger.info(f"處理特殊情況 N=11：組成兩個 4 人組和一個 3 人組")
-        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
-        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
-        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+        group1, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4, dining_history_pairs)
+        group2, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4, dining_history_pairs)
+        group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
         
         if group1: result_groups.append(_create_group_dict(group1, user_data))
         if group2: result_groups.append(_create_group_dict(group2, user_data))
@@ -320,7 +387,7 @@ def _match_users_into_groups(user_data):
         elif total_users == 7:  # 已處理
             pass
         elif total_users == 3:  # 如果總數恰好是3, 需要組成一個3人組
-            group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3)
+            group3, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 3, dining_history_pairs)
             if group3: result_groups.append(_create_group_dict(group3, user_data))
             return result_groups
     else:
@@ -335,7 +402,7 @@ def _match_users_into_groups(user_data):
             logger.error("邏輯錯誤：剩餘用戶不足以組成計劃的 4 人組")
             break
             
-        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4)
+        group4, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 4, dining_history_pairs)
         
         if group4:
             result_groups.append(_create_group_dict(group4, user_data))
@@ -356,7 +423,7 @@ def _match_users_into_groups(user_data):
             logger.error("邏輯錯誤：剩餘用戶不足以組成計劃的 5 人組")
             break
             
-        group5, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 5)
+        group5, remaining_user_ids = _find_best_group(remaining_user_ids, user_data, categorized_users, 5, dining_history_pairs)
         
         if group5:
             result_groups.append(_create_group_dict(group5, user_data))
@@ -375,16 +442,41 @@ def _match_users_into_groups(user_data):
     
     return result_groups
 
-def _calculate_group_score(group_ids, user_data):
+def calculate_history_penalty(group_ids: List[str], dining_history_pairs: Dict[str, Set[str]]) -> int:
+    """
+    計算組內成員的聚餐歷史懲罰分數
+    
+    Args:
+        group_ids: 組內成員ID列表
+        dining_history_pairs: 用戶聚餐歷史配對字典
+        
+    Returns:
+        int: 懲罰分數（負數，曾經一起聚餐的配對越多，懲罰越重）
+    """
+    if not dining_history_pairs:
+        return 0
+    
+    penalty = 0
+    # 檢查組內每對用戶是否曾經一起聚餐過
+    for i, uid1 in enumerate(group_ids):
+        for uid2 in group_ids[i+1:]:
+            if uid1 in dining_history_pairs and uid2 in dining_history_pairs[uid1]:
+                penalty -= 10  # 每對曾經一起聚餐的用戶扣10分
+    
+    return penalty
+
+
+def _calculate_group_score(group_ids, user_data, dining_history_pairs: Dict[str, Set[str]] = None):
     """
     計算組別的質量分數。
     分數越高越好。
-    返回 (性別平衡分數, 個性相似度分數, 總人數)
+    返回 (性別平衡分數, 個性相似度分數, 聚餐歷史懲罰分數, 總人數)
     性別平衡：2男2女最高(4人組), 3男2女/2男3女次之(5人組)
     個性相似度：相同個性類型越多越好
+    聚餐歷史：曾經一起聚餐過的配對會有懲罰分數
     """
     size = len(group_ids)
-    if size == 0: return (-1, -1, 0)
+    if size == 0: return (-1, -1, 0, 0)
     
     genders = [user_data[uid].get('gender') for uid in group_ids]
     p_types = [user_data[uid].get('personality_type') for uid in group_ids]
@@ -411,11 +503,14 @@ def _calculate_group_score(group_ids, user_data):
     # 分數 = (相同個性人數)^2 的總和 (鼓勵大群體)
     personality_score = sum(count ** 2 for count in p_type_counts.values())
     
-    return (gender_score, personality_score, size)
+    # 聚餐歷史懲罰分數
+    history_penalty = calculate_history_penalty(group_ids, dining_history_pairs) if dining_history_pairs else 0
+    
+    return (gender_score, personality_score, history_penalty, size)
 
-def _find_best_group(remaining_ids_set, user_data, categorized_users, target_size):
+def _find_best_group(remaining_ids_set, user_data, categorized_users, target_size, dining_history_pairs: Dict[str, Set[str]] = None):
     """
-    從剩餘用戶中找到最佳的組（基於性別和個性）
+    從剩餘用戶中找到最佳的組（基於性別、個性和聚餐歷史）
     對於大規模用戶，使用啟發式方法而不是窮舉所有可能組合
     返回 (找到的組ID列表 或 None, 更新後的剩餘用戶ID集合)
     """
@@ -424,10 +519,10 @@ def _find_best_group(remaining_ids_set, user_data, categorized_users, target_siz
     
     # 針對大規模用戶進行優化
     if len(remaining_ids_set) > 100:
-        return _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, target_size)
+        return _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, target_size, dining_history_pairs)
     
     best_group = None
-    best_score = (-1, -1, -1)  # (性別分, 個性分, size)
+    best_score = (-1, -1, -100, -1)  # (性別分, 個性分, 歷史懲罰分, size)
     
     # 優化：限制檢查的組合數量以避免性能問題
     max_combinations_to_check = 1000
@@ -439,11 +534,12 @@ def _find_best_group(remaining_ids_set, user_data, categorized_users, target_siz
     for current_group_tuple in potential_combinations:
         count += 1
         current_group = list(current_group_tuple)
-        current_score = _calculate_group_score(current_group, user_data)
+        current_score = _calculate_group_score(current_group, user_data, dining_history_pairs)
         
-        # 比較分數 (優先性別，其次個性)
-        if current_score[0] > best_score[0] or \
-           (current_score[0] == best_score[0] and current_score[1] > best_score[1]):
+        # 比較分數 (優先聚餐歷史懲罰，其次性別，再次個性)
+        if current_score[2] > best_score[2] or \
+           (current_score[2] == best_score[2] and current_score[0] > best_score[0]) or \
+           (current_score[2] == best_score[2] and current_score[0] == best_score[0] and current_score[1] > best_score[1]):
             best_score = current_score
             best_group = current_group
         
@@ -459,15 +555,33 @@ def _find_best_group(remaining_ids_set, user_data, categorized_users, target_siz
         # 這理論上只在人數不足時發生
         return None, remaining_ids_set
 
-def _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, target_size):
+def _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, target_size, dining_history_pairs: Dict[str, Set[str]] = None):
     """
     大規模用戶的啟發式最佳組查找算法
     策略：
     1. 根據性別將用戶分組
     2. 根據個性類型進一步分組
     3. 優先從同一個性類型中選擇用戶，同時平衡性別比例
+    4. 盡量避免曾經一起聚餐過的用戶配對
     """
     remaining_ids = list(remaining_ids_set)
+    
+    # 輔助函數：計算候選用戶與已選用戶的歷史重複數
+    def count_history_overlap(candidate_id: str, selected_ids: List[str]) -> int:
+        if not dining_history_pairs or candidate_id not in dining_history_pairs:
+            return 0
+        return sum(1 for sid in selected_ids if sid in dining_history_pairs[candidate_id])
+    
+    # 輔助函數：從候選列表中選擇與已選用戶歷史重複最少的用戶
+    def select_best_candidate(candidates: List[str], selected_ids: List[str]) -> Optional[str]:
+        if not candidates:
+            return None
+        if not dining_history_pairs:
+            return candidates[0]
+        
+        # 按歷史重複數排序，選擇重複最少的
+        sorted_candidates = sorted(candidates, key=lambda c: count_history_overlap(c, selected_ids))
+        return sorted_candidates[0]
     
     # 按性別和個性類型分類用戶
     males = []
@@ -522,15 +636,34 @@ def _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, 
         # 從最多的類型開始選擇
         selected_type = sorted_types[0]
         
-        # 選擇所需數量的男性和女性
-        selected_males = male_by_type[selected_type][:ideal_male_count]
-        selected_females = female_by_type[selected_type][:ideal_female_count]
+        # 選擇所需數量的男性和女性，考慮聚餐歷史
+        selected_males = []
+        available_males = male_by_type[selected_type].copy()
+        
+        while len(selected_males) < ideal_male_count and available_males:
+            best_candidate = select_best_candidate(available_males, selected_males + best_group)
+            if best_candidate:
+                selected_males.append(best_candidate)
+                available_males.remove(best_candidate)
+        
+        selected_females = []
+        available_females = female_by_type[selected_type].copy()
+        
+        while len(selected_females) < ideal_female_count and available_females:
+            best_candidate = select_best_candidate(available_females, selected_males + selected_females + best_group)
+            if best_candidate:
+                selected_females.append(best_candidate)
+                available_females.remove(best_candidate)
         
         # 如果選擇的用戶不足，從其他類型中補充
         while len(selected_males) < ideal_male_count and len(males) > len(selected_males):
             for t in sorted_types[1:]:
                 if t in male_by_type and male_by_type[t]:
-                    selected_males.append(male_by_type[t].pop(0))
+                    available = [m for m in male_by_type[t] if m not in selected_males]
+                    best_candidate = select_best_candidate(available, selected_males + selected_females)
+                    if best_candidate:
+                        selected_males.append(best_candidate)
+                        male_by_type[t].remove(best_candidate)
                     if len(selected_males) >= ideal_male_count:
                         break
             
@@ -538,7 +671,11 @@ def _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, 
             if len(selected_males) < ideal_male_count:
                 for t in set(male_by_type.keys()) - common_types:
                     if male_by_type[t]:
-                        selected_males.append(male_by_type[t].pop(0))
+                        available = [m for m in male_by_type[t] if m not in selected_males]
+                        best_candidate = select_best_candidate(available, selected_males + selected_females)
+                        if best_candidate:
+                            selected_males.append(best_candidate)
+                            male_by_type[t].remove(best_candidate)
                         if len(selected_males) >= ideal_male_count:
                             break
             
@@ -547,7 +684,9 @@ def _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, 
                 # 使用隨機選擇
                 remaining_males = list(set(males) - set(selected_males))
                 if remaining_males:
-                    selected_males.append(random.choice(remaining_males))
+                    best_candidate = select_best_candidate(remaining_males, selected_males + selected_females)
+                    if best_candidate:
+                        selected_males.append(best_candidate)
                 else:
                     break
         
@@ -555,30 +694,58 @@ def _find_best_group_heuristic(remaining_ids_set, user_data, categorized_users, 
         while len(selected_females) < ideal_female_count and len(females) > len(selected_females):
             for t in sorted_types[1:]:
                 if t in female_by_type and female_by_type[t]:
-                    selected_females.append(female_by_type[t].pop(0))
+                    available = [f for f in female_by_type[t] if f not in selected_females]
+                    best_candidate = select_best_candidate(available, selected_males + selected_females)
+                    if best_candidate:
+                        selected_females.append(best_candidate)
+                        female_by_type[t].remove(best_candidate)
                     if len(selected_females) >= ideal_female_count:
                         break
             
             if len(selected_females) < ideal_female_count:
                 for t in set(female_by_type.keys()) - common_types:
                     if female_by_type[t]:
-                        selected_females.append(female_by_type[t].pop(0))
+                        available = [f for f in female_by_type[t] if f not in selected_females]
+                        best_candidate = select_best_candidate(available, selected_males + selected_females)
+                        if best_candidate:
+                            selected_females.append(best_candidate)
+                            female_by_type[t].remove(best_candidate)
                         if len(selected_females) >= ideal_female_count:
                             break
             
             if len(selected_females) < ideal_female_count:
                 remaining_females = list(set(females) - set(selected_females))
                 if remaining_females:
-                    selected_females.append(random.choice(remaining_females))
+                    best_candidate = select_best_candidate(remaining_females, selected_males + selected_females)
+                    if best_candidate:
+                        selected_females.append(best_candidate)
                 else:
                     break
         
         best_group = selected_males + selected_females
     else:
-        # 如果沒有共同的類型，隨機選擇
-        random.shuffle(males)
-        random.shuffle(females)
-        best_group = males[:ideal_male_count] + females[:ideal_female_count]
+        # 如果沒有共同的類型，選擇時考慮聚餐歷史
+        selected_males = []
+        available_males = males.copy()
+        random.shuffle(available_males)
+        
+        while len(selected_males) < ideal_male_count and available_males:
+            best_candidate = select_best_candidate(available_males, selected_males)
+            if best_candidate:
+                selected_males.append(best_candidate)
+                available_males.remove(best_candidate)
+        
+        selected_females = []
+        available_females = females.copy()
+        random.shuffle(available_females)
+        
+        while len(selected_females) < ideal_female_count and available_females:
+            best_candidate = select_best_candidate(available_females, selected_males + selected_females)
+            if best_candidate:
+                selected_females.append(best_candidate)
+                available_females.remove(best_candidate)
+        
+        best_group = selected_males + selected_females
     
     # 如果人數不足，返回None
     if len(best_group) < target_size:
@@ -602,8 +769,13 @@ def _create_group_dict(user_ids, user_data):
         "female_count": female_count,
     }
 
-def verify_matching_results():
-    """驗證配對結果是否符合配對邏輯"""
+def verify_matching_results(check_history: bool = False):
+    """
+    驗證配對結果是否符合配對邏輯
+    
+    Args:
+        check_history: 是否檢查聚餐歷史衝突
+    """
     logger.info("正在驗證配對結果...")
     
     # 獲取所有配對組
@@ -613,6 +785,13 @@ def verify_matching_results():
         return False
     
     logger.info(f"找到 {len(groups)} 個配對組")
+    
+    # 獲取聚餐歷史配對
+    dining_history_pairs = None
+    history_conflicts = 0
+    if check_history:
+        all_user_ids = list(mock_db.users.keys())
+        dining_history_pairs = mock_db.get_dining_history_pairs(all_user_ids)
     
     # 驗證每個組
     for group in groups:
@@ -672,6 +851,21 @@ def verify_matching_results():
             logger.info(f"  組 {group.id} 是5人組，男性{member_genders['male']}人，女性{member_genders['female']}人")
         elif group_size == 3:
             logger.info(f"  組 {group.id} 是3人組，男性{member_genders['male']}人，女性{member_genders['female']}人")
+        
+        # 檢查聚餐歷史衝突
+        if check_history and dining_history_pairs:
+            group_conflicts = 0
+            for i, uid1 in enumerate(group.user_ids):
+                for uid2 in group.user_ids[i+1:]:
+                    if uid1 in dining_history_pairs and uid2 in dining_history_pairs[uid1]:
+                        group_conflicts += 1
+                        logger.warning(f"  組 {group.id} 中用戶 {uid1[:8]}... 和 {uid2[:8]}... 曾經一起聚餐過")
+            
+            if group_conflicts > 0:
+                logger.warning(f"  組 {group.id} 有 {group_conflicts} 對歷史衝突")
+                history_conflicts += group_conflicts
+            else:
+                logger.info(f"  組 {group.id} 無歷史衝突 ✓")
     
     # 獲取用戶狀態統計
     waiting_restaurant_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_restaurant")
@@ -682,6 +876,10 @@ def verify_matching_results():
     logger.info(f"  等待餐廳選擇: {waiting_restaurant_count}")
     logger.info(f"  等待配對: {waiting_matching_count}")
     logger.info(f"  配對失敗: {matching_failed_count}")
+    
+    # 輸出歷史衝突統計
+    if check_history:
+        logger.info(f"聚餐歷史衝突統計: {history_conflicts} 對衝突")
     
     logger.info("配對結果驗證完成")
     return True
@@ -1194,6 +1392,324 @@ def test_performance_profiling():
     
     logger.info("性能分析測試完成")
 
+def test_scenario_10():
+    """場景10: 測試聚餐歷史避免功能 - 驗證算法會盡量避免將曾經一起聚餐過的用戶分到同一組"""
+    logger.info("========== 測試場景10: 聚餐歷史避免功能測試 ==========")
+    
+    # 清空模擬數據庫
+    mock_db.users = {}
+    mock_db.groups = []
+    mock_db.dining_history = []
+    
+    # 創建16位測試用戶 - 均衡分佈
+    user_ids = []
+    for i in range(16):
+        user_id = str(uuid.uuid4())
+        user_ids.append(user_id)
+        personality_type = PERSONALITY_TYPES[i % len(PERSONALITY_TYPES)]
+        gender = GENDERS[i % 2]
+        
+        user = MockDBUser(
+            user_id=user_id,
+            gender=gender,
+            personality_type=personality_type,
+            nickname=f"用戶{i+1}"
+        )
+        mock_db.add_user(user)
+    
+    # 創建聚餐歷史 - 假設用戶0,1,2,3曾經一起聚餐過
+    history1 = MockDiningHistory(
+        history_id=str(uuid.uuid4()),
+        user_ids=[user_ids[0], user_ids[1], user_ids[2], user_ids[3]]
+    )
+    mock_db.add_dining_history(history1)
+    
+    # 假設用戶4,5,6,7也曾經一起聚餐過
+    history2 = MockDiningHistory(
+        history_id=str(uuid.uuid4()),
+        user_ids=[user_ids[4], user_ids[5], user_ids[6], user_ids[7]]
+    )
+    mock_db.add_dining_history(history2)
+    
+    logger.info(f"已創建2次聚餐歷史記錄:")
+    logger.info(f"  歷史1: 用戶 0,1,2,3 曾經一起聚餐")
+    logger.info(f"  歷史2: 用戶 4,5,6,7 曾經一起聚餐")
+    
+    # 執行配對
+    process_batch_matching()
+    
+    # 驗證結果 - 檢查歷史衝突
+    verify_matching_results(check_history=True)
+    
+    # 統計衝突數量
+    groups = mock_db.get_all_groups()
+    dining_history_pairs = mock_db.get_dining_history_pairs(user_ids)
+    
+    total_conflicts = 0
+    for group in groups:
+        for i, uid1 in enumerate(group.user_ids):
+            for uid2 in group.user_ids[i+1:]:
+                if uid1 in dining_history_pairs and uid2 in dining_history_pairs[uid1]:
+                    total_conflicts += 1
+    
+    logger.info(f"總計歷史衝突對數: {total_conflicts}")
+    logger.info(f"理論最大衝突對數: 12 (如果完全不考慮歷史)")
+    logger.info(f"衝突減少率: {(1 - total_conflicts/12)*100:.1f}%" if total_conflicts < 12 else "未減少衝突")
+    
+    logger.info("場景10測試完成")
+    return total_conflicts
+
+
+def test_scenario_11():
+    """場景11: 大規模聚餐歷史避免測試 - 100位用戶，30次歷史聚餐"""
+    logger.info("========== 測試場景11: 大規模聚餐歷史避免測試 (100位用戶，30次歷史聚餐) ==========")
+    
+    # 清空模擬數據庫
+    mock_db.users = {}
+    mock_db.groups = []
+    mock_db.dining_history = []
+    
+    # 創建100位測試用戶
+    user_count = 100
+    user_ids = []
+    
+    for i in range(user_count):
+        user_id = str(uuid.uuid4())
+        user_ids.append(user_id)
+        personality_type = PERSONALITY_TYPES[i % len(PERSONALITY_TYPES)]
+        gender = GENDERS[i % 2]
+        
+        user = MockDBUser(
+            user_id=user_id,
+            gender=gender,
+            personality_type=personality_type,
+            nickname=f"用戶{i+1}"
+        )
+        mock_db.add_user(user)
+    
+    # 創建30次聚餐歷史 - 隨機選擇4人組成一次聚餐
+    history_count = 30
+    for i in range(history_count):
+        # 隨機選擇4位用戶
+        history_user_ids = random.sample(user_ids, 4)
+        history = MockDiningHistory(
+            history_id=str(uuid.uuid4()),
+            user_ids=history_user_ids
+        )
+        mock_db.add_dining_history(history)
+    
+    # 獲取歷史配對數量
+    dining_history_pairs = mock_db.get_dining_history_pairs(user_ids)
+    total_history_pairs = sum(len(v) for v in dining_history_pairs.values()) // 2
+    logger.info(f"已創建 {history_count} 次聚餐歷史，共 {total_history_pairs} 對歷史配對")
+    
+    # 執行配對並計時
+    logger.info("開始執行配對算法，計時開始...")
+    start_time = time.time()
+    
+    # 執行配對
+    matching_result = process_batch_matching()
+    
+    end_time = time.time()
+    execution_time = end_time - start_time
+    
+    logger.info(f"配對算法執行完成，耗時: {execution_time:.4f} 秒")
+    
+    # 驗證結果
+    verify_matching_results(check_history=True)
+    
+    # 統計衝突數量
+    groups = mock_db.get_all_groups()
+    total_conflicts = 0
+    for group in groups:
+        for i, uid1 in enumerate(group.user_ids):
+            for uid2 in group.user_ids[i+1:]:
+                if uid1 in dining_history_pairs and uid2 in dining_history_pairs[uid1]:
+                    total_conflicts += 1
+    
+    logger.info(f"\n========== 場景11結果摘要 ==========")
+    logger.info(f"用戶數: {user_count}")
+    logger.info(f"歷史聚餐次數: {history_count}")
+    logger.info(f"歷史配對數: {total_history_pairs}")
+    logger.info(f"執行時間: {execution_time:.4f} 秒")
+    logger.info(f"形成組數: {len(groups)}")
+    logger.info(f"歷史衝突對數: {total_conflicts}")
+    
+    logger.info("場景11測試完成")
+    return execution_time, total_conflicts
+
+
+def test_scenario_12():
+    """場景12: 對比測試 - 比較有無聚餐歷史考量的配對結果"""
+    logger.info("========== 測試場景12: 有無聚餐歷史考量的對比測試 ==========")
+    
+    # 創建固定的測試數據
+    user_ids = []
+    user_data_template = {}
+    
+    for i in range(20):
+        user_id = str(uuid.uuid4())
+        user_ids.append(user_id)
+        personality_type = PERSONALITY_TYPES[i % len(PERSONALITY_TYPES)]
+        gender = GENDERS[i % 2]
+        user_data_template[user_id] = {
+            "gender": gender,
+            "personality_type": personality_type
+        }
+    
+    # 創建聚餐歷史 - 前8人曾經分成2組聚餐過
+    dining_history_pairs = {uid: set() for uid in user_ids}
+    
+    # 歷史1: 用戶0,1,2,3
+    for i in range(4):
+        for j in range(i+1, 4):
+            dining_history_pairs[user_ids[i]].add(user_ids[j])
+            dining_history_pairs[user_ids[j]].add(user_ids[i])
+    
+    # 歷史2: 用戶4,5,6,7
+    for i in range(4, 8):
+        for j in range(i+1, 8):
+            dining_history_pairs[user_ids[i]].add(user_ids[j])
+            dining_history_pairs[user_ids[j]].add(user_ids[i])
+    
+    logger.info("測試配置:")
+    logger.info(f"  總用戶數: 20")
+    logger.info(f"  歷史配對: 用戶0-3曾一起聚餐, 用戶4-7曾一起聚餐")
+    
+    # 測試1: 不考慮聚餐歷史
+    logger.info("\n--- 測試1: 不考慮聚餐歷史 ---")
+    result_without_history = _match_users_into_groups(user_data_template, None)
+    
+    conflicts_without = 0
+    for group in result_without_history:
+        group_ids = group["user_ids"]
+        for i, uid1 in enumerate(group_ids):
+            for uid2 in group_ids[i+1:]:
+                if uid1 in dining_history_pairs and uid2 in dining_history_pairs[uid1]:
+                    conflicts_without += 1
+    
+    logger.info(f"形成組數: {len(result_without_history)}")
+    logger.info(f"歷史衝突對數: {conflicts_without}")
+    
+    # 測試2: 考慮聚餐歷史
+    logger.info("\n--- 測試2: 考慮聚餐歷史 ---")
+    result_with_history = _match_users_into_groups(user_data_template, dining_history_pairs)
+    
+    conflicts_with = 0
+    for group in result_with_history:
+        group_ids = group["user_ids"]
+        for i, uid1 in enumerate(group_ids):
+            for uid2 in group_ids[i+1:]:
+                if uid1 in dining_history_pairs and uid2 in dining_history_pairs[uid1]:
+                    conflicts_with += 1
+    
+    logger.info(f"形成組數: {len(result_with_history)}")
+    logger.info(f"歷史衝突對數: {conflicts_with}")
+    
+    # 對比結果
+    logger.info("\n--- 對比結果 ---")
+    logger.info(f"不考慮歷史的衝突數: {conflicts_without}")
+    logger.info(f"考慮歷史的衝突數: {conflicts_with}")
+    
+    if conflicts_with < conflicts_without:
+        improvement = (1 - conflicts_with/conflicts_without) * 100 if conflicts_without > 0 else 100
+        logger.info(f"改善率: {improvement:.1f}%")
+    elif conflicts_with == conflicts_without:
+        logger.info("衝突數相同 (可能已是最優解或歷史配對分佈特殊)")
+    else:
+        logger.warning("考慮歷史後衝突數反而增加，這不應該發生")
+    
+    logger.info("場景12測試完成")
+    return conflicts_without, conflicts_with
+
+
+def test_scenario_13():
+    """場景13: 性能壓力測試 - 300位用戶，100次歷史聚餐"""
+    logger.info("========== 測試場景13: 性能壓力測試 (300位用戶，100次歷史聚餐) ==========")
+    
+    # 清空模擬數據庫
+    mock_db.users = {}
+    mock_db.groups = []
+    mock_db.dining_history = []
+    
+    # 創建300位測試用戶
+    user_count = 300
+    user_ids = []
+    
+    for i in range(user_count):
+        user_id = str(uuid.uuid4())
+        user_ids.append(user_id)
+        personality_type = PERSONALITY_TYPES[i % len(PERSONALITY_TYPES)]
+        gender = GENDERS[i % 2]
+        
+        user = MockDBUser(
+            user_id=user_id,
+            gender=gender,
+            personality_type=personality_type,
+            nickname=f"用戶{i+1}"
+        )
+        mock_db.add_user(user)
+    
+    # 創建100次聚餐歷史
+    history_count = 100
+    for i in range(history_count):
+        # 隨機選擇4-5位用戶
+        group_size = random.choice([4, 5])
+        history_user_ids = random.sample(user_ids, group_size)
+        history = MockDiningHistory(
+            history_id=str(uuid.uuid4()),
+            user_ids=history_user_ids
+        )
+        mock_db.add_dining_history(history)
+    
+    # 獲取歷史配對數量
+    dining_history_pairs = mock_db.get_dining_history_pairs(user_ids)
+    total_history_pairs = sum(len(v) for v in dining_history_pairs.values()) // 2
+    logger.info(f"已創建 {history_count} 次聚餐歷史，共 {total_history_pairs} 對歷史配對")
+    
+    # 執行配對並計時
+    logger.info("開始執行配對算法，計時開始...")
+    start_time = time.time()
+    
+    # 執行配對
+    matching_result = process_batch_matching()
+    
+    end_time = time.time()
+    execution_time = end_time - start_time
+    
+    logger.info(f"配對算法執行完成，耗時: {execution_time:.4f} 秒")
+    
+    # 統計結果
+    groups = mock_db.get_all_groups()
+    total_conflicts = 0
+    for group in groups:
+        for i, uid1 in enumerate(group.user_ids):
+            for uid2 in group.user_ids[i+1:]:
+                if uid1 in dining_history_pairs and uid2 in dining_history_pairs[uid1]:
+                    total_conflicts += 1
+    
+    logger.info(f"\n========== 場景13結果摘要 ==========")
+    logger.info(f"用戶數: {user_count}")
+    logger.info(f"歷史聚餐次數: {history_count}")
+    logger.info(f"歷史配對數: {total_history_pairs}")
+    logger.info(f"執行時間: {execution_time:.4f} 秒")
+    logger.info(f"形成組數: {len(groups)}")
+    logger.info(f"歷史衝突對數: {total_conflicts}")
+    
+    # 性能評估
+    if execution_time < 1.0:
+        logger.info("性能評估: 優秀 (< 1秒)")
+    elif execution_time < 5.0:
+        logger.info("性能評估: 良好 (< 5秒)")
+    elif execution_time < 10.0:
+        logger.info("性能評估: 可接受 (< 10秒)")
+    else:
+        logger.warning("性能評估: 需要優化 (> 10秒)")
+    
+    logger.info("場景13測試完成")
+    return execution_time, total_conflicts, len(groups)
+
+
 def run_all_tests():
     """運行所有測試"""
     logger.info("開始運行所有配對測試...")
@@ -1220,14 +1736,57 @@ def run_all_tests():
     logger.info(f"性別平衡度: {gender_balance:.4f} (越接近0越好)")
     logger.info(f"個性相似度: {personality_similarity:.4f} (越接近1越好)")
     
+    # 運行聚餐歷史相關測試
+    logger.info("\n========== 聚餐歷史功能測試 ==========")
+    test_scenario_10()  # 基本聚餐歷史避免測試
+    test_scenario_11()  # 大規模聚餐歷史測試
+    test_scenario_12()  # 對比測試
+    test_scenario_13()  # 性能壓力測試
+    
     # 運行性能分析
     test_performance_profiling()
     
     logger.info("所有測試完成")
 
+def run_dining_history_tests():
+    """只運行聚餐歷史相關的測試"""
+    logger.info("========== 開始運行聚餐歷史功能測試 ==========")
+    
+    # 基本功能測試
+    conflicts_10 = test_scenario_10()
+    
+    # 大規模測試
+    exec_time_11, conflicts_11 = test_scenario_11()
+    
+    # 對比測試
+    conflicts_without, conflicts_with = test_scenario_12()
+    
+    # 性能壓力測試
+    exec_time_13, conflicts_13, groups_13 = test_scenario_13()
+    
+    # 輸出總結
+    logger.info("\n" + "="*60)
+    logger.info("聚餐歷史功能測試總結")
+    logger.info("="*60)
+    logger.info(f"場景10 (16用戶，2次歷史): 衝突數 = {conflicts_10}")
+    logger.info(f"場景11 (100用戶，30次歷史): 執行時間 = {exec_time_11:.4f}秒, 衝突數 = {conflicts_11}")
+    logger.info(f"場景12 (對比測試): 無歷史考量衝突 = {conflicts_without}, 有歷史考量衝突 = {conflicts_with}")
+    logger.info(f"場景13 (300用戶，100次歷史): 執行時間 = {exec_time_13:.4f}秒, 衝突數 = {conflicts_13}, 組數 = {groups_13}")
+    
+    # 計算改善率
+    if conflicts_without > 0:
+        improvement = (1 - conflicts_with / conflicts_without) * 100
+        logger.info(f"\n聚餐歷史考量改善率: {improvement:.1f}%")
+    
+    logger.info("\n聚餐歷史功能測試完成")
+
+
 if __name__ == "__main__":
     # 運行所有測試
     run_all_tests()
+    
+    # 如果只想運行聚餐歷史相關測試
+    # run_dining_history_tests()
     
     # 如果只想運行大規模測試
     # test_scenario_9()
