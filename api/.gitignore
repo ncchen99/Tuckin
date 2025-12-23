@@ -11,4 +11,5 @@ venv.bak/
 .idea/
 .vscode/ 
 firebase-credentials.json
+GOOGLE_CREDENTIALS.json
 *.log

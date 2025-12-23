@@ -85,3 +85,6 @@ firebase-credentials.json
 # iOS
 ios/Runner/GoogleService-Info.plist
 ios/Runner/GoogleService-Info.plist
+
+
+GOOGLE_CREDENTIALS.json

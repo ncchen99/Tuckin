@@ -1,5 +1,6 @@
 import json
 import os
+import base64
 import firebase_admin
 from firebase_admin import credentials, messaging
 from typing import Dict, Any, List
@@ -11,10 +12,21 @@ def initialize_firebase():
     # 載入環境變數
     load_dotenv()
     try:
-        # 從環境變數讀取憑證 JSON 字串
+        # 從環境變數讀取憑證（支援 base64 編碼）
         cred_json = os.getenv('GOOGLE_CREDENTIALS')
         if not cred_json:
             raise ValueError("環境變數 GOOGLE_CREDENTIALS 未設定或為空")
+
+        # 嘗試解碼 base64（如果是 base64 編碼的話）
+        try:
+            # 如果是 base64，先解碼
+            decoded_bytes = base64.b64decode(cred_json)
+            cred_json = decoded_bytes.decode('utf-8')
+            print("成功解碼 base64 格式的 GOOGLE_CREDENTIALS")
+        except Exception:
+            # 如果解碼失敗，假設它已經是 JSON 字串
+            print("GOOGLE_CREDENTIALS 為 JSON 字串格式")
+            pass
 
         cred_dict = json.loads(cred_json)
         cred = credentials.Certificate(cred_dict)
