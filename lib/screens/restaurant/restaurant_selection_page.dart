@@ -135,8 +135,8 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     await showCustomConfirmationDialog(
       context: context,
       iconPath: 'assets/images/icon/delete.webp',
-      title: '確認刪除',
-      content: '確定要刪除「$restaurantName」嗎？',
+      title: '確定要刪除\n「$restaurantName」嗎？',
+      content: '',
       cancelButtonText: '取消',
       confirmButtonText: '刪除',
       barrierDismissible: false,
