@@ -128,106 +128,71 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
     if (_userRecommendedRestaurant == null) return;
 
     final restaurantId = _userRecommendedRestaurant!['id']?.toString();
+    final restaurantName = _userRecommendedRestaurant!['name'] ?? '此餐廳';
     if (restaurantId == null) return;
 
-    // 顯示確認對話框
-    final bool? confirm = await showDialog<bool>(
+    // 使用自定義確認對話框
+    await showCustomConfirmationDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15.r),
-          ),
-          title: Text(
-            '確認刪除',
-            style: TextStyle(
-              fontFamily: 'OtsutomeFont',
-              fontSize: 20.sp,
-              color: const Color(0xFF23456B),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            '確定要刪除「${_userRecommendedRestaurant!['name']}」嗎？',
-            style: TextStyle(
-              fontFamily: 'OtsutomeFont',
-              fontSize: 16.sp,
-              color: const Color(0xFF23456B),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                '取消',
-                style: TextStyle(
-                  fontFamily: 'OtsutomeFont',
-                  fontSize: 16.sp,
-                  color: Colors.grey,
+      iconPath: 'assets/images/icon/delete.webp',
+      title: '確認刪除',
+      content: '確定要刪除「$restaurantName」嗎？',
+      cancelButtonText: '取消',
+      confirmButtonText: '刪除',
+      barrierDismissible: false,
+      onCancel: () {
+        Navigator.of(context).pop();
+      },
+      onConfirm: () async {
+        try {
+          // 呼叫後端 API 刪除餐廳
+          final success = await _restaurantService.deleteUserAddedRestaurant(
+            restaurantId,
+          );
+
+          if (success && mounted) {
+            // 關閉對話框
+            Navigator.of(context).pop();
+
+            // 清除本地狀態
+            setState(() {
+              // 如果當前選中的是被刪除的餐廳，取消選擇
+              if (_selectedRestaurantId == _userRecommendedRestaurant!['id']) {
+                _selectedRestaurantId = null;
+              }
+              _userRecommendedRestaurant = null;
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  '餐廳已刪除',
+                  style: TextStyle(fontFamily: 'OtsutomeFont'),
                 ),
               ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(
-                '刪除',
-                style: TextStyle(
-                  fontFamily: 'OtsutomeFont',
-                  fontSize: 16.sp,
-                  color: const Color(0xFFB33D1C),
+            );
+          }
+        } catch (e) {
+          debugPrint('刪除餐廳出錯: $e');
+          // 關閉對話框
+          if (mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                backgroundColor: const Color(0xFFB33D1C),
+                content: Text(
+                  '刪除失敗: $e',
+                  style: const TextStyle(
+                    fontFamily: 'OtsutomeFont',
+                    color: Colors.white,
+                  ),
                 ),
               ),
-            ),
-          ],
-        );
+            );
+          }
+        }
       },
     );
-
-    if (confirm != true) return;
-
-    try {
-      // 呼叫後端 API 刪除餐廳
-      final success = await _restaurantService.deleteUserAddedRestaurant(
-        restaurantId,
-      );
-
-      if (success && mounted) {
-        // 清除本地狀態
-        setState(() {
-          // 如果當前選中的是被刪除的餐廳，取消選擇
-          if (_selectedRestaurantId == _userRecommendedRestaurant!['id']) {
-            _selectedRestaurantId = null;
-          }
-          _userRecommendedRestaurant = null;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              '餐廳已刪除',
-              style: TextStyle(fontFamily: 'OtsutomeFont'),
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('刪除餐廳出錯: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFFB33D1C),
-            content: Text(
-              '刪除失敗: $e',
-              style: const TextStyle(
-                fontFamily: 'OtsutomeFont',
-                color: Colors.white,
-              ),
-            ),
-          ),
-        );
-      }
-    }
   }
 
   // 檢查是否為有效的Google地圖連結
@@ -493,10 +458,10 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                 padding: EdgeInsets.symmetric(vertical: 10.h),
                                 child:
                                     _isSubmittingLink
-                                        ? const LoadingImage(
-                                          width: 60,
-                                          height: 60,
-                                          color: Color(0xFF23456B),
+                                        ? LoadingImage(
+                                          width: 40.w,
+                                          height: 40.h,
+                                          color: const Color(0xFF23456B),
                                         )
                                         : ImageButton(
                                           text: '取消',

@@ -366,11 +366,16 @@ async def delete_restaurant(
         restaurant = result.data[0]
         
         # 檢查是否為該用戶新增的餐廳
+        # 如果餐廳不是該用戶新增的（例如系統餐廳），直接返回成功
+        # 這樣前端可以清除本地狀態，但不會真正刪除系統餐廳
         if restaurant.get("added_by_user_id") != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="您只能刪除自己新增的餐廳"
-            )
+            logger.info(f"用戶 {user_id} 嘗試刪除非自己新增的餐廳 {restaurant_id}，返回成功但不實際刪除")
+            return {
+                "success": True,
+                "message": "餐廳已從您的列表中移除",
+                "restaurant_id": restaurant_id,
+                "actually_deleted": False  # 標記未實際刪除
+            }
         
         # 刪除 R2 上的圖片（如果存在）
         image_path = restaurant.get("image_path")

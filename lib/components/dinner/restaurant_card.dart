@@ -452,8 +452,8 @@ class _DeleteIconButtonState extends State<_DeleteIconButton> {
   @override
   Widget build(BuildContext context) {
     // 陰影偏移量
-    final shadowOffset = 3.h;
-    final iconSize = 28.w;
+    final shadowOffset = 4.h;
+    final iconSize = 36.w; // 加大圖標尺寸
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
