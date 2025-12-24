@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:tuckin/services/api_service.dart';
+import '../core/api_service.dart';
 
 /// 餐廳相關服務 (通過後端API實現)
 class PlacesService {

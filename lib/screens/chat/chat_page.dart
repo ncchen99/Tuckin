@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/services/chat_service.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/user_service.dart';
-import 'package:tuckin/services/image_cache_service.dart';
-import 'package:tuckin/services/notification_service.dart';
-import 'package:tuckin/services/realtime_service.dart';
-import 'package:tuckin/services/time_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:tuckin/models/chat_message.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:cached_network_image/cached_network_image.dart';

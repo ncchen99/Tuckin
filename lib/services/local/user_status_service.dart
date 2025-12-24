@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import 'package:tuckin/services/time_service.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/chat_service.dart';
-import 'package:tuckin/services/image_cache_service.dart';
+import 'time_service.dart';
+import '../core/auth_service.dart';
+import '../data/database_service.dart';
+import '../api/chat_service.dart';
+import 'image_cache_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:tuckin/utils/dinner_time_utils.dart';

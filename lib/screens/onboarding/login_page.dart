@@ -3,12 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/user_status_service.dart';
-import '../../components/components.dart';
-import '../../../utils/index.dart'; // 導入自適應佈局工具和NavigationService
-// 導入基本資料填寫頁面
-import '../../../services/database_service.dart';
+import 'package:tuckin/services/services.dart';
+import 'package:tuckin/components/components.dart';
+import 'package:tuckin/utils/index.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

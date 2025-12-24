@@ -7,8 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'api_service.dart';
-import 'image_cache_service.dart';
+import '../core/api_service.dart';
+import '../local/image_cache_service.dart';
 
 class UserService {
   static final UserService _instance = UserService._internal();
@@ -308,7 +308,7 @@ class UserService {
   Future<void> updateAvatarUrlCache(Map<String, String?> avatars) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final prefs = await SharedPreferences.getInstance();
-    
+
     for (final entry in avatars.entries) {
       if (entry.value != null) {
         final cacheKey = 'other_avatar_url_${entry.key}';
@@ -319,7 +319,9 @@ class UserService {
         _avatarUrlMemoryCacheTime[cacheKey] = now;
       }
     }
-    debugPrint('已更新 ${avatars.values.where((v) => v != null).length} 個頭像 URL 緩存');
+    debugPrint(
+      '已更新 ${avatars.values.where((v) => v != null).length} 個頭像 URL 緩存',
+    );
   }
 
   /// 清除特定用戶的頭像 URL 緩存
@@ -363,7 +365,9 @@ class UserService {
       results[userId] = url;
     }
 
-    debugPrint('從緩存讀取 ${results.values.where((v) => v != null).length}/${userIds.length} 個頭像 URL');
+    debugPrint(
+      '從緩存讀取 ${results.values.where((v) => v != null).length}/${userIds.length} 個頭像 URL',
+    );
     return results;
   }
 

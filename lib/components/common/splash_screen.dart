@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/index.dart';
-import '../../services/auth_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'dart:async';
 
 /// 原 SplashScreen 轉為 App 狀態轉換組件

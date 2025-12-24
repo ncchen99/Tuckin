@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/user_status_service.dart';
+import 'package:tuckin/services/services.dart';
 
 /// 集中管理應用程式的導航邏輯
 ///

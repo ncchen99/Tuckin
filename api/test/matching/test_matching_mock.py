@@ -865,7 +865,7 @@ def verify_matching_results(check_history: bool = False):
                 logger.warning(f"  組 {group.id} 有 {group_conflicts} 對歷史衝突")
                 history_conflicts += group_conflicts
             else:
-                logger.info(f"  組 {group.id} 無歷史衝突 ✓")
+                logger.info(f"  組 {group.id} 無歷史衝突")
     
     # 獲取用戶狀態統計
     waiting_restaurant_count = sum(1 for user in mock_db.users.values() if user.status == "waiting_restaurant")

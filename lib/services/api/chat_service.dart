@@ -10,9 +10,9 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/chat_message.dart';
-import 'api_service.dart';
-import 'auth_service.dart';
+import '../../models/chat_message.dart';
+import '../core/api_service.dart';
+import '../core/auth_service.dart';
 
 class ChatService {
   static final ChatService _instance = ChatService._internal();

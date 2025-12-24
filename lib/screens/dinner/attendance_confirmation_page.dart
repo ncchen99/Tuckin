@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:tuckin/utils/index.dart'; // 包含 NavigationService
 import 'dart:async';
-import 'package:tuckin/services/user_status_service.dart'; // <-- 引入 UserStatusService
-import 'package:provider/provider.dart'; // <-- 引入 Provider
-import 'package:tuckin/services/time_service.dart';
+import 'package:provider/provider.dart';
 
 class AttendanceConfirmationPage extends StatefulWidget {
   const AttendanceConfirmationPage({super.key});

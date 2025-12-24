@@ -2,15 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/components/common/stroke_text_widget.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/image_cache_service.dart';
-import 'package:tuckin/services/chat_service.dart';
-import 'package:tuckin/services/user_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
-import 'package:tuckin/services/user_status_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

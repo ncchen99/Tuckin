@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/utils/index.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/notification_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
-import 'package:tuckin/services/user_status_service.dart';
 import 'package:provider/provider.dart';
-import 'package:tuckin/services/time_service.dart';
 
 class DinnerReservationPage extends StatefulWidget {
   const DinnerReservationPage({super.key});

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:tuckin/services/time_service.dart';
+import 'package:tuckin/services/services.dart';
 
 /// 頁面階段狀態
 enum DinnerPageStage {

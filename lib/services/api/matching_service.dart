@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:tuckin/services/api_service.dart';
-import 'package:tuckin/services/error_handler.dart';
+import '../core/api_service.dart';
+import '../core/error_handler.dart';
 import 'package:tuckin/utils/dinner_time_utils.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'auth_service.dart'; // 需要AuthService來獲取token
-import 'supabase_service.dart';
+import '../core/auth_service.dart';
+import '../core/supabase_service.dart';
 
 /// 加入配對回應模型
 class JoinMatchingResponse {

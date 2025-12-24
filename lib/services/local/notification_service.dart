@@ -2,12 +2,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:tuckin/services/supabase_service.dart';
-import 'package:tuckin/services/chat_service.dart';
-import 'package:tuckin/services/database_service.dart';
+import '../core/supabase_service.dart';
+import '../api/chat_service.dart';
+import '../data/database_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:tuckin/services/time_service.dart';
+import 'time_service.dart';
 
 /// 通知服務，處理推送通知相關邏輯
 class NotificationService {

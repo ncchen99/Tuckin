@@ -1,29 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:tuckin/services/auth_service.dart';
+import 'package:tuckin/services/services.dart'; // 統一導入所有服務
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tuckin/utils/route_observer.dart'; // 導入路由觀察器
 import 'package:tuckin/components/components.dart'; // 導入共用組件
 import 'package:connectivity_plus/connectivity_plus.dart'; // 導入網絡狀態檢測
 import 'package:tuckin/components/common/error_screen.dart'; // 導入錯誤畫面組件
-import 'package:tuckin/services/error_handler.dart';
-import 'package:tuckin/services/api_service.dart'; // 添加導入 API 服務
 import 'package:flutter_native_splash/flutter_native_splash.dart'; // 導入原生啟動畫面
-// 添加導入通知服務
-import 'package:tuckin/services/notification_service.dart';
-import 'package:tuckin/services/realtime_service.dart'; // 導入實時服務
 import 'package:firebase_core/firebase_core.dart';
-// 添加導入IO庫用於網絡請求
 import 'package:http/http.dart' as http; // 添加HTTP包用於網絡請求
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart'; // 導入 Provider 套件
-import 'package:tuckin/services/user_status_service.dart'; // 導入 UserStatusService
 // 導入時區相關包
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:tuckin/services/time_service.dart';
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';

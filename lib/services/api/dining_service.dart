@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:tuckin/services/api_service.dart';
-import 'package:tuckin/services/auth_service.dart';
+import '../core/api_service.dart';
+import '../core/auth_service.dart';
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';

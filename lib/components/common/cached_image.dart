@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:tuckin/services/image_cache_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:tuckin/components/common/loading_image.dart';
 
 /// 緩存圖片組件 - 用於顯示網路圖片並自動緩存

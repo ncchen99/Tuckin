@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/image_cache_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
-import 'package:tuckin/services/user_status_service.dart';
-import 'package:tuckin/services/dining_service.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
-import 'package:tuckin/services/time_service.dart';
 
 class RestaurantReservationPage extends StatefulWidget {
   const RestaurantReservationPage({super.key});

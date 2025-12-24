@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/realtime_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:tuckin/utils/index.dart';
 // 導入轉場動畫
 // 下一個頁面

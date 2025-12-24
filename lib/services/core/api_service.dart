@@ -33,7 +33,7 @@ class ApiService {
 
   // 後端API基礎URL
   final String baseUrl = 'https://tuckin.fly.dev/api';
-  // kDebugMode
+  // DebugMode
   //     ? 'http://10.0.2.2:8000/api' // Debug 模式下，模擬器連接本地主機的 URL
   //     : 'https://tuckin-api-c6943d8e20da.herokuapp.com/api'; // Release 模式下的生產 URL
 

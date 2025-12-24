@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:tuckin/services/supabase_service.dart';
-import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/auth_service.dart';
-import 'package:tuckin/services/user_status_service.dart';
+import '../core/supabase_service.dart';
+import 'database_service.dart';
+import '../core/auth_service.dart';
+import '../local/user_status_service.dart';
 
 /// RealtimeService 用於訂閱 Supabase 的實時數據庫變更
 /// 主要功能：監聽 user_status 資料表的變更，自動導航至對應頁面

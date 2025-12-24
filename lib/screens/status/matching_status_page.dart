@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/auth_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:tuckin/utils/index.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tuckin/services/notification_service.dart';
-
 import 'package:provider/provider.dart';
-import 'package:tuckin/services/user_status_service.dart';
 
 class MatchingStatusPage extends StatefulWidget {
   const MatchingStatusPage({super.key});

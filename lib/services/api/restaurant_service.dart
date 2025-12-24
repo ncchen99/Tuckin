@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:tuckin/services/api_service.dart';
-import 'package:tuckin/services/places_service.dart';
-import 'package:tuckin/services/database_service.dart';
-import 'package:tuckin/services/supabase_service.dart';
-import 'package:tuckin/services/auth_service.dart';
+import '../core/api_service.dart';
+import 'places_service.dart';
+import '../data/database_service.dart';
+import '../core/supabase_service.dart';
+import '../core/auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';

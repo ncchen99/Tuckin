@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'dart:async';
 import 'package:tuckin/components/components.dart';
 import 'package:tuckin/models/chat_message.dart';
-import 'package:tuckin/services/chat_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:tuckin/utils/index.dart';
 
 /// 全螢幕圖片查看器

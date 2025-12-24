@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:io';
 import 'package:tuckin/components/components.dart';
-import 'package:tuckin/services/restaurant_service.dart';
-import 'package:tuckin/services/matching_service.dart';
-import 'package:tuckin/services/database_service.dart';
+import 'package:tuckin/services/services.dart';
 import 'package:tuckin/utils/index.dart';
 
 class RestaurantSelectionPage extends StatefulWidget {
