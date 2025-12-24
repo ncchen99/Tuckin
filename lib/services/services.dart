@@ -30,3 +30,4 @@ export 'local/image_cache_service.dart';
 export 'local/notification_service.dart';
 export 'local/time_service.dart';
 export 'local/user_status_service.dart';
+export 'local/system_config_service.dart';

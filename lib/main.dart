@@ -12,6 +12,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http; // 添加HTTP包用於網絡請求
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart'; // 導入 Provider 套件
+import 'package:url_launcher/url_launcher.dart'; // 導入 url_launcher
 // 導入時區相關包
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -38,6 +39,7 @@ import 'screens/profile/profile_page.dart';
 // 導入新增狀態頁面
 import 'screens/status/confirmation_timeout_page.dart';
 import 'screens/status/low_attendance_page.dart';
+import 'screens/status/service_unavailable_page.dart';
 // 導入聊天頁面
 import 'screens/chat/chat_page.dart';
 
@@ -51,6 +53,10 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // 全局變數，存儲初始路由
 String initialRoute = '/';
+
+// 全局變數，存儲系統檢查結果（供 MyApp 使用）
+// ignore: unused_element
+SystemCheckResult? _systemCheckResult;
 
 // 測試網絡連接的函數
 Future<bool> _testNetworkConnection() async {
@@ -312,12 +318,154 @@ Future<void> _initializeApp() async {
 
     // 確保在所有準備工作完成後才運行主應用
     runApp(MyApp(errorHandler: errorHandler));
+
+    // 在背景執行系統檢查（不阻塞主流程）
+    _performSystemCheckInBackground();
   } else {
     debugPrint('初始化未成功，使用默認路由: /');
     initialRoute = '/';
     // 即使初始化失敗，也運行主應用以顯示錯誤訊息
     runApp(MyApp(errorHandler: errorHandler));
   }
+}
+
+// 在背景執行系統檢查
+Future<void> _performSystemCheckInBackground() async {
+  try {
+    debugPrint('開始背景系統檢查...');
+    final result = await SystemConfigService().performSystemCheck();
+    _systemCheckResult = result;
+
+    debugPrint(
+      '系統檢查完成 - 服務可用: ${result.isServiceAvailable}, '
+      '需要強制更新: ${result.needsForceUpdate}, '
+      '有可選更新: ${result.hasOptionalUpdate}',
+    );
+
+    // 如果需要顯示系統狀態頁面，通知 MyApp
+    if (!result.canUseApp && navigatorKey.currentState != null) {
+      // 使用 navigatorKey 導航到系統狀態頁面
+      _showSystemStatusPage(result);
+    } else if (result.hasOptionalUpdate && navigatorKey.currentState != null) {
+      // 有可選更新，顯示更新提示對話框
+      _showOptionalUpdateDialog(result);
+    }
+  } catch (e) {
+    debugPrint('背景系統檢查失敗: $e');
+  }
+}
+
+// 顯示系統狀態頁面
+void _showSystemStatusPage(SystemCheckResult result) {
+  if (navigatorKey.currentState == null) {
+    debugPrint('Navigator 尚未準備好，稍後重試顯示系統狀態頁面');
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _showSystemStatusPage(result);
+    });
+    return;
+  }
+
+  if (!result.isServiceAvailable) {
+    // 服務暫停
+    navigatorKey.currentState!.pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder:
+            (context) => ServiceUnavailablePage(
+              type: ServiceUnavailableType.maintenance,
+              reason: result.serviceDisabledReason,
+              estimatedRestoreTime: result.estimatedRestoreTime,
+              onRetry: () async {
+                // 重新檢查系統狀態
+                final newResult =
+                    await SystemConfigService().performSystemCheck();
+                _systemCheckResult = newResult;
+
+                if (newResult.canUseApp && navigatorKey.currentState != null) {
+                  // 服務恢復，回到主應用
+                  navigatorKey.currentState!.pushNamedAndRemoveUntil(
+                    initialRoute,
+                    (route) => false,
+                  );
+                } else if (!newResult.isServiceAvailable) {
+                  // 仍然不可用，更新頁面
+                  _showSystemStatusPage(newResult);
+                } else if (newResult.needsForceUpdate) {
+                  // 需要強制更新
+                  _showSystemStatusPage(newResult);
+                }
+              },
+            ),
+      ),
+      (route) => false,
+    );
+  } else if (result.needsForceUpdate) {
+    // 需要強制更新
+    navigatorKey.currentState!.pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder:
+            (context) => ServiceUnavailablePage(
+              type: ServiceUnavailableType.forceUpdate,
+              updateUrl: result.updateUrl,
+              latestVersion: result.latestVersion,
+              currentVersion: result.currentVersion,
+            ),
+      ),
+      (route) => false,
+    );
+  }
+}
+
+// 顯示可選更新對話框
+void _showOptionalUpdateDialog(SystemCheckResult result) {
+  if (navigatorKey.currentState == null) {
+    debugPrint('Navigator 尚未準備好，稍後重試顯示更新對話框');
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _showOptionalUpdateDialog(result);
+    });
+    return;
+  }
+
+  final context = navigatorKey.currentContext;
+  if (context == null) {
+    debugPrint('無法獲取 context，無法顯示對話框');
+    return;
+  }
+
+  // 延遲一下，確保頁面已經完全渲染
+  Future.delayed(const Duration(milliseconds: 600), () {
+    if (navigatorKey.currentContext == null) return;
+
+    showCustomConfirmationDialog(
+      context: navigatorKey.currentContext!,
+      iconPath: 'assets/images/icon/update.webp',
+      title: '',
+      content: '發現新版本的APP\n要立即更新嗎？',
+      cancelButtonText: '稍後',
+      confirmButtonText: '好哇',
+      loadingColor: const Color(0xFF23456B),
+      barrierDismissible: true,
+      onCancel: () {
+        Navigator.of(navigatorKey.currentContext!).pop();
+      },
+      onConfirm: () async {
+        if (result.updateUrl != null && result.updateUrl!.isNotEmpty) {
+          try {
+            final uri = Uri.parse(result.updateUrl!);
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } else {
+              debugPrint('無法開啟更新連結: ${result.updateUrl}');
+            }
+          } catch (e) {
+            debugPrint('開啟更新連結失敗: $e');
+          }
+        }
+        if (navigatorKey.currentContext != null) {
+          Navigator.of(navigatorKey.currentContext!).pop();
+        }
+      },
+    );
+  });
 }
 
 class MyApp extends StatefulWidget {

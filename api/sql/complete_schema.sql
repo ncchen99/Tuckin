@@ -562,6 +562,50 @@ CREATE POLICY dining_history_select ON dining_history
     FOR SELECT TO authenticated
     USING (auth.uid() = ANY(user_ids)); 
 
+-- === 系統配置表：system_config ===
+-- 用於儲存 APP 版本資訊和服務狀態
+CREATE TABLE IF NOT EXISTS system_config (
+    id SERIAL PRIMARY KEY,
+    config_key VARCHAR(50) NOT NULL UNIQUE,
+    config_value TEXT,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 創建索引
+CREATE INDEX IF NOT EXISTS idx_system_config_key ON system_config(config_key);
+
+-- 為系統配置表啟用 RLS
+ALTER TABLE system_config ENABLE ROW LEVEL SECURITY;
+
+-- 允許所有已認證用戶讀取系統配置（公開資訊）
+CREATE POLICY system_config_select ON system_config
+    FOR SELECT TO authenticated
+    USING (true);
+
+-- 服務角色可以完全管理系統配置
+CREATE POLICY service_all_system_config ON system_config
+    FOR ALL TO authenticated
+    USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+
+-- 插入預設系統配置
+INSERT INTO system_config (config_key, config_value, description) VALUES
+    ('latest_app_version', '2.0.0', '最新 APP 版本號'),
+    ('min_required_version', '2.0.0', '最低要求 APP 版本號（低於此版本必須更新）'),
+    ('is_service_enabled', 'true', '服務是否啟用（true/false）'),
+    ('service_disabled_reason', '', '服務暫停原因'),
+    ('estimated_restore_time', '', '預計恢復時間（ISO 8601 格式）'),
+    ('update_url_android', 'https://play.google.com/store/apps/details?id=com.tuckin.app', 'Android 更新連結'),
+    ('update_url_ios', 'https://apps.apple.com/tw/app/tuckin/id6751713165', 'iOS 更新連結')
+ON CONFLICT (config_key) DO NOTHING;
+
+-- 創建自動更新時間戳觸發器
+CREATE TRIGGER update_system_config_updated_at
+BEFORE UPDATE ON system_config
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
+
 CREATE OR REPLACE FUNCTION get_group_votes(group_uuid UUID)
 RETURNS TABLE (
     id UUID,
