@@ -295,8 +295,8 @@ class _RestaurantCardState extends State<RestaurantCard>
                 _effectiveVoteCount == 0 &&
                 widget.onDelete != null)
               Positioned(
-                top: -8.h,
-                right: -8.w,
+                top: -18.h, // 調整位置補償 padding
+                right: -18.w,
                 child: _DeleteIconButton(
                   onTap: widget.onDelete!,
                 ),
@@ -453,47 +453,53 @@ class _DeleteIconButtonState extends State<_DeleteIconButton> {
   Widget build(BuildContext context) {
     // 陰影偏移量
     final shadowOffset = 4.h;
-    final iconSize = 36.w; // 加大圖標尺寸
+    final iconSize = 36.w; // 圖標尺寸
+    final hitPadding = 10.w; // 擴大點擊範圍的 padding
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque, // 確保整個區域都可點擊
       onTapDown: (_) => setState(() => _isPressed = true),
       onTapUp: (_) {
         setState(() => _isPressed = false);
         widget.onTap();
       },
       onTapCancel: () => setState(() => _isPressed = false),
-      child: SizedBox(
-        width: iconSize,
-        height: iconSize + shadowOffset,
-        child: Stack(
-          children: [
-            // 底部陰影圖片
-            if (!_isPressed)
+      child: Padding(
+        // 擴大點擊範圍但不改變視覺尺寸
+        padding: EdgeInsets.all(hitPadding),
+        child: SizedBox(
+          width: iconSize,
+          height: iconSize + shadowOffset,
+          child: Stack(
+            children: [
+              // 底部陰影圖片
+              if (!_isPressed)
+                Positioned(
+                  left: 0,
+                  top: shadowOffset,
+                  child: Image.asset(
+                    'assets/images/icon/cross.webp',
+                    width: iconSize,
+                    height: iconSize,
+                    fit: BoxFit.contain,
+                    color: Colors.black.withOpacity(0.4),
+                    colorBlendMode: BlendMode.srcIn,
+                  ),
+                ),
+
+              // 主圖標
               Positioned(
+                top: _isPressed ? shadowOffset : 0,
                 left: 0,
-                top: shadowOffset,
                 child: Image.asset(
                   'assets/images/icon/cross.webp',
                   width: iconSize,
                   height: iconSize,
                   fit: BoxFit.contain,
-                  color: Colors.black.withOpacity(0.4),
-                  colorBlendMode: BlendMode.srcIn,
                 ),
               ),
-
-            // 主圖標
-            Positioned(
-              top: _isPressed ? shadowOffset : 0,
-              left: 0,
-              child: Image.asset(
-                'assets/images/icon/cross.webp',
-                width: iconSize,
-                height: iconSize,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

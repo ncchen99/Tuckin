@@ -459,8 +459,8 @@ class _RestaurantSelectionPageState extends State<RestaurantSelectionPage> {
                                 child:
                                     _isSubmittingLink
                                         ? LoadingImage(
-                                          width: 40.w,
-                                          height: 40.h,
+                                          width: 55.w,
+                                          height: 55.h,
                                           color: const Color(0xFF23456B),
                                         )
                                         : ImageButton(

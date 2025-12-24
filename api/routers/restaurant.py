@@ -209,11 +209,47 @@ async def search_restaurants(
                 .execute()
             
             if not existing.data or len(existing.data) == 0:
+                # 檢查該餐廳是否已在當前群組的投票列表中
+                user_group = supabase.table("user_matching_info") \
+                    .select("matching_group_id") \
+                    .eq("user_id", current_user.user.id) \
+                    .execute()
+                
+                if user_group.data and len(user_group.data) > 0:
+                    group_id = user_group.data[0]["matching_group_id"]
+                    
+                    # 查詢群組投票中是否已有此餐廳（使用google_place_id比對）
+                    group_votes = supabase.table("restaurant_votes") \
+                        .select("restaurant_id") \
+                        .eq("group_id", group_id) \
+                        .execute()
+                    
+                    if group_votes.data:
+                        voted_restaurant_ids = [vote["restaurant_id"] for vote in group_votes.data]
+                        
+                        # 從restaurants表中獲取這些已投票餐廳的google_place_id
+                        voted_restaurants = supabase.table("restaurants") \
+                            .select("id, google_place_id") \
+                            .in_("id", voted_restaurant_ids) \
+                            .execute()
+                        
+                        # 檢查是否有相同的google_place_id
+                        for voted_restaurant in voted_restaurants.data:
+                            if voted_restaurant.get("google_place_id") == valid_place_id:
+                                logger.info(f"[{request_id}] 餐廳 {restaurant_data['name']} 已在群組投票中，不能重複新增")
+                                raise HTTPException(
+                                    status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail="此餐廳已在目前群組的投票列表中，無法重複新增"
+                                )
+                
                 # 記錄是誰新增的餐廳
                 restaurant_data["added_by_user_id"] = current_user.user.id
                 # 儲存到資料庫
                 supabase.table("restaurants").insert(restaurant_data).execute()
                 logger.info(f"[{request_id}] 餐廳保存到資料庫: {restaurant_data['name']}, 新增者: {current_user.user.id}")
+        except HTTPException as e:
+            # 重新拋出HTTP異常
+            raise e
         except Exception as e:
             logger.error(f"[{request_id}] 保存餐廳到資料庫時出錯: {str(e)}")
         
@@ -248,6 +284,40 @@ async def create_restaurant(
             if existing.data and len(existing.data) > 0:
                 # 餐廳已存在
                 return RestaurantResponse(**existing.data[0])
+        
+        # 檢查該餐廳是否已在當前群組的投票列表中
+        user_group = supabase.table("user_matching_info") \
+            .select("matching_group_id") \
+            .eq("user_id", current_user.user.id) \
+            .execute()
+        
+        if user_group.data and len(user_group.data) > 0:
+            group_id = user_group.data[0]["matching_group_id"]
+            
+            # 查詢群組投票中是否已有此餐廳（使用google_place_id比對）
+            group_votes = supabase.table("restaurant_votes") \
+                .select("restaurant_id") \
+                .eq("group_id", group_id) \
+                .execute()
+            
+            if group_votes.data:
+                voted_restaurant_ids = [vote["restaurant_id"] for vote in group_votes.data]
+                
+                # 從restaurants表中獲取這些已投票餐廳的google_place_id
+                voted_restaurants = supabase.table("restaurants") \
+                    .select("id, google_place_id") \
+                    .in_("id", voted_restaurant_ids) \
+                    .execute()
+                
+                # 檢查是否有相同的google_place_id
+                if restaurant.google_place_id:
+                    for voted_restaurant in voted_restaurants.data:
+                        if voted_restaurant.get("google_place_id") == restaurant.google_place_id:
+                            logger.info(f"餐廳 {restaurant.name} 已在群組投票中，不能重複新增")
+                            raise HTTPException(
+                                status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="此餐廳已在目前群組的投票列表中，無法重複新增"
+                            )
         
         # 創建新餐廳
         restaurant_data = restaurant.dict()
