@@ -5,6 +5,7 @@ app = 'tuckin-api'
 primary_region = 'nrt'  # 東京區域，對台灣用戶延遲較低
 
 [build]
+  dockerfile = "Dockerfile"
 
 [http_service]
   internal_port = 8080
