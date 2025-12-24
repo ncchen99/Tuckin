@@ -27,6 +27,7 @@ from utils.image_processor import (
     process_and_update_image,
     download_and_upload_photo
 )
+from utils.cloudflare import delete_file_from_r2, extract_r2_path_from_url
 from services.notification_service import NotificationService
 from utils.dinner_time_utils import DinnerTimeUtils
 
@@ -208,9 +209,11 @@ async def search_restaurants(
                 .execute()
             
             if not existing.data or len(existing.data) == 0:
+                # 記錄是誰新增的餐廳
+                restaurant_data["added_by_user_id"] = current_user.user.id
                 # 儲存到資料庫
                 supabase.table("restaurants").insert(restaurant_data).execute()
-                logger.info(f"[{request_id}] 餐廳保存到資料庫: {restaurant_data['name']}")
+                logger.info(f"[{request_id}] 餐廳保存到資料庫: {restaurant_data['name']}, 新增者: {current_user.user.id}")
         except Exception as e:
             logger.error(f"[{request_id}] 保存餐廳到資料庫時出錯: {str(e)}")
         
@@ -252,6 +255,7 @@ async def create_restaurant(
         restaurant_data["id"] = restaurant_id
         restaurant_data["created_at"] = datetime.utcnow().isoformat()
         restaurant_data["is_user_added"] = True  # 標記為用戶添加的餐廳
+        restaurant_data["added_by_user_id"] = current_user.user.id  # 記錄新增者
         
         # 如果沒有提供網站，但有Google Place ID，則使用Google Map連結
         if not restaurant_data.get("website") and restaurant_data.get("google_place_id"):
@@ -321,6 +325,94 @@ async def get_restaurant(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"獲取餐廳詳細資訊時出錯: {str(e)}"
+        )
+
+@router.delete("/{restaurant_id}", status_code=status.HTTP_200_OK)
+async def delete_restaurant(
+    restaurant_id: str,
+    supabase: Client = Depends(get_supabase_service),
+    current_user = Depends(get_current_user)
+):
+    """
+    刪除用戶自己新增的餐廳
+    - 只有新增該餐廳的用戶才能刪除
+    - 同時刪除 R2 上的餐廳圖片
+    - 同時刪除相關的投票記錄
+    """
+    try:
+        user_id = current_user.user.id
+        
+        # 驗證UUID格式
+        try:
+            UUID(restaurant_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="無效的餐廳ID格式"
+            )
+        
+        # 查詢餐廳
+        result = supabase.table("restaurants") \
+            .select("*") \
+            .eq("id", restaurant_id) \
+            .execute()
+        
+        if not result.data or len(result.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"找不到ID為 {restaurant_id} 的餐廳"
+            )
+        
+        restaurant = result.data[0]
+        
+        # 檢查是否為該用戶新增的餐廳
+        if restaurant.get("added_by_user_id") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="您只能刪除自己新增的餐廳"
+            )
+        
+        # 刪除 R2 上的圖片（如果存在）
+        image_path = restaurant.get("image_path")
+        if image_path:
+            r2_path = extract_r2_path_from_url(image_path)
+            if r2_path:
+                delete_success = await delete_file_from_r2(r2_path)
+                if delete_success:
+                    logger.info(f"成功刪除餐廳圖片: {r2_path}")
+                else:
+                    logger.warning(f"刪除餐廳圖片失敗: {r2_path}")
+        
+        # 刪除相關的投票記錄
+        supabase.table("restaurant_votes") \
+            .delete() \
+            .eq("restaurant_id", restaurant_id) \
+            .execute()
+        
+        logger.info(f"已刪除餐廳 {restaurant_id} 的投票記錄")
+        
+        # 刪除餐廳
+        supabase.table("restaurants") \
+            .delete() \
+            .eq("id", restaurant_id) \
+            .execute()
+        
+        logger.info(f"用戶 {user_id} 成功刪除餐廳: {restaurant_id}")
+        
+        return {
+            "success": True,
+            "message": "餐廳已成功刪除",
+            "restaurant_id": restaurant_id
+        }
+    
+    except HTTPException as e:
+        # 重新拋出HTTP異常
+        raise e
+    except Exception as e:
+        logger.error(f"刪除餐廳時出錯: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"刪除餐廳時出錯: {str(e)}"
         )
 
 @router.post("/vote", response_model=RestaurantVote)

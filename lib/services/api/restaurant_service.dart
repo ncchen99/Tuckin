@@ -236,4 +236,59 @@ class RestaurantService {
   Map<String, dynamic> getSampleRestaurantData() {
     return _placesService.generateSampleRestaurantData(_restaurantIdCounter++);
   }
+
+  /// 刪除用戶自己新增的餐廳
+  ///
+  /// [restaurantId] 餐廳ID
+  /// 只有新增該餐廳的用戶才能刪除
+  Future<bool> deleteUserAddedRestaurant(String restaurantId) async {
+    try {
+      final String apiEndpoint =
+          '${_apiService.baseUrl}/restaurant/$restaurantId';
+
+      // 獲取當前用戶
+      final currentUser = await _authService.getCurrentUser();
+
+      if (currentUser == null) {
+        throw ApiError(message: '未登入，無法刪除餐廳');
+      }
+
+      // 獲取 session
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null) {
+        throw ApiError(message: '無法獲取用戶登入資訊，請重新登入');
+      }
+
+      // 發送刪除請求
+      final response = await http.delete(
+        Uri.parse(apiEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.accessToken}',
+        },
+      );
+
+      // 檢查回應狀態
+      if (response.statusCode == 200) {
+        debugPrint('餐廳刪除成功: $restaurantId');
+        return true;
+      } else {
+        // 刪除失敗
+        String errorMessage;
+        try {
+          final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+          errorMessage = errorData['detail'] ?? '刪除失敗 (${response.statusCode})';
+        } catch (_) {
+          errorMessage = '刪除失敗 (${response.statusCode})';
+        }
+        throw ApiError(message: errorMessage);
+      }
+    } catch (e) {
+      debugPrint('刪除餐廳出錯: $e');
+      if (e is ApiError) {
+        rethrow;
+      }
+      throw ApiError(message: '刪除餐廳時發生錯誤: $e');
+    }
+  }
 }

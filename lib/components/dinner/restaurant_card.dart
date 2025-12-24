@@ -14,6 +14,8 @@ class RestaurantCard extends StatefulWidget {
   final VoidCallback onTap;
   final String? mapUrl;
   final int? voteCount;
+  final bool isUserAdded; // 是否為用戶自己新增的餐廳
+  final VoidCallback? onDelete; // 刪除按鈕的回調函數
 
   const RestaurantCard({
     super.key,
@@ -25,6 +27,8 @@ class RestaurantCard extends StatefulWidget {
     required this.onTap,
     this.mapUrl,
     this.voteCount,
+    this.isUserAdded = false,
+    this.onDelete,
   });
 
   @override
@@ -284,6 +288,19 @@ class _RestaurantCardState extends State<RestaurantCard>
                   },
                 ),
               ),
+
+            // 刪除按鈕 - 只在用戶新增的餐廳且未選中且無票數時顯示
+            if (widget.isUserAdded &&
+                !widget.isSelected &&
+                _effectiveVoteCount == 0 &&
+                widget.onDelete != null)
+              Positioned(
+                top: -8.h,
+                right: -8.w,
+                child: _DeleteIconButton(
+                  onTap: widget.onDelete!,
+                ),
+              ),
           ],
         ),
       ),
@@ -413,6 +430,70 @@ class RecommendRestaurantCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 刪除按鈕組件（帶陰影和按壓效果）
+class _DeleteIconButton extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _DeleteIconButton({required this.onTap});
+
+  @override
+  State<_DeleteIconButton> createState() => _DeleteIconButtonState();
+}
+
+class _DeleteIconButtonState extends State<_DeleteIconButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // 陰影偏移量
+    final shadowOffset = 3.h;
+    final iconSize = 28.w;
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: SizedBox(
+        width: iconSize,
+        height: iconSize + shadowOffset,
+        child: Stack(
+          children: [
+            // 底部陰影圖片
+            if (!_isPressed)
+              Positioned(
+                left: 0,
+                top: shadowOffset,
+                child: Image.asset(
+                  'assets/images/icon/cross.webp',
+                  width: iconSize,
+                  height: iconSize,
+                  fit: BoxFit.contain,
+                  color: Colors.black.withOpacity(0.4),
+                  colorBlendMode: BlendMode.srcIn,
+                ),
+              ),
+
+            // 主圖標
+            Positioned(
+              top: _isPressed ? shadowOffset : 0,
+              left: 0,
+              child: Image.asset(
+                'assets/images/icon/cross.webp',
+                width: iconSize,
+                height: iconSize,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS restaurants (
     business_hours TEXT,
     google_place_id TEXT,
     is_user_added BOOLEAN DEFAULT FALSE,
+    added_by_user_id UUID REFERENCES auth.users(id), -- 新增此餐廳的用戶ID
     phone TEXT,
     website TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -345,6 +346,7 @@ CREATE INDEX IF NOT EXISTS idx_rating_sessions_session_token ON rating_sessions(
 CREATE INDEX IF NOT EXISTS idx_user_ratings_from_user_id ON user_ratings(from_user_id);
 CREATE INDEX IF NOT EXISTS idx_user_ratings_to_user_id ON user_ratings(to_user_id);
 CREATE INDEX IF NOT EXISTS idx_user_ratings_dining_event_id ON user_ratings(dining_event_id);
+CREATE INDEX IF NOT EXISTS idx_restaurants_added_by_user_id ON restaurants(added_by_user_id);
 
 -- === 排程任務表：schedule_table ===
 -- 用於儲存系統層級的時間驅動任務（由 GCP Scheduler 觸發 API 來批次執行）
@@ -460,6 +462,11 @@ CREATE POLICY "服務可以為任何用戶創建通知" ON user_notifications
 
 -- 為用戶提供對餐廳表的讀取權限
 CREATE POLICY restaurants_read ON restaurants FOR SELECT TO authenticated USING (true);
+
+-- 用戶可以刪除自己新增的餐廳
+CREATE POLICY user_delete_own_restaurant ON restaurants
+    FOR DELETE TO authenticated
+    USING (added_by_user_id = auth.uid());
 
 -- 為群組成員提供對群組聚餐事件的讀取權限
 CREATE POLICY dining_events_group_read ON dining_events 
