@@ -99,7 +99,7 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                 // 標題（如果有）
                 if (widget.title.isNotEmpty)
                   Padding(
-                    padding: EdgeInsets.only(top: 5.h),
+                    padding: EdgeInsets.only(top: 5.h, left: 30.w, right: 30.w),
                     child: Text(
                       widget.title,
                       textAlign: TextAlign.center,
@@ -117,7 +117,7 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                   margin: EdgeInsets.symmetric(horizontal: 20.w),
                   padding: EdgeInsets.symmetric(
                     vertical: 10.h,
-                    horizontal: 10.w,
+                    horizontal: 20.w,
                   ),
                   child: Text(
                     widget.content,
