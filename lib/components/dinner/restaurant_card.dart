@@ -297,9 +297,7 @@ class _RestaurantCardState extends State<RestaurantCard>
               Positioned(
                 top: -18.h, // 調整位置補償 padding
                 right: -18.w,
-                child: _DeleteIconButton(
-                  onTap: widget.onDelete!,
-                ),
+                child: _DeleteIconButton(onTap: widget.onDelete!),
               ),
           ],
         ),
