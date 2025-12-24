@@ -356,7 +356,11 @@ CREATE TABLE IF NOT EXISTS schedule_table (
         'match',                -- 每週一次大配對
         'restaurant_vote_end',  -- 餐廳投票結束
         'event_end',            -- 活動結束（將 confirmed → completed）
-        'rating_end'            -- 評分結束（轉存歷史與清理資料）
+        'rating_end',           -- 評分結束（轉存歷史與清理資料）
+        'reminder_booking',     -- 預約提醒（match 前一天）
+        'reminder_matching',    -- 配對完成通知（match 當天）
+        'reminder_vote_result', -- 投票結果通知（vote_end 當天）
+        'reminder_attendance'   -- 出席提醒（聚餐當天）
     )),
     scheduled_time TIMESTAMP WITH TIME ZONE NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','done','failed')),

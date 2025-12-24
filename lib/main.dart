@@ -439,7 +439,7 @@ void _showOptionalUpdateDialog(SystemCheckResult result) {
       context: navigatorKey.currentContext!,
       iconPath: 'assets/images/icon/update.webp',
       title: '',
-      content: '發現新版本的APP\n要立即更新嗎？',
+      content: '發現新版本的 Tuckin\n要立即更新嗎？',
       cancelButtonText: '稍後',
       confirmButtonText: '好哇',
       loadingColor: const Color(0xFF23456B),
