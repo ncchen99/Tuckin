@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS reminder_templates (
     -- 通知標題
     title TEXT NOT NULL,
     
-    -- 通知內容（支持佔位符：{time}, {location}, {date}, {restaurant_name}）
+    -- 通知內容（支持佔位符：{time}, {location}, {date}, {day}, {restaurant_name}）
     body TEXT NOT NULL,
     
     -- 是否啟用
@@ -67,32 +67,12 @@ CHECK (status IN ('pending', 'processing', 'done', 'failed'));
 -- 插入預設的提醒訊息模板
 -- ===== 預約聚餐提醒 (booking_reminder) =====
 INSERT INTO reminder_templates (reminder_type, style_tag, title, body, weight) VALUES
--- 溫暖邀請型
-('booking_reminder', 'warm', '新的一週，新的相遇 ✨', '本週聚餐開放預約囉！來找個時間，認識有趣的靈魂吧', 2),
-('booking_reminder', 'warm', '週末好時光 🌟', '新的一週即將開始，來預約一場溫暖的聚餐吧！', 1),
-
--- 活潑趣味型
-('booking_reminder', 'fun', '美食召喚中 🎉', '美食 + 新朋友 = 完美的一週！現在就預約下週聚餐', 2),
-('booking_reminder', 'fun', '餐桌冒險等你來 🍽️', '想認識有趣的人嗎？快來預約本週聚餐！', 1),
-
--- 簡潔提醒型
-('booking_reminder', 'simple', '本週聚餐開放預約', '別錯過這次認識新朋友的機會，現在就來預約吧！', 1)
-
+('booking_reminder', 'simple', '聚餐預約提醒', '這週的聚餐在星期{day}，歡迎報名參加', 1)
 ON CONFLICT DO NOTHING;
 
 -- ===== 參加聚餐提醒 (attendance_reminder) =====
 INSERT INTO reminder_templates (reminder_type, style_tag, title, body, weight) VALUES
--- 溫暖提醒型
-('attendance_reminder', 'warm', '今晚見！💫', '別忘了你和新朋友的約會，{time} 在 {restaurant_name} 等你', 2),
-('attendance_reminder', 'warm', '準備好了嗎？✨', '今晚的餐桌上，會有精彩的故事等著你', 1),
-
--- 活潑趣味型
-('attendance_reminder', 'fun', '倒數計時！🎊', '今天就是聚餐日！記得 {time} 準時出現喔', 2),
-('attendance_reminder', 'fun', '美食時間到 🍜', '今晚 {time}，{restaurant_name} 有一桌精彩等著你！', 1),
-
--- 簡潔提醒型
-('attendance_reminder', 'simple', '聚餐提醒', '今天 {time} 的聚餐記得出席，地點：{restaurant_name}', 1)
-
+('attendance_reminder', 'simple', '聚餐提醒', '今晚{time}點的聚餐在{restaurant_name}，期待見面喔！', 1)
 ON CONFLICT DO NOTHING;
 
 -- 為 reminder_templates 表添加更新時間觸發器

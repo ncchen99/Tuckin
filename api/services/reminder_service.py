@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from supabase import Client
 
 from services.notification_service import NotificationService
+from utils.dinner_time_utils import DinnerTimeUtils
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,14 @@ class ReminderService:
     ) -> Dict[str, Any]:
         """發送預約聚餐提醒"""
         title = template["title"]
-        body = template["body"]
+        body_template = template["body"]
+        
+        # 計算本週聚餐日是星期幾
+        dinner_info = DinnerTimeUtils.calculate_dinner_time_info()
+        weekday_text = dinner_info.weekday_text  # 例如："一" 或 "四"
+        
+        # 替換 {day} 佔位符
+        body = body_template.replace("{day}", weekday_text)
         
         success_count = 0
         failed_count = 0
@@ -356,14 +364,19 @@ class ReminderService:
     
     def _format_template(self, template_body: str, event_info: Optional[Dict[str, Any]]) -> str:
         """替換模板中的佔位符"""
+        # 計算本週聚餐日是星期幾
+        dinner_info = DinnerTimeUtils.calculate_dinner_time_info()
+        weekday_text = dinner_info.weekday_text  # 例如："一" 或 "四"
+        
         if not event_info:
-            # 如果沒有活動資訊，移除佔位符
+            # 如果沒有活動資訊，使用預設值
             return (
                 template_body
                 .replace("{time}", "18:00")
                 .replace("{restaurant_name}", "指定餐廳")
                 .replace("{location}", "")
                 .replace("{date}", "今天")
+                .replace("{day}", weekday_text)
             )
         
         return (
@@ -372,6 +385,7 @@ class ReminderService:
             .replace("{restaurant_name}", event_info.get("restaurant_name", "指定餐廳"))
             .replace("{location}", event_info.get("location", ""))
             .replace("{date}", event_info.get("date", "今天"))
+            .replace("{day}", weekday_text)
         )
     
     async def _send_matching_reminders(
