@@ -312,14 +312,16 @@ class ReminderService:
                 self.supabase.table("user_matching_info")
                 .select("matching_group_id")
                 .eq("user_id", user_id)
-                .maybe_single()
+                .limit(1)
                 .execute()
             )
             
-            if not matching_info.data or not matching_info.data.get("matching_group_id"):
+            if not matching_info.data or len(matching_info.data) == 0:
                 return None
             
-            group_id = matching_info.data["matching_group_id"]
+            group_id = matching_info.data[0].get("matching_group_id")
+            if not group_id:
+                return None
             
             # 獲取該群組的聚餐活動
             event_result = (
@@ -622,11 +624,11 @@ class ReminderService:
                 self.supabase.table("matching_groups")
                 .select("user_ids")
                 .eq("id", group_id)
-                .maybe_single()
+                .limit(1)
                 .execute()
             )
-            if result.data:
-                return result.data.get("user_ids", [])
+            if result.data and len(result.data) > 0:
+                return result.data[0].get("user_ids", [])
             return []
         except Exception as e:
             logger.error(f"獲取群組 {group_id} 成員時發生錯誤: {e}")
@@ -644,12 +646,12 @@ class ReminderService:
                 self.supabase.table("dining_events")
                 .select("description")
                 .eq("id", event_id)
-                .maybe_single()
+                .limit(1)
                 .execute()
             )
             
-            if event.data:
-                current_desc = event.data.get("description", "")
+            if event.data and len(event.data) > 0:
+                current_desc = event.data[0].get("description", "")
                 # 移除強制結束標記
                 new_desc = current_desc.replace(" (投票時間已到自動選出)", "")
                 
@@ -669,16 +671,16 @@ class ReminderService:
                 self.supabase.table("user_matching_info")
                 .select("matching_group_id, confirmation_deadline")
                 .eq("user_id", user_id)
-                .maybe_single()
+                .limit(1)
                 .execute()
             )
             
-            if not matching_info.data:
+            if not matching_info.data or len(matching_info.data) == 0:
                 return None
             
             return {
-                "group_id": matching_info.data.get("matching_group_id"),
-                "deadline": matching_info.data.get("confirmation_deadline")
+                "group_id": matching_info.data[0].get("matching_group_id"),
+                "deadline": matching_info.data[0].get("confirmation_deadline")
             }
         except Exception as e:
             logger.error(f"獲取用戶 {user_id} 的配對群組資訊時發生錯誤: {e}")

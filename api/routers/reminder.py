@@ -177,17 +177,24 @@ async def preview_reminder_recipients(
         user_details = []
         for user in users:
             user_id = user["user_id"]
-            profile = (
-                supabase.table("user_profiles")
-                .select("nickname")
-                .eq("user_id", user_id)
-                .maybe_single()
-                .execute()
-            )
+            nickname = None
+            try:
+                profile = (
+                    supabase.table("user_profiles")
+                    .select("nickname")
+                    .eq("user_id", user_id)
+                    .limit(1)
+                    .execute()
+                )
+                if profile.data and len(profile.data) > 0:
+                    nickname = profile.data[0].get("nickname")
+            except Exception:
+                pass  # 忽略查詢 nickname 的錯誤
+            
             user_details.append({
                 "user_id": user_id,
                 "status": user["status"],
-                "nickname": profile.data.get("nickname") if profile.data else None
+                "nickname": nickname
             })
         
         return {
