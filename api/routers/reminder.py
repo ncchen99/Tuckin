@@ -181,7 +181,7 @@ async def preview_reminder_recipients(
                 supabase.table("user_profiles")
                 .select("nickname")
                 .eq("user_id", user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
             user_details.append({

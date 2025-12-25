@@ -312,7 +312,7 @@ class ReminderService:
                 self.supabase.table("user_matching_info")
                 .select("matching_group_id")
                 .eq("user_id", user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
             
@@ -622,7 +622,7 @@ class ReminderService:
                 self.supabase.table("matching_groups")
                 .select("user_ids")
                 .eq("id", group_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
             if result.data:
@@ -644,7 +644,7 @@ class ReminderService:
                 self.supabase.table("dining_events")
                 .select("description")
                 .eq("id", event_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
             
@@ -669,7 +669,7 @@ class ReminderService:
                 self.supabase.table("user_matching_info")
                 .select("matching_group_id, confirmation_deadline")
                 .eq("user_id", user_id)
-                .single()
+                .maybe_single()
                 .execute()
             )
             
