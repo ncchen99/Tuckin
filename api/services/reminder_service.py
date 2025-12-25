@@ -91,7 +91,15 @@ class ReminderService:
                 "message": "沒有符合條件的用戶"
             }
         
-        # 獲取提醒模板
+        # 根據提醒類型準備訊息
+        if reminder_type == "reminder_matching":
+            # 配對成功通知（不使用模板，使用固定訊息）
+            return await self._send_matching_reminders(eligible_users)
+        elif reminder_type == "reminder_vote_result":
+            # 投票結果通知（需要獲取餐廳資訊，不使用模板）
+            return await self._send_vote_result_reminders(eligible_users)
+        
+        # 其他提醒類型需要獲取模板（booking 和 attendance）
         template = await self._get_random_template(reminder_type)
         
         if not template:
@@ -102,16 +110,9 @@ class ReminderService:
                 "error": "找不到可用的提醒模板"
             }
         
-        # 根據提醒類型準備訊息
         if reminder_type == "reminder_attendance":
             # 出席提醒需要額外獲取聚餐資訊
             return await self._send_attendance_reminders(eligible_users, template)
-        elif reminder_type == "reminder_matching":
-            # 配對成功通知（不使用模板，使用固定訊息）
-            return await self._send_matching_reminders(eligible_users)
-        elif reminder_type == "reminder_vote_result":
-            # 投票結果通知（需要獲取餐廳資訊）
-            return await self._send_vote_result_reminders(eligible_users)
         else:
             # 預約提醒直接發送
             return await self._send_booking_reminders(eligible_users, template)

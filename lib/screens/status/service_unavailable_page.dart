@@ -89,13 +89,13 @@ class _ServiceUnavailablePageState extends State<ServiceUnavailablePage> {
 
     String timeText = '';
     if (days > 0) {
-      timeText = '${days}天${hours}小時${minutes}分鐘';
+      timeText = '$days天$hours小時$minutes分鐘';
     } else if (hours > 0) {
-      timeText = '${hours}小時${minutes}分鐘';
+      timeText = '$hours小時$minutes分鐘';
     } else if (minutes > 0) {
-      timeText = '${minutes}分鐘${seconds}秒';
+      timeText = '$minutes分鐘$seconds秒';
     } else {
-      timeText = '${seconds}秒';
+      timeText = '$seconds秒';
     }
 
     setState(() {
