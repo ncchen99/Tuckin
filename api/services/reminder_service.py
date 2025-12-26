@@ -18,8 +18,12 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from supabase import Client
 
+import pytz
 from services.notification_service import NotificationService
 from utils.dinner_time_utils import DinnerTimeUtils
+
+# 設定臺灣時區
+TW_TIMEZONE = pytz.timezone('Asia/Taipei')
 
 logger = logging.getLogger(__name__)
 
@@ -340,13 +344,15 @@ class ReminderService:
             event = event_result.data[0]
             restaurant = event.get("restaurants", {}) or {}
             
-            # 格式化時間
+            # 格式化時間（需要轉換 UTC 到台灣時間）
             event_date = event.get("date")
             time_str = "18:00"  # 預設時間
             if event_date:
                 try:
                     dt = datetime.fromisoformat(event_date.replace("Z", "+00:00"))
-                    time_str = dt.strftime("%H:%M")
+                    # 將 UTC 時間轉換為台灣時間
+                    dt_tw = dt.astimezone(TW_TIMEZONE)
+                    time_str = dt_tw.strftime("%H:%M")
                 except:
                     pass
             
@@ -693,8 +699,10 @@ class ReminderService:
         
         try:
             dt = datetime.fromisoformat(event_date.replace("Z", "+00:00"))
-            month = dt.month
-            day = dt.day
+            # 將 UTC 時間轉換為台灣時間
+            dt_tw = dt.astimezone(TW_TIMEZONE)
+            month = dt_tw.month
+            day = dt_tw.day
             return f"{month}月{day}日"
         except Exception:
             return "聚餐當天"
