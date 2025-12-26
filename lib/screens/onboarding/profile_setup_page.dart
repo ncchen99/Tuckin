@@ -589,122 +589,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         !_isProcessingAvatar; // 處理頭像時不能提交
   }
 
-  // 動態計算頂部間距，確保在不同螢幕尺寸下底部距離一致
-  double _calculateTopSpacing(BuildContext context) {
-    // 獲取螢幕可用高度
-    final screenHeight = MediaQuery.of(context).size.height;
-    final safeAreaTop = MediaQuery.of(context).padding.top;
-    final safeAreaBottom = MediaQuery.of(context).padding.bottom;
-    final availableHeight = screenHeight - safeAreaTop - safeAreaBottom;
-
-    // 精確計算每個區域的高度（使用實際 UI 中的數值）
-    // 1. 頂部標題區域
-    final topArea =
-        25.h + // top padding
-        10.h + // bottom padding
-        25.sp + // 標題 fontSize: 25.sp
-        8.h; // 額外空間（BackIconButton bottom: 8.h）
-
-    // 2. 頭像區域
-    final avatarArea =
-        15.h + // margin top
-        120.h; // 頭像 width: 120.h, height: 120.h
-
-    // 3. 暱稱區域
-    final nicknameArea =
-        10.h + // margin top
-        5.h + // margin bottom
-        18.sp + // 標籤「綽號」fontSize: 18.sp
-        60.h + // IconTextInput height: 60.h
-        16.h; // IconTextInput margin (8.h * 2)
-
-    // 4. 性別區域
-    final genderArea =
-        2.h + // margin top
-        5.h + // margin bottom
-        18.sp + // 標籤「性別」fontSize: 18.sp
-        8.h + // 標籤 padding bottom
-        50.h; // 選項按鈕 height: 50.h
-
-    // 5. 個人描述區域
-    final descArea =
-        10.h + // margin top
-        18.sp + // 標籤「一句話介紹自己」fontSize: 18.sp
-        8.h + // 標籤 padding bottom
-        70.h + // TextField SizedBox height: 70.h
-        20.h; // Container padding (10.h * 2)
-
-    // 6. 按鈕區域
-    final buttonArea =
-        20.h + // margin bottom
-        40.h + // Padding vertical (20.h * 2)
-        70.h; // ImageButton height: 70.h
-
-    // 7. 進度指示器
-    final indicatorArea =
-        widget.isFromProfile
-            ? 0.0
-            : (31.w); // padding top + bottom + dot size: 12.h
-
-    final contentHeight =
-        topArea +
-        avatarArea +
-        nicknameArea +
-        genderArea +
-        descArea +
-        buttonArea +
-        indicatorArea +
-        37.h;
-
-    // 計算剩餘空間
-    final remainingSpace = availableHeight - contentHeight;
-
-    // DEBUG: 打印詳細信息，方便比較不同設備
-    debugPrint(
-      '==================== Profile Setup Spacing Debug ====================',
-    );
-    debugPrint('設備螢幕高度: $screenHeight px');
-    debugPrint('安全區域 Top: $safeAreaTop px');
-    debugPrint('安全區域 Bottom: $safeAreaBottom px');
-    debugPrint('可用高度: $availableHeight px');
-    debugPrint(
-      '------------------------------------------------------------------',
-    );
-    debugPrint('頂部區域: $topArea px (25.h + 10.h + 25.sp + 8.h)');
-    debugPrint('頭像區域: $avatarArea px (15.h + 120.h)');
-    debugPrint('暱稱區域: $nicknameArea px (10.h + 5.h + 18.sp + 60.h + 16.h)');
-    debugPrint('性別區域: $genderArea px (2.h + 5.h + 18.sp + 8.h + 50.h)');
-    debugPrint('個人描述: $descArea px (10.h + 18.sp + 8.h + 70.h + 20.h)');
-    debugPrint('按鈕區域: $buttonArea px (20.h + 40.h + 70.h)');
-    debugPrint(
-      '進度指示器: $indicatorArea px (15.h + 10.h + 12.h, isFromProfile=${widget.isFromProfile})',
-    );
-    debugPrint(
-      '------------------------------------------------------------------',
-    );
-    debugPrint('內容總高度: $contentHeight px');
-    debugPrint('剩餘空間: $remainingSpace px');
-
-    // 策略：使用較小的安全邊距（因為現在估算更準確了）
-    final safeMargin = 10.0; // 減小安全邊距到 10px
-    final calculatedSpacing = remainingSpace - safeMargin;
-    final minSpacing = widget.isFromProfile ? 10.h : 5.h; // 降低最小間距
-
-    // 取計算值和最小間距中的較大值
-    final finalSpacing =
-        calculatedSpacing > minSpacing ? calculatedSpacing : minSpacing;
-
-    debugPrint('安全邊距: $safeMargin px');
-    debugPrint('計算後間距: $calculatedSpacing px');
-    debugPrint('最小間距: $minSpacing px');
-    debugPrint('最終使用間距: $finalSpacing px');
-    debugPrint(
-      '======================================================================',
-    );
-
-    return finalSpacing;
-  }
-
   // 處理返回按鈕
   void _handleBack() {
     if (widget.isFromProfile) {
@@ -908,617 +792,702 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                                 color: const Color(0xFFB33D1C),
                               ),
                             )
-                            : SingleChildScrollView(
-                              controller: _scrollController,
-                              physics: const ClampingScrollPhysics(),
-                              padding: EdgeInsets.only(
-                                bottom:
-                                    MediaQuery.of(context).viewInsets.bottom,
-                              ),
-                              child: Column(
-                                children: [
-                                  // 頂部標題和返回按鈕
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      top: 25.h,
-                                      bottom: 10.h,
+                            : LayoutBuilder(
+                              builder: (context, constraints) {
+                                return SingleChildScrollView(
+                                  controller: _scrollController,
+                                  physics: const ClampingScrollPhysics(),
+                                  padding: EdgeInsets.only(
+                                    bottom:
+                                        MediaQuery.of(
+                                          context,
+                                        ).viewInsets.bottom,
+                                  ),
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      minHeight: constraints.maxHeight,
                                     ),
-                                    child: Row(
-                                      children: [
-                                        // 左側返回按鈕 - 只在從profile頁面來時顯示
-                                        if (widget.isFromProfile)
+                                    child: IntrinsicHeight(
+                                      child: Column(
+                                        children: [
+                                          // 頂部標題和返回按鈕
                                           Padding(
                                             padding: EdgeInsets.only(
-                                              left: 20.w,
-                                              bottom: 8.h,
+                                              top: 25.h,
+                                              bottom: 10.h,
                                             ),
-                                            child: BackIconButton(
-                                              onPressed: _handleBack,
-                                              width: 35.w,
-                                              height: 35.h,
-                                            ),
-                                          ),
-                                        // 中央標題
-                                        Expanded(
-                                          child: Text(
-                                            '基本資料設定',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 25.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        // 為了平衡布局，添加一個空白區域
-                                        if (widget.isFromProfile)
-                                          SizedBox(width: 55.w),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // 頭像顯示區域
-                                  Container(
-                                    margin: EdgeInsets.only(top: 15.h),
-                                    child: Center(
-                                      child: GestureDetector(
-                                        onTap:
-                                            _hasCustomAvatar
-                                                ? null // 如果有自訂頭像，不響應整個頭像的點擊
-                                                : _handleAvatarUpload, // 如果是預設頭像，點擊可上傳
-                                        child: Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            // 圓形頭像容器
-                                            Container(
-                                              width: 120.h,
-                                              height: 120.h,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.black
-                                                        .withOpacity(0.1),
-                                                    blurRadius: 4,
-                                                    offset: Offset(0, 2.h),
+                                            child: Row(
+                                              children: [
+                                                // 左側返回按鈕 - 只在從profile頁面來時顯示
+                                                if (widget.isFromProfile)
+                                                  Padding(
+                                                    padding: EdgeInsets.only(
+                                                      left: 20.w,
+                                                      bottom: 8.h,
+                                                    ),
+                                                    child: BackIconButton(
+                                                      onPressed: _handleBack,
+                                                      width: 35.w,
+                                                      height: 35.h,
+                                                    ),
                                                   ),
-                                                ],
-                                              ),
-                                              child: ClipOval(
-                                                child:
-                                                    _isLoadingAvatar
-                                                        ? AvatarShimmerPlaceholder(
-                                                          size: 120.h,
-                                                        )
-                                                        : _hasCustomAvatar &&
-                                                            _localAvatarBytes !=
-                                                                null
-                                                        ? Image.memory(
-                                                          _localAvatarBytes!,
-                                                          fit: BoxFit.cover,
-                                                        )
-                                                        : _hasCustomAvatar &&
-                                                            _avatarUrl != null
-                                                        ? _avatarUrl!
-                                                                .startsWith('/')
-                                                            ? // 本地快取文件，使用 Image.file
-                                                            Image.file(
-                                                              File(_avatarUrl!),
-                                                              fit: BoxFit.cover,
-                                                              errorBuilder: (
-                                                                context,
-                                                                error,
-                                                                stackTrace,
-                                                              ) {
-                                                                debugPrint(
-                                                                  '本地快取文件損壞，觸發重新載入: $_uploadedAvatarPath',
-                                                                );
-                                                                // 本地文件損壞，觸發重新載入
-                                                                Future.microtask(
-                                                                  () =>
-                                                                      _loadUserAvatar(),
-                                                                );
-                                                                // 暫時顯示預設頭像
-                                                                return Container(
-                                                                  color:
-                                                                      Colors
-                                                                          .white,
-                                                                  child: Image.asset(
-                                                                    _defaultAvatarPath ??
-                                                                        'assets/images/avatar/no_bg/male_1.webp',
-                                                                    fit:
-                                                                        BoxFit
-                                                                            .cover,
-                                                                  ),
-                                                                );
-                                                              },
-                                                            )
-                                                            : // 網路 URL，使用 CachedNetworkImage
-                                                            CachedNetworkImage(
-                                                              imageUrl:
-                                                                  _avatarUrl!,
-                                                              cacheKey:
-                                                                  _uploadedAvatarPath, // 使用穩定的快取 key
-                                                              cacheManager:
-                                                                  ImageCacheService()
-                                                                      .avatarCacheManager,
-                                                              fit: BoxFit.cover,
-                                                              placeholder: (
-                                                                context,
-                                                                url,
-                                                              ) {
-                                                                return AvatarShimmerPlaceholder(
-                                                                  size: 120.h,
-                                                                );
-                                                              },
-                                                              errorWidget: (
-                                                                context,
-                                                                url,
-                                                                error,
-                                                              ) {
-                                                                debugPrint(
-                                                                  '網路圖片載入失敗，觸發重新載入: $_uploadedAvatarPath',
-                                                                );
-                                                                // 網路圖片載入失敗，觸發重新載入
-                                                                Future.microtask(
-                                                                  () =>
-                                                                      _loadUserAvatar(),
-                                                                );
-                                                                // 暫時顯示預設頭像
-                                                                return Container(
-                                                                  color:
-                                                                      Colors
-                                                                          .white,
-                                                                  child: Image.asset(
-                                                                    _defaultAvatarPath ??
-                                                                        'assets/images/avatar/no_bg/male_1.webp',
-                                                                    fit:
-                                                                        BoxFit
-                                                                            .cover,
-                                                                  ),
-                                                                );
-                                                              },
-                                                            )
-                                                        : Container(
-                                                          color: Colors.white,
-                                                          child: Image.asset(
-                                                            _defaultAvatarPath ??
-                                                                'assets/images/avatar/no_bg/male_1.webp',
-                                                            fit: BoxFit.cover,
-                                                          ),
-                                                        ),
-                                              ),
+                                                // 中央標題
+                                                Expanded(
+                                                  child: Text(
+                                                    '基本資料設定',
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontSize: 25.sp,
+                                                      fontFamily:
+                                                          'OtsutomeFont',
+                                                      color: const Color(
+                                                        0xFF23456B,
+                                                      ),
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                                // 為了平衡布局，添加一個空白區域
+                                                if (widget.isFromProfile)
+                                                  SizedBox(width: 55.w),
+                                              ],
                                             ),
-                                            // 右下角功能圖示
-                                            Positioned(
-                                              right: 0,
-                                              bottom: 0,
-                                              child: _AvatarIconButton(
-                                                iconPath:
-                                                    _hasCustomAvatar
-                                                        ? 'assets/images/icon/cross.webp'
-                                                        : 'assets/images/icon/camera.webp',
-                                                size: 36.w,
+                                          ),
+
+                                          // 頭像顯示區域
+                                          Container(
+                                            margin: EdgeInsets.only(top: 15.h),
+                                            child: Center(
+                                              child: GestureDetector(
                                                 onTap:
                                                     _hasCustomAvatar
-                                                        ? _handleAvatarDelete
-                                                        : _handleAvatarUpload,
+                                                        ? null // 如果有自訂頭像，不響應整個頭像的點擊
+                                                        : _handleAvatarUpload, // 如果是預設頭像，點擊可上傳
+                                                child: Stack(
+                                                  clipBehavior: Clip.none,
+                                                  children: [
+                                                    // 圓形頭像容器
+                                                    Container(
+                                                      width: 120.h,
+                                                      height: 120.h,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black
+                                                                .withOpacity(
+                                                                  0.1,
+                                                                ),
+                                                            blurRadius: 4,
+                                                            offset: Offset(
+                                                              0,
+                                                              2.h,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: ClipOval(
+                                                        child:
+                                                            _isLoadingAvatar
+                                                                ? AvatarShimmerPlaceholder(
+                                                                  size: 120.h,
+                                                                )
+                                                                : _hasCustomAvatar &&
+                                                                    _localAvatarBytes !=
+                                                                        null
+                                                                ? Image.memory(
+                                                                  _localAvatarBytes!,
+                                                                  fit:
+                                                                      BoxFit
+                                                                          .cover,
+                                                                )
+                                                                : _hasCustomAvatar &&
+                                                                    _avatarUrl !=
+                                                                        null
+                                                                ? _avatarUrl!
+                                                                        .startsWith(
+                                                                          '/',
+                                                                        )
+                                                                    ? // 本地快取文件，使用 Image.file
+                                                                    Image.file(
+                                                                      File(
+                                                                        _avatarUrl!,
+                                                                      ),
+                                                                      fit:
+                                                                          BoxFit
+                                                                              .cover,
+                                                                      errorBuilder: (
+                                                                        context,
+                                                                        error,
+                                                                        stackTrace,
+                                                                      ) {
+                                                                        debugPrint(
+                                                                          '本地快取文件損壞，觸發重新載入: $_uploadedAvatarPath',
+                                                                        );
+                                                                        // 本地文件損壞，觸發重新載入
+                                                                        Future.microtask(
+                                                                          () =>
+                                                                              _loadUserAvatar(),
+                                                                        );
+                                                                        // 暫時顯示預設頭像
+                                                                        return Container(
+                                                                          color:
+                                                                              Colors.white,
+                                                                          child: Image.asset(
+                                                                            _defaultAvatarPath ??
+                                                                                'assets/images/avatar/no_bg/male_1.webp',
+                                                                            fit:
+                                                                                BoxFit.cover,
+                                                                          ),
+                                                                        );
+                                                                      },
+                                                                    )
+                                                                    : // 網路 URL，使用 CachedNetworkImage
+                                                                    CachedNetworkImage(
+                                                                      imageUrl:
+                                                                          _avatarUrl!,
+                                                                      cacheKey:
+                                                                          _uploadedAvatarPath, // 使用穩定的快取 key
+                                                                      cacheManager:
+                                                                          ImageCacheService()
+                                                                              .avatarCacheManager,
+                                                                      fit:
+                                                                          BoxFit
+                                                                              .cover,
+                                                                      placeholder: (
+                                                                        context,
+                                                                        url,
+                                                                      ) {
+                                                                        return AvatarShimmerPlaceholder(
+                                                                          size:
+                                                                              120.h,
+                                                                        );
+                                                                      },
+                                                                      errorWidget: (
+                                                                        context,
+                                                                        url,
+                                                                        error,
+                                                                      ) {
+                                                                        debugPrint(
+                                                                          '網路圖片載入失敗，觸發重新載入: $_uploadedAvatarPath',
+                                                                        );
+                                                                        // 網路圖片載入失敗，觸發重新載入
+                                                                        Future.microtask(
+                                                                          () =>
+                                                                              _loadUserAvatar(),
+                                                                        );
+                                                                        // 暫時顯示預設頭像
+                                                                        return Container(
+                                                                          color:
+                                                                              Colors.white,
+                                                                          child: Image.asset(
+                                                                            _defaultAvatarPath ??
+                                                                                'assets/images/avatar/no_bg/male_1.webp',
+                                                                            fit:
+                                                                                BoxFit.cover,
+                                                                          ),
+                                                                        );
+                                                                      },
+                                                                    )
+                                                                : Container(
+                                                                  color:
+                                                                      Colors
+                                                                          .white,
+                                                                  child: Image.asset(
+                                                                    _defaultAvatarPath ??
+                                                                        'assets/images/avatar/no_bg/male_1.webp',
+                                                                    fit:
+                                                                        BoxFit
+                                                                            .cover,
+                                                                  ),
+                                                                ),
+                                                      ),
+                                                    ),
+                                                    // 右下角功能圖示
+                                                    Positioned(
+                                                      right: 0,
+                                                      bottom: 0,
+                                                      child: _AvatarIconButton(
+                                                        iconPath:
+                                                            _hasCustomAvatar
+                                                                ? 'assets/images/icon/cross.webp'
+                                                                : 'assets/images/icon/camera.webp',
+                                                        size: 36.w,
+                                                        onTap:
+                                                            _hasCustomAvatar
+                                                                ? _handleAvatarDelete
+                                                                : _handleAvatarUpload,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
                                             ),
-                                          ],
-                                        ),
+                                          ),
+
+                                          // 暱稱輸入框
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 20.w,
+                                            ),
+                                            margin: EdgeInsets.only(
+                                              top: 10.h,
+                                              bottom: 5.h,
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Padding(
+                                                  padding: EdgeInsets.only(
+                                                    left: 8.w,
+                                                  ),
+                                                  child: Text(
+                                                    '綽號',
+                                                    style: TextStyle(
+                                                      fontSize: 18.sp,
+                                                      fontFamily:
+                                                          'OtsutomeFont',
+                                                      color: const Color(
+                                                        0xFF23456B,
+                                                      ),
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    // 點擊暱稱輸入框時防止冒泡到父級GestureDetector
+                                                  },
+                                                  child: IconTextInput(
+                                                    hintText: '請輸入綽號',
+                                                    iconPath:
+                                                        'assets/images/icon/user_profile.webp',
+                                                    controller:
+                                                        _nicknameController,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // 性別選擇
+                                          Container(
+                                            margin: EdgeInsets.only(
+                                              top: 2.h,
+                                              bottom: 5.h,
+                                            ),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 20.w,
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Padding(
+                                                  padding: EdgeInsets.only(
+                                                    left: 8.w,
+                                                    bottom: 8.h,
+                                                  ),
+                                                  child: Text(
+                                                    '性別',
+                                                    style: TextStyle(
+                                                      fontSize: 18.sp,
+                                                      fontFamily:
+                                                          'OtsutomeFont',
+                                                      color: const Color(
+                                                        0xFF23456B,
+                                                      ),
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Row(
+                                                  children: [
+                                                    // 男性選項
+                                                    Expanded(
+                                                      child: GestureDetector(
+                                                        onTap: () {
+                                                          setState(() {
+                                                            _selectedGender = 1;
+                                                            // 如果沒有自訂頭像且性別變更，更新預設頭像
+                                                            if (!_hasCustomAvatar &&
+                                                                _previousGender !=
+                                                                    1) {
+                                                              _updateDefaultAvatar();
+                                                              _previousGender =
+                                                                  1;
+                                                            }
+                                                          });
+                                                          // 選擇性別後向下滾動一小段
+                                                          _scrollDownABit();
+                                                        },
+                                                        child: Container(
+                                                          height: 50.h,
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white,
+                                                            border: Border.all(
+                                                              color:
+                                                                  _selectedGender ==
+                                                                          1
+                                                                      ? const Color(
+                                                                        0xFF23456B,
+                                                                      )
+                                                                      : Colors
+                                                                          .white,
+                                                              width: 2,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  12.r,
+                                                                ),
+                                                          ),
+                                                          child: Center(
+                                                            child: Text(
+                                                              '男生',
+                                                              style: TextStyle(
+                                                                fontSize: 16.sp,
+                                                                fontFamily:
+                                                                    'OtsutomeFont',
+                                                                color:
+                                                                    const Color(
+                                                                      0xFF23456B,
+                                                                    ),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                height: 1.5,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+
+                                                    SizedBox(width: 15.w),
+
+                                                    // 女性選項
+                                                    Expanded(
+                                                      child: GestureDetector(
+                                                        onTap: () {
+                                                          setState(() {
+                                                            _selectedGender = 2;
+                                                            // 如果沒有自訂頭像且性別變更，更新預設頭像
+                                                            if (!_hasCustomAvatar &&
+                                                                _previousGender !=
+                                                                    2) {
+                                                              _updateDefaultAvatar();
+                                                              _previousGender =
+                                                                  2;
+                                                            }
+                                                          });
+                                                          // 選擇性別後向下滾動一小段
+                                                          _scrollDownABit();
+                                                        },
+                                                        child: Container(
+                                                          height: 50.h,
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white,
+                                                            border: Border.all(
+                                                              color:
+                                                                  _selectedGender ==
+                                                                          2
+                                                                      ? const Color(
+                                                                        0xFF23456B,
+                                                                      )
+                                                                      : Colors
+                                                                          .white,
+                                                              width: 2,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  12.r,
+                                                                ),
+                                                          ),
+                                                          child: Center(
+                                                            child: Text(
+                                                              '女生',
+                                                              style: TextStyle(
+                                                                fontSize: 16.sp,
+                                                                fontFamily:
+                                                                    'OtsutomeFont',
+                                                                color:
+                                                                    const Color(
+                                                                      0xFF23456B,
+                                                                    ),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                height: 1.5,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+
+                                                    SizedBox(width: 15.w),
+
+                                                    // 不設定選項
+                                                    Expanded(
+                                                      child: GestureDetector(
+                                                        onTap: () {
+                                                          setState(() {
+                                                            _selectedGender = 3;
+                                                            _showGenderTip =
+                                                                true; // 顯示提示框
+                                                            // 如果沒有自訂頭像且性別變更，更新預設頭像
+                                                            if (!_hasCustomAvatar &&
+                                                                _previousGender !=
+                                                                    3) {
+                                                              _updateDefaultAvatar();
+                                                              _previousGender =
+                                                                  3;
+                                                            }
+                                                          });
+
+                                                          // 選擇性別後向下滾動一小段
+                                                          _scrollDownABit();
+
+                                                          // 3秒後自動隱藏提示框
+                                                          Future.delayed(
+                                                            const Duration(
+                                                              seconds: 4,
+                                                            ),
+                                                            () {
+                                                              if (mounted) {
+                                                                setState(() {
+                                                                  _showGenderTip =
+                                                                      false;
+                                                                });
+                                                              }
+                                                            },
+                                                          );
+                                                        },
+                                                        child: Container(
+                                                          height: 50.h,
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white,
+                                                            border: Border.all(
+                                                              color:
+                                                                  _selectedGender ==
+                                                                          3
+                                                                      ? const Color(
+                                                                        0xFF23456B,
+                                                                      )
+                                                                      : Colors
+                                                                          .white,
+                                                              width: 2,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  12.r,
+                                                                ),
+                                                          ),
+                                                          child: Center(
+                                                            child: Text(
+                                                              '不設定',
+                                                              style: TextStyle(
+                                                                fontSize: 16.sp,
+                                                                fontFamily:
+                                                                    'OtsutomeFont',
+                                                                color:
+                                                                    const Color(
+                                                                      0xFF23456B,
+                                                                    ),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                height: 1.5,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // 個人亮點描述輸入框
+                                          Container(
+                                            margin: EdgeInsets.only(top: 10.h),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 20.w,
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Padding(
+                                                  padding: EdgeInsets.only(
+                                                    left: 8.w,
+                                                    bottom: 8.h,
+                                                  ),
+                                                  child: Text(
+                                                    '一句話介紹自己',
+                                                    style: TextStyle(
+                                                      fontSize: 18.sp,
+                                                      fontFamily:
+                                                          'OtsutomeFont',
+                                                      color: const Color(
+                                                        0xFF23456B,
+                                                      ),
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    // 點擊文字框時防止冒泡到父級GestureDetector
+                                                  },
+                                                  child: Container(
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                          horizontal: 15.w,
+                                                          vertical: 10.h,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            12.r,
+                                                          ),
+                                                      border: Border.all(
+                                                        color: const Color(
+                                                          0xFF23456B,
+                                                        ),
+                                                        width: 2,
+                                                      ),
+                                                    ),
+                                                    child: SizedBox(
+                                                      height: 70.h,
+                                                      child: TextField(
+                                                        controller:
+                                                            _personalDescController,
+                                                        focusNode:
+                                                            _personalDescFocusNode,
+                                                        maxLines: null,
+                                                        minLines: 3,
+                                                        keyboardType:
+                                                            TextInputType.text,
+                                                        textInputAction:
+                                                            TextInputAction
+                                                                .done,
+                                                        onTap: () {
+                                                          // 每次點擊都滾動，使用智能滾動方法
+                                                          _scrollToTextField();
+                                                        },
+                                                        onSubmitted: (value) {
+                                                          // 按下完成按鈕時收起鍵盤
+                                                          FocusScope.of(
+                                                            context,
+                                                          ).unfocus();
+                                                        },
+                                                        decoration: InputDecoration(
+                                                          hintText:
+                                                              '例：我喜歡嘗試新的食物！',
+                                                          border:
+                                                              InputBorder.none,
+                                                          hintStyle: TextStyle(
+                                                            color: Colors.grey,
+                                                            fontFamily:
+                                                                'OtsutomeFont',
+                                                            fontSize: 16.sp,
+                                                          ),
+                                                          contentPadding:
+                                                              EdgeInsets.zero,
+                                                        ),
+                                                        style: TextStyle(
+                                                          fontFamily:
+                                                              'OtsutomeFont',
+                                                          fontSize: 16.sp,
+                                                          color: const Color(
+                                                            0xFF23456B,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // 彈性間距 - 自動填充剩餘空間
+                                          const Spacer(),
+
+                                          // 底部按鈕區域
+                                          Container(
+                                            margin: EdgeInsets.only(
+                                              bottom: 20.h,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Column(
+                                              children: [
+                                                Padding(
+                                                  padding: EdgeInsets.symmetric(
+                                                    vertical: 20.h,
+                                                  ),
+                                                  child:
+                                                      // 下一步或完成按鈕
+                                                      _isLoading
+                                                          ? Container(
+                                                            alignment:
+                                                                Alignment
+                                                                    .center,
+                                                            child: LoadingImage(
+                                                              width: 60.w,
+                                                              height: 60.h,
+                                                              color:
+                                                                  const Color(
+                                                                    0xFFB33D1C,
+                                                                  ),
+                                                            ),
+                                                          )
+                                                          : ImageButton(
+                                                            text:
+                                                                widget.isFromProfile
+                                                                    ? '完成'
+                                                                    : '下一步',
+                                                            imagePath:
+                                                                'assets/images/ui/button/red_l.webp',
+                                                            width: 150.w,
+                                                            height: 70.h,
+                                                            onPressed:
+                                                                _handleNextStep,
+                                                            isEnabled:
+                                                                _isFormValid(), // 根據表單有效性決定按鈕是否啟用
+                                                          ),
+                                                ),
+                                                // 進度指示器 - 只在非profile來源時顯示
+                                                if (!widget.isFromProfile)
+                                                  Padding(
+                                                    padding: EdgeInsets.only(
+                                                      top: 15.h,
+                                                      bottom: 10.h,
+                                                    ),
+                                                    child:
+                                                        const ProgressDotsIndicator(
+                                                          totalSteps: 5,
+                                                          currentStep: 2,
+                                                        ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
-
-                                  // 暱稱輸入框
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 20.w,
-                                    ),
-                                    margin: EdgeInsets.only(
-                                      top: 10.h,
-                                      bottom: 5.h,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Padding(
-                                          padding: EdgeInsets.only(left: 8.w),
-                                          child: Text(
-                                            '綽號',
-                                            style: TextStyle(
-                                              fontSize: 18.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        GestureDetector(
-                                          onTap: () {
-                                            // 點擊暱稱輸入框時防止冒泡到父級GestureDetector
-                                          },
-                                          child: IconTextInput(
-                                            hintText: '請輸入綽號',
-                                            iconPath:
-                                                'assets/images/icon/user_profile.webp',
-                                            controller: _nicknameController,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // 性別選擇
-                                  Container(
-                                    margin: EdgeInsets.only(
-                                      top: 2.h,
-                                      bottom: 5.h,
-                                    ),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 20.w,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Padding(
-                                          padding: EdgeInsets.only(
-                                            left: 8.w,
-                                            bottom: 8.h,
-                                          ),
-                                          child: Text(
-                                            '性別',
-                                            style: TextStyle(
-                                              fontSize: 18.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        Row(
-                                          children: [
-                                            // 男性選項
-                                            Expanded(
-                                              child: GestureDetector(
-                                                onTap: () {
-                                                  setState(() {
-                                                    _selectedGender = 1;
-                                                    // 如果沒有自訂頭像且性別變更，更新預設頭像
-                                                    if (!_hasCustomAvatar &&
-                                                        _previousGender != 1) {
-                                                      _updateDefaultAvatar();
-                                                      _previousGender = 1;
-                                                    }
-                                                  });
-                                                  // 選擇性別後向下滾動一小段
-                                                  _scrollDownABit();
-                                                },
-                                                child: Container(
-                                                  height: 50.h,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    border: Border.all(
-                                                      color:
-                                                          _selectedGender == 1
-                                                              ? const Color(
-                                                                0xFF23456B,
-                                                              )
-                                                              : Colors.white,
-                                                      width: 2,
-                                                    ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12.r,
-                                                        ),
-                                                  ),
-                                                  child: Center(
-                                                    child: Text(
-                                                      '男生',
-                                                      style: TextStyle(
-                                                        fontSize: 16.sp,
-                                                        fontFamily:
-                                                            'OtsutomeFont',
-                                                        color: const Color(
-                                                          0xFF23456B,
-                                                        ),
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        height: 1.5,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-
-                                            SizedBox(width: 15.w),
-
-                                            // 女性選項
-                                            Expanded(
-                                              child: GestureDetector(
-                                                onTap: () {
-                                                  setState(() {
-                                                    _selectedGender = 2;
-                                                    // 如果沒有自訂頭像且性別變更，更新預設頭像
-                                                    if (!_hasCustomAvatar &&
-                                                        _previousGender != 2) {
-                                                      _updateDefaultAvatar();
-                                                      _previousGender = 2;
-                                                    }
-                                                  });
-                                                  // 選擇性別後向下滾動一小段
-                                                  _scrollDownABit();
-                                                },
-                                                child: Container(
-                                                  height: 50.h,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    border: Border.all(
-                                                      color:
-                                                          _selectedGender == 2
-                                                              ? const Color(
-                                                                0xFF23456B,
-                                                              )
-                                                              : Colors.white,
-                                                      width: 2,
-                                                    ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12.r,
-                                                        ),
-                                                  ),
-                                                  child: Center(
-                                                    child: Text(
-                                                      '女生',
-                                                      style: TextStyle(
-                                                        fontSize: 16.sp,
-                                                        fontFamily:
-                                                            'OtsutomeFont',
-                                                        color: const Color(
-                                                          0xFF23456B,
-                                                        ),
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        height: 1.5,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-
-                                            SizedBox(width: 15.w),
-
-                                            // 不設定選項
-                                            Expanded(
-                                              child: GestureDetector(
-                                                onTap: () {
-                                                  setState(() {
-                                                    _selectedGender = 3;
-                                                    _showGenderTip =
-                                                        true; // 顯示提示框
-                                                    // 如果沒有自訂頭像且性別變更，更新預設頭像
-                                                    if (!_hasCustomAvatar &&
-                                                        _previousGender != 3) {
-                                                      _updateDefaultAvatar();
-                                                      _previousGender = 3;
-                                                    }
-                                                  });
-
-                                                  // 選擇性別後向下滾動一小段
-                                                  _scrollDownABit();
-
-                                                  // 3秒後自動隱藏提示框
-                                                  Future.delayed(
-                                                    const Duration(seconds: 4),
-                                                    () {
-                                                      if (mounted) {
-                                                        setState(() {
-                                                          _showGenderTip =
-                                                              false;
-                                                        });
-                                                      }
-                                                    },
-                                                  );
-                                                },
-                                                child: Container(
-                                                  height: 50.h,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    border: Border.all(
-                                                      color:
-                                                          _selectedGender == 3
-                                                              ? const Color(
-                                                                0xFF23456B,
-                                                              )
-                                                              : Colors.white,
-                                                      width: 2,
-                                                    ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12.r,
-                                                        ),
-                                                  ),
-                                                  child: Center(
-                                                    child: Text(
-                                                      '不設定',
-                                                      style: TextStyle(
-                                                        fontSize: 16.sp,
-                                                        fontFamily:
-                                                            'OtsutomeFont',
-                                                        color: const Color(
-                                                          0xFF23456B,
-                                                        ),
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        height: 1.5,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // 個人亮點描述輸入框
-                                  Container(
-                                    margin: EdgeInsets.only(top: 10.h),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 20.w,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Padding(
-                                          padding: EdgeInsets.only(
-                                            left: 8.w,
-                                            bottom: 8.h,
-                                          ),
-                                          child: Text(
-                                            '一句話介紹自己',
-                                            style: TextStyle(
-                                              fontSize: 18.sp,
-                                              fontFamily: 'OtsutomeFont',
-                                              color: const Color(0xFF23456B),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        GestureDetector(
-                                          onTap: () {
-                                            // 點擊文字框時防止冒泡到父級GestureDetector
-                                          },
-                                          child: Container(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: 15.w,
-                                              vertical: 10.h,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                                  BorderRadius.circular(12.r),
-                                              border: Border.all(
-                                                color: const Color(0xFF23456B),
-                                                width: 2,
-                                              ),
-                                            ),
-                                            child: SizedBox(
-                                              height: 70.h,
-                                              child: TextField(
-                                                controller:
-                                                    _personalDescController,
-                                                focusNode:
-                                                    _personalDescFocusNode,
-                                                maxLines: null,
-                                                minLines: 3,
-                                                keyboardType:
-                                                    TextInputType.text,
-                                                textInputAction:
-                                                    TextInputAction.done,
-                                                onTap: () {
-                                                  // 每次點擊都滾動，使用智能滾動方法
-                                                  _scrollToTextField();
-                                                },
-                                                onSubmitted: (value) {
-                                                  // 按下完成按鈕時收起鍵盤
-                                                  FocusScope.of(
-                                                    context,
-                                                  ).unfocus();
-                                                },
-                                                decoration: InputDecoration(
-                                                  hintText: '例：我喜歡嘗試新的食物！',
-                                                  border: InputBorder.none,
-                                                  hintStyle: TextStyle(
-                                                    color: Colors.grey,
-                                                    fontFamily: 'OtsutomeFont',
-                                                    fontSize: 16.sp,
-                                                  ),
-                                                  contentPadding:
-                                                      EdgeInsets.zero,
-                                                ),
-                                                style: TextStyle(
-                                                  fontFamily: 'OtsutomeFont',
-                                                  fontSize: 16.sp,
-                                                  color: const Color(
-                                                    0xFF23456B,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // 底部按鈕區域
-                                  Container(
-                                    margin: EdgeInsets.only(bottom: 20.h),
-                                    alignment: Alignment.center,
-                                    child: Column(
-                                      children: [
-                                        // 動態間距區域，確保不同螢幕尺寸下底部距離一致
-                                        SizedBox(
-                                          height: _calculateTopSpacing(context),
-                                        ),
-                                        Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            vertical: 20.h,
-                                          ),
-                                          child:
-                                              // 下一步或完成按鈕
-                                              _isLoading
-                                                  ? Container(
-                                                    alignment: Alignment.center,
-                                                    child: LoadingImage(
-                                                      width: 60.w,
-                                                      height: 60.h,
-                                                      color: const Color(
-                                                        0xFFB33D1C,
-                                                      ),
-                                                    ),
-                                                  )
-                                                  : ImageButton(
-                                                    text:
-                                                        widget.isFromProfile
-                                                            ? '完成'
-                                                            : '下一步',
-                                                    imagePath:
-                                                        'assets/images/ui/button/red_l.webp',
-                                                    width: 150.w,
-                                                    height: 70.h,
-                                                    onPressed: _handleNextStep,
-                                                    isEnabled:
-                                                        _isFormValid(), // 根據表單有效性決定按鈕是否啟用
-                                                  ),
-                                        ),
-                                        // 進度指示器 - 只在非profile來源時顯示
-                                        if (!widget.isFromProfile)
-                                          Padding(
-                                            padding: EdgeInsets.only(
-                                              top: 15.h,
-                                              bottom: 10.h,
-                                            ),
-                                            child: const ProgressDotsIndicator(
-                                              totalSteps: 5,
-                                              currentStep: 2,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
                   ),
                   // 右上角性別提示框
