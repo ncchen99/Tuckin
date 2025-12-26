@@ -2018,7 +2018,7 @@ class _AttendeeListDialogState extends State<_AttendeeListDialog> {
   double _calculateDialogContentHeight(BuildContext context) {
     // 每個成員項目高度 = padding(12*2) + avatar(55) + divider(1) + 額外空間
     // 實際測量：padding 24 + avatar 55 + divider 1 + 額外緩衝 = ~95
-    const double itemHeight = 90.0;
+    const double itemHeight = 85.0;
 
     // 直接根據參加人數計算所需高度
     final displayCount = widget.expectedAttendeeCount;
