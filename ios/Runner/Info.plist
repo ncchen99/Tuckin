@@ -70,5 +70,11 @@
 	<false/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Tuckin 需要使用相機來拍攝聊天圖片</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Tuckin 需要存取相簿來選擇或儲存圖片</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Tuckin 需要使用麥克風來錄製影片</string>
 </dict>
 </plist>
