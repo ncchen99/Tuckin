@@ -35,6 +35,20 @@ class CustomConfirmationDialog extends StatefulWidget {
 class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
   bool _isProcessing = false;
 
+  /// 將字串中的跳脫字元轉換為實際字元
+  /// 例如：將 "\n" 轉換為實際的換行符
+  /// 注意：先處理反斜線本身，避免誤轉換
+  String _unescapeString(String text) {
+    // 先將 "\\" 轉換為臨時標記，避免後續處理時誤轉換
+    final tempMarker = '\u0000'; // 使用不可見字元作為臨時標記
+    return text
+        .replaceAll('\\\\', tempMarker) // 先處理反斜線本身
+        .replaceAll('\\n', '\n') // 換行符
+        .replaceAll('\\t', '\t') // Tab 符
+        .replaceAll('\\r', '\r') // 回車符
+        .replaceAll(tempMarker, '\\'); // 最後將臨時標記還原為反斜線
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -101,7 +115,7 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                   Padding(
                     padding: EdgeInsets.only(top: 5.h, left: 20.w, right: 20.w),
                     child: Text(
-                      widget.title,
+                      _unescapeString(widget.title),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 18.sp,
@@ -120,7 +134,7 @@ class _CustomConfirmationDialogState extends State<CustomConfirmationDialog> {
                     horizontal: 10.w,
                   ),
                   child: Text(
-                    widget.content,
+                    _unescapeString(widget.content),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 18.sp,

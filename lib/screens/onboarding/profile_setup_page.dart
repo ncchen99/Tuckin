@@ -56,8 +56,9 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     _loadUserProfile();
     // 添加監聯器，當暱稱輸入框變更時重新渲染頁面
     _nicknameController.addListener(_updateButtonState);
-    // 初始化預設頭像
-    _updateDefaultAvatar();
+    // 移除初始化預設頭像的調用，讓頭像在載入完性別資料後再根據實際性別生成
+    // 這樣可以確保頭像會依據用戶的性別推薦
+    // _updateDefaultAvatar();
     // 監聽個人描述輸入框的焦點變化
     _personalDescFocusNode.addListener(_onPersonalDescFocusChange);
   }
