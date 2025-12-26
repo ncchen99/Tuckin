@@ -8,6 +8,7 @@ import '../data/database_service.dart';
 import 'package:tuckin/utils/index.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'time_service.dart';
+import 'user_status_service.dart';
 
 /// 通知服務，處理推送通知相關邏輯
 class NotificationService {
@@ -304,7 +305,7 @@ class NotificationService {
   }
 
   // 處理點擊通知（Firebase 通知，用於後台/關閉時收到的通知）
-  void _handleNotificationClick(RemoteMessage message) {
+  Future<void> _handleNotificationClick(RemoteMessage message) async {
     debugPrint('點擊了 Firebase 通知: ${message.data}');
 
     // 檢查是否為聊天通知
@@ -316,6 +317,13 @@ class NotificationService {
       debugPrint('點擊聊天通知，導航到聊天室: $diningEventId');
       _navigateToChatRoom(diningEventId);
       return;
+    }
+
+    // 處理 dining_event_created 通知：需要先清除舊的聚餐緩存資料
+    if (notificationType == 'dining_event_created') {
+      debugPrint('點擊 dining_event_created 通知，清除舊的聚餐緩存資料');
+      final userStatusService = UserStatusService();
+      await userStatusService.resetDiningData();
     }
 
     // 非聊天通知：根據使用者狀態進行導航
@@ -516,6 +524,14 @@ class NotificationService {
       await _showChatNotification(message, diningEventId);
       // 不要調用 _handleNotificationNavigation()，避免頁面跳轉
       return;
+    }
+
+    // 處理 dining_event_created 通知：需要先清除舊的聚餐緩存資料
+    // 這樣頁面導航後會強制從 API 獲取最新資料，而不是使用舊緩存
+    if (notificationType == 'dining_event_created') {
+      debugPrint('收到 dining_event_created 通知，清除舊的聚餐緩存資料');
+      final userStatusService = UserStatusService();
+      await userStatusService.resetDiningData();
     }
 
     // 非聊天通知的處理邏輯（保持原有行為）
