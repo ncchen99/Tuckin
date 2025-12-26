@@ -4,6 +4,39 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../core/supabase_service.dart';
 import '../core/api_service.dart';
 
+/// 版本更新公告模型
+class VersionAnnouncement {
+  final String appVersion;
+  final String? title;
+  final String content;
+  final String? iconPath;
+  final String? actionRoute;
+  final String actionLabel;
+  final String cancelLabel;
+
+  VersionAnnouncement({
+    required this.appVersion,
+    this.title,
+    required this.content,
+    this.iconPath,
+    this.actionRoute,
+    this.actionLabel = '前往設定',
+    this.cancelLabel = '稍後',
+  });
+
+  factory VersionAnnouncement.fromMap(Map<String, dynamic> map) {
+    return VersionAnnouncement(
+      appVersion: map['app_version'] as String,
+      title: map['title'] as String?,
+      content: map['content'] as String,
+      iconPath: map['icon_path'] as String?,
+      actionRoute: map['action_route'] as String?,
+      actionLabel: (map['action_label'] as String?) ?? '前往設定',
+      cancelLabel: (map['cancel_label'] as String?) ?? '稍後',
+    );
+  }
+}
+
 /// 系統配置資訊模型
 class SystemConfig {
   final String latestAppVersion;
@@ -67,6 +100,7 @@ class SystemCheckResult {
   final String? updateUrl;
   final String? latestVersion;
   final String currentVersion;
+  final VersionAnnouncement? versionAnnouncement;
 
   SystemCheckResult({
     required this.isServiceAvailable,
@@ -77,6 +111,7 @@ class SystemCheckResult {
     this.updateUrl,
     this.latestVersion,
     required this.currentVersion,
+    this.versionAnnouncement,
   });
 
   /// 是否可以正常使用 APP
@@ -225,8 +260,11 @@ class SystemConfigService {
       // 根據平台選擇更新連結
       final updateUrl = _getUpdateUrl(config);
 
+      // 獲取當前版本的公告
+      final versionAnnouncement = await fetchVersionAnnouncement(currentVersion);
+
       debugPrint(
-        'SystemConfigService: 系統檢查完成 - 服務可用: $isServiceAvailable, 強制更新: $needsForceUpdate, 可選更新: $hasOptionalUpdate',
+        'SystemConfigService: 系統檢查完成 - 服務可用: $isServiceAvailable, 強制更新: $needsForceUpdate, 可選更新: $hasOptionalUpdate, 有版本公告: ${versionAnnouncement != null}',
       );
 
       return SystemCheckResult(
@@ -240,6 +278,7 @@ class SystemConfigService {
         updateUrl: updateUrl,
         latestVersion: config.latestAppVersion,
         currentVersion: currentVersion,
+        versionAnnouncement: versionAnnouncement,
       );
     } catch (e) {
       debugPrint('SystemConfigService: 系統檢查失敗: $e');
@@ -250,6 +289,35 @@ class SystemConfigService {
         hasOptionalUpdate: false,
         currentVersion: currentVersion,
       );
+    }
+  }
+
+  /// 獲取指定版本的公告
+  Future<VersionAnnouncement?> fetchVersionAnnouncement(String appVersion) async {
+    try {
+      return await _apiService.handleRequest(
+        request: () async {
+          final response = await _supabaseService.client
+              .from('version_announcements')
+              .select()
+              .eq('app_version', appVersion)
+              .eq('is_enabled', true)
+              .maybeSingle();
+
+          if (response == null) {
+            debugPrint('SystemConfigService: 未找到版本 $appVersion 的公告');
+            return null;
+          }
+
+          final announcement = VersionAnnouncement.fromMap(response);
+          debugPrint('SystemConfigService: 找到版本 $appVersion 的公告: ${announcement.content}');
+          return announcement;
+        },
+        timeout: const Duration(seconds: 5),
+      );
+    } catch (e) {
+      debugPrint('SystemConfigService: 獲取版本公告失敗: $e');
+      return null;
     }
   }
 

@@ -19,3 +19,9 @@ export 'dinner_time_utils.dart';
 
 // 導出數字格式化工具
 export 'number_formatter.dart';
+
+// 導出系統檢查處理器
+export 'system_check_handler.dart';
+
+// 導出生命週期處理器
+export 'lifecycle_handler.dart';

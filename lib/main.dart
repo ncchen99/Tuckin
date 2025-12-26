@@ -2,21 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tuckin/services/services.dart'; // 統一導入所有服務
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:tuckin/utils/route_observer.dart'; // 導入路由觀察器
 import 'package:tuckin/components/components.dart'; // 導入共用組件
 import 'package:connectivity_plus/connectivity_plus.dart'; // 導入網絡狀態檢測
 import 'package:tuckin/components/common/error_screen.dart'; // 導入錯誤畫面組件
 import 'package:flutter_native_splash/flutter_native_splash.dart'; // 導入原生啟動畫面
 import 'package:firebase_core/firebase_core.dart';
-import 'package:http/http.dart' as http; // 添加HTTP包用於網絡請求
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart'; // 導入 Provider 套件
-import 'package:url_launcher/url_launcher.dart'; // 導入 url_launcher
-// 導入時區相關包
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter_timezone/flutter_timezone.dart';
 
 // 導入頁面
 import 'screens/onboarding/welcome_screen.dart';
@@ -39,7 +31,6 @@ import 'screens/profile/profile_page.dart';
 // 導入新增狀態頁面
 import 'screens/status/confirmation_timeout_page.dart';
 import 'screens/status/low_attendance_page.dart';
-import 'screens/status/service_unavailable_page.dart';
 // 導入聊天頁面
 import 'screens/chat/chat_page.dart';
 
@@ -54,169 +45,12 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 // 全局變數，存儲初始路由
 String initialRoute = '/';
 
-// 全局變數，存儲系統檢查結果（供 MyApp 使用）
-// ignore: unused_element
-SystemCheckResult? _systemCheckResult;
-
-// 測試網絡連接的函數
-Future<bool> _testNetworkConnection() async {
-  try {
-    // 嘗試連接Google的DNS伺服器
-    final result = await http
-        .get(Uri.parse('https://g.co'))
-        .timeout(const Duration(seconds: 5));
-    return result.statusCode == 200;
-  } catch (e) {
-    try {
-      // 嘗試連接Google的伺服器
-      final result = await http
-          .get(Uri.parse('https://www.google.com'))
-          .timeout(const Duration(seconds: 5));
-      return result.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
-}
-
-// 初始化服務的函數
-Future<bool> _initializeServices(ErrorHandler errorHandler) async {
-  try {
-    // 初始化 AuthService
-    await AuthService().initialize();
-    debugPrint('AuthService 初始化成功');
-
-    // 初始化 RealtimeService
-    try {
-      await RealtimeService().initialize(navigatorKey);
-      debugPrint('RealtimeService 初始化成功');
-    } catch (e) {
-      debugPrint('RealtimeService 初始化錯誤: $e');
-      // 這裡不會阻止應用繼續啟動
-    }
-    return true;
-  } catch (e) {
-    debugPrint('服務初始化錯誤: $e');
-
-    // 處理錯誤
-    if (e is ApiError) {
-      errorHandler.handleApiError(e, () async {
-        try {
-          await _initializeServices(errorHandler);
-        } catch (retryError) {
-          debugPrint('重試初始化服務錯誤: $retryError');
-        }
-      });
-    } else {
-      errorHandler.showError(
-        message: '網絡連接錯誤，請檢查您的網絡設置',
-        isServerError: false,
-        isNetworkError: true,
-        onRetry: () async {
-          // 網絡重試邏輯...
-          debugPrint('用戶點擊重試按鈕，重新測試網絡連接...');
-          bool retryNetworkConnected = await _testNetworkConnection();
-          if (retryNetworkConnected) {
-            debugPrint('網絡連接已恢復，繼續應用流程');
-
-            // 確保 Firebase 已初始化
-            try {
-              await Firebase.initializeApp();
-              debugPrint('Firebase 重新初始化成功');
-            } catch (e) {
-              debugPrint('Firebase 重新初始化錯誤（可能已經初始化）: $e');
-            }
-
-            errorHandler.clearError();
-            bool servicesInitialized = await _initializeServices(errorHandler);
-            if (servicesInitialized) {
-              initialRoute = await _determineInitialRoute();
-              await _initializeNotificationService();
-              runApp(MyApp(errorHandler: errorHandler));
-            }
-          } else {
-            debugPrint('網絡連接仍然不可用');
-          }
-        },
-      );
-    }
-
-    // 嘗試強制登出以重置狀態
-    try {
-      await AuthService().signOut();
-    } catch (signOutError) {
-      debugPrint('強制登出錯誤: $signOutError');
-    }
-    return false;
-  }
-}
-
-// 確定初始路由的函數
-Future<String> _determineInitialRoute() async {
-  try {
-    debugPrint('_determineInitialRoute: 開始獲取初始路由');
-    String route = await NavigationService().determineInitialRoute();
-    debugPrint('_determineInitialRoute: 設置初始路由為: $route');
-
-    // 添加全局初始路由變量的賦值
-    initialRoute = route;
-    debugPrint('_determineInitialRoute: 已將全局 initialRoute 設置為 $initialRoute');
-
-    return route;
-  } catch (e) {
-    debugPrint('_determineInitialRoute: 確定初始路由出錯: $e');
-    debugPrintStack(label: '初始路由確定錯誤堆疊');
-    return '/';
-  }
-}
-
-// 初始化通知服務的函數
-Future<void> _initializeNotificationService() async {
-  try {
-    debugPrint('開始初始化通知服務...');
-    await NotificationService().initialize(navigatorKey);
-    debugPrint('通知服務初始化成功');
-
-    // 檢查 APP 冷啟動時是否有待處理的通知
-    await NotificationService().checkInitialMessage();
-    debugPrint('已檢查初始通知');
-
-    // 獲取 FCM token 並輸出（僅用於調試）
-    final token = await FirebaseMessaging.instance.getToken();
-    debugPrint('FCM Token: ${token?.substring(0, 50)}...');
-  } catch (e) {
-    debugPrint('通知服務初始化錯誤: $e');
-    // 輸出詳細錯誤堆疊
-    debugPrintStack(label: '通知服務初始化錯誤堆疊');
-    // 通知服務初始化失敗不阻止應用程序啟動
-  }
-}
-
-// 初始化時區設置
-Future<void> _initializeTimeZone() async {
-  try {
-    debugPrint('初始化時區...');
-    tz.initializeTimeZones();
-    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
-    debugPrint('成功初始化時區: $timeZoneName');
-  } catch (e) {
-    debugPrint('初始化時區錯誤: $e');
-    // 使用一個默認時區作為備用
-    try {
-      tz.setLocalLocation(tz.getLocation('Asia/Taipei'));
-    } catch (_) {
-      // 如果無法設置任何時區，則不阻止程序繼續運行
-    }
-  }
-}
-
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   // 初始化時區
-  await _initializeTimeZone();
+  await AppInitializerService().initializeTimeZone();
 
   // 一開始先顯示 LoadingScreen，包裹在 MaterialApp 中確保有正確的 Directionality
   runApp(
@@ -250,222 +84,53 @@ void main() async {
 // 將應用初始化邏輯提取到單獨函數中
 Future<void> _initializeApp() async {
   final errorHandler = ErrorHandler();
-  bool initSuccess = false;
+  final appInitializer = AppInitializerService();
 
-  try {
-    await dotenv.load(fileName: '.env');
-    debugPrint('環境變數加載成功。變數數量: ${dotenv.env.length}');
-    initSuccess = true;
-  } catch (e) {
-    debugPrint('環境變數加載錯誤: $e');
-  }
+  // 執行完整初始化流程
+  initialRoute = await appInitializer.performFullInitialization(
+    errorHandler: errorHandler,
+    navigatorKey: navigatorKey,
+    onNetworkError: () async {
+      // 網絡重試邏輯
+      debugPrint('用戶點擊重試按鈕，重新測試網絡連接...');
+      bool retryNetworkConnected = await appInitializer.testNetworkConnection();
+      if (retryNetworkConnected) {
+        debugPrint('網絡連接已恢復，繼續應用流程');
 
-  // 首先初始化 Firebase（必須在其他服務之前）
-  try {
-    await Firebase.initializeApp();
-    debugPrint('Firebase 初始化成功');
-  } catch (e) {
-    debugPrint('Firebase 初始化錯誤: $e');
-    debugPrintStack(label: 'Firebase 初始化錯誤堆疊');
-  }
-
-  // 初始化時間服務（Release 版抓取 NTP，Debug/Profile 直接用裝置時間）
-  try {
-    await TimeService().initialize();
-    debugPrint('TimeService 初始化完成');
-  } catch (e) {
-    debugPrint('TimeService 初始化錯誤: $e');
-  }
-
-  bool isNetworkConnected = false;
-  try {
-    // 若 NTP 已成功同步，視為網路可用，跳過額外的網絡測試以加速啟動
-    if (TimeService().isSynced) {
-      isNetworkConnected = true;
-      debugPrint('TimeService 已同步（NTP 成功），略過網絡測試');
-    } else {
-      debugPrint('正在測試網絡連接...');
-      isNetworkConnected = await _testNetworkConnection();
-      debugPrint('網絡連接測試結果: ${isNetworkConnected ? '成功' : '失敗'}');
-    }
-    if (!isNetworkConnected) {
-      debugPrint('網絡連接測試失敗，顯示錯誤訊息');
-      errorHandler.showError(
-        message: '網絡連接錯誤，請檢查您的網絡設置',
-        isServerError: false,
-        isNetworkError: true,
-        onRetry: () async {
-          // 網絡重試邏輯...
-        },
-      );
-    }
-  } catch (e) {
-    debugPrint('網絡連接測試出錯: $e');
-    isNetworkConnected = false;
-  }
-
-  if (isNetworkConnected) {
-    await _initializeServices(errorHandler);
-  }
-
-  // 重要：在決定初始路由之前不要構建主應用
-  if (initSuccess) {
-    // 獲取初始路由
-    initialRoute = await _determineInitialRoute();
-    await _initializeNotificationService();
-
-    debugPrint('所有初始化完成，開始運行主應用 - 初始路由為: $initialRoute');
-
-    // 確保在所有準備工作完成後才運行主應用
-    runApp(MyApp(errorHandler: errorHandler));
-
-    // 在背景執行系統檢查（不阻塞主流程）
-    _performSystemCheckInBackground();
-  } else {
-    debugPrint('初始化未成功，使用默認路由: /');
-    initialRoute = '/';
-    // 即使初始化失敗，也運行主應用以顯示錯誤訊息
-    runApp(MyApp(errorHandler: errorHandler));
-  }
-}
-
-// 在背景執行系統檢查
-Future<void> _performSystemCheckInBackground() async {
-  try {
-    debugPrint('開始背景系統檢查...');
-    final result = await SystemConfigService().performSystemCheck();
-    _systemCheckResult = result;
-
-    debugPrint(
-      '系統檢查完成 - 服務可用: ${result.isServiceAvailable}, '
-      '需要強制更新: ${result.needsForceUpdate}, '
-      '有可選更新: ${result.hasOptionalUpdate}',
-    );
-
-    // 如果需要顯示系統狀態頁面，通知 MyApp
-    if (!result.canUseApp && navigatorKey.currentState != null) {
-      // 使用 navigatorKey 導航到系統狀態頁面
-      _showSystemStatusPage(result);
-    } else if (result.hasOptionalUpdate && navigatorKey.currentState != null) {
-      // 有可選更新，顯示更新提示對話框
-      _showOptionalUpdateDialog(result);
-    }
-  } catch (e) {
-    debugPrint('背景系統檢查失敗: $e');
-  }
-}
-
-// 顯示系統狀態頁面
-void _showSystemStatusPage(SystemCheckResult result) {
-  if (navigatorKey.currentState == null) {
-    debugPrint('Navigator 尚未準備好，稍後重試顯示系統狀態頁面');
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _showSystemStatusPage(result);
-    });
-    return;
-  }
-
-  if (!result.isServiceAvailable) {
-    // 服務暫停
-    navigatorKey.currentState!.pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder:
-            (context) => ServiceUnavailablePage(
-              type: ServiceUnavailableType.maintenance,
-              reason: result.serviceDisabledReason,
-              estimatedRestoreTime: result.estimatedRestoreTime,
-              onRetry: () async {
-                // 重新檢查系統狀態
-                final newResult =
-                    await SystemConfigService().performSystemCheck();
-                _systemCheckResult = newResult;
-
-                if (newResult.canUseApp && navigatorKey.currentState != null) {
-                  // 服務恢復，回到主應用
-                  navigatorKey.currentState!.pushNamedAndRemoveUntil(
-                    initialRoute,
-                    (route) => false,
-                  );
-                } else if (!newResult.isServiceAvailable) {
-                  // 仍然不可用，更新頁面
-                  _showSystemStatusPage(newResult);
-                } else if (newResult.needsForceUpdate) {
-                  // 需要強制更新
-                  _showSystemStatusPage(newResult);
-                }
-              },
-            ),
-      ),
-      (route) => false,
-    );
-  } else if (result.needsForceUpdate) {
-    // 需要強制更新
-    navigatorKey.currentState!.pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder:
-            (context) => ServiceUnavailablePage(
-              type: ServiceUnavailableType.forceUpdate,
-              updateUrl: result.updateUrl,
-              latestVersion: result.latestVersion,
-              currentVersion: result.currentVersion,
-            ),
-      ),
-      (route) => false,
-    );
-  }
-}
-
-// 顯示可選更新對話框
-void _showOptionalUpdateDialog(SystemCheckResult result) {
-  if (navigatorKey.currentState == null) {
-    debugPrint('Navigator 尚未準備好，稍後重試顯示更新對話框');
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _showOptionalUpdateDialog(result);
-    });
-    return;
-  }
-
-  final context = navigatorKey.currentContext;
-  if (context == null) {
-    debugPrint('無法獲取 context，無法顯示對話框');
-    return;
-  }
-
-  // 延遲一下，確保頁面已經完全渲染
-  Future.delayed(const Duration(milliseconds: 600), () {
-    if (navigatorKey.currentContext == null) return;
-
-    showCustomConfirmationDialog(
-      context: navigatorKey.currentContext!,
-      iconPath: 'assets/images/icon/update.webp',
-      title: '',
-      content: '發現新版本的 Tuckin\n要立即更新嗎？',
-      cancelButtonText: '稍後',
-      confirmButtonText: '好哇',
-      loadingColor: const Color(0xFF23456B),
-      barrierDismissible: true,
-      onCancel: () {
-        Navigator.of(navigatorKey.currentContext!).pop();
-      },
-      onConfirm: () async {
-        if (result.updateUrl != null && result.updateUrl!.isNotEmpty) {
-          try {
-            final uri = Uri.parse(result.updateUrl!);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            } else {
-              debugPrint('無法開啟更新連結: ${result.updateUrl}');
-            }
-          } catch (e) {
-            debugPrint('開啟更新連結失敗: $e');
-          }
+        // 確保 Firebase 已初始化
+        try {
+          await Firebase.initializeApp();
+          debugPrint('Firebase 重新初始化成功');
+        } catch (e) {
+          debugPrint('Firebase 重新初始化錯誤（可能已經初始化）: $e');
         }
-        if (navigatorKey.currentContext != null) {
-          Navigator.of(navigatorKey.currentContext!).pop();
+
+        errorHandler.clearError();
+        bool servicesInitialized = await appInitializer.initializeServices(
+          errorHandler,
+          navigatorKey,
+        );
+        if (servicesInitialized) {
+          initialRoute = await appInitializer.determineInitialRoute();
+          await appInitializer.initializeNotificationService(navigatorKey);
+          runApp(MyApp(errorHandler: errorHandler));
         }
-      },
-    );
-  });
+      } else {
+        debugPrint('網絡連接仍然不可用');
+      }
+    },
+  );
+
+  debugPrint('所有初始化完成，開始運行主應用 - 初始路由為: $initialRoute');
+
+  // 運行主應用
+  runApp(MyApp(errorHandler: errorHandler));
+
+  // 在背景執行系統檢查（不阻塞主流程）
+  SystemCheckHandler().performSystemCheckInBackground(
+    navigatorKey: navigatorKey,
+    initialRoute: initialRoute,
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -487,8 +152,8 @@ class _MyAppState extends State<MyApp> {
   // 添加標記，表示是否是首次構建
   bool _isFirstBuild = true;
 
-  // 添加生命週期觀察者變數
-  final _lifecycleEventHandler = _LifecycleEventHandler();
+  // 生命週期觀察者
+  final _lifecycleHandler = LifecycleHandler();
 
   @override
   void initState() {
@@ -499,7 +164,7 @@ class _MyAppState extends State<MyApp> {
     _setupErrorListener();
 
     // 添加生命週期監聽，在應用程式恢復前台時清除通知
-    WidgetsBinding.instance.addObserver(_lifecycleEventHandler);
+    WidgetsBinding.instance.addObserver(_lifecycleHandler);
 
     // 在應用啟動時清除通知
     _clearNotificationsOnLaunch();
@@ -549,7 +214,7 @@ class _MyAppState extends State<MyApp> {
     RealtimeService().dispose();
 
     // 移除生命週期觀察者
-    WidgetsBinding.instance.removeObserver(_lifecycleEventHandler);
+    WidgetsBinding.instance.removeObserver(_lifecycleHandler);
 
     super.dispose();
   }
@@ -669,6 +334,8 @@ class _MyAppState extends State<MyApp> {
       _isTestingNetwork = true;
     });
 
+    final appInitializer = AppInitializerService();
+
     try {
       // 顯示測試中提示
       ScaffoldMessenger.of(context).showSnackBar(
@@ -679,7 +346,7 @@ class _MyAppState extends State<MyApp> {
       );
 
       debugPrint('嘗試重新測試網絡連接...');
-      bool networkConnected = await _testNetworkConnection();
+      bool networkConnected = await appInitializer.testNetworkConnection();
       debugPrint('網絡重新測試結果: ${networkConnected ? '成功' : '失敗'}');
 
       if (!networkConnected) {
@@ -726,7 +393,10 @@ class _MyAppState extends State<MyApp> {
 
       debugPrint('開始初始化服務...');
       try {
-        bool success = await _initializeServices(_errorHandler);
+        bool success = await appInitializer.initializeServices(
+          _errorHandler,
+          navigatorKey,
+        );
 
         if (success) {
           // 只有在服務初始化成功時才更新UI
@@ -902,7 +572,7 @@ class _MyAppState extends State<MyApp> {
 
             // 用戶引導頁面
             '/login': (context) => const LoginPage(),
-            '/profile_setup': (context) => const ProfileSetupPage(),
+            // '/profile_setup' 移至 onGenerateRoute 以支持參數傳遞
             '/food_preference': (context) => const FoodPreferencePage(),
             '/personality_test': (context) => const PersonalityTestPage(),
 
@@ -937,6 +607,18 @@ class _MyAppState extends State<MyApp> {
           onGenerateRoute: (settings) {
             debugPrint('正在產生路由: ${settings.name}');
 
+            // 處理 profile_setup 路由（帶參數）
+            if (settings.name == '/profile_setup') {
+              final args = settings.arguments as Map<String, dynamic>?;
+              final isFromProfile = args?['isFromProfile'] as bool? ?? false;
+
+              return MaterialPageRoute(
+                builder:
+                    (context) => ProfileSetupPage(isFromProfile: isFromProfile),
+                settings: settings,
+              );
+            }
+
             // 處理聊天室路由（帶參數）
             if (settings.name == '/chat') {
               final args = settings.arguments as Map<String, dynamic>?;
@@ -968,18 +650,5 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
     );
-  }
-}
-
-// 創建生命週期監聽器類，用於處理應用程式恢復前台時的邏輯
-class _LifecycleEventHandler extends WidgetsBindingObserver {
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // 應用恢復前台時只清除已顯示的通知，保留排程通知
-      NotificationService().clearDisplayedNotifications();
-      // 應用恢復前台時嘗試刷新 NTP（非阻塞）
-      // TimeService().refresh();
-    }
   }
 }

@@ -638,3 +638,41 @@ BEGIN
     RETURN;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- === 版本更新公告表：version_announcements ===
+-- 用於儲存每個版本的新功能公告，當用戶更新後第一次打開 App 時顯示
+CREATE TABLE IF NOT EXISTS version_announcements (
+    id SERIAL PRIMARY KEY,
+    app_version VARCHAR(20) NOT NULL UNIQUE,  -- 對應的 App 版本，如 "2.1.0"
+    is_enabled BOOLEAN DEFAULT TRUE,          -- 是否啟用此公告
+    title TEXT,                               -- 對話框標題（可選）
+    content TEXT NOT NULL,                    -- 公告內容
+    icon_path TEXT,                           -- 圖示路徑，如 "assets/images/icon/new_feature.webp"
+    action_route TEXT,                        -- 確認後導航路由，如 "/profile"
+    action_label TEXT DEFAULT '前往設定',     -- 確認按鈕文字
+    cancel_label TEXT DEFAULT '稍後',         -- 取消按鈕文字
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 創建索引
+CREATE INDEX IF NOT EXISTS idx_version_announcements_version ON version_announcements(app_version);
+
+-- 為版本公告表啟用 RLS
+ALTER TABLE version_announcements ENABLE ROW LEVEL SECURITY;
+
+-- 允許所有已認證用戶讀取版本公告（公開資訊）
+CREATE POLICY version_announcements_select ON version_announcements
+    FOR SELECT TO authenticated
+    USING (true);
+
+-- 服務角色可以完全管理版本公告
+CREATE POLICY service_all_version_announcements ON version_announcements
+    FOR ALL TO authenticated
+    USING (current_setting('request.jwt.claims', true)::json->>'app' = 'service_role');
+
+-- 創建自動更新時間戳觸發器
+CREATE TRIGGER update_version_announcements_updated_at
+BEFORE UPDATE ON version_announcements
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp_column();
