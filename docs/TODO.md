@@ -265,4 +265,25 @@
 - [ ] [新功能] 多次未到停權處理，停權的使用者狀態與前端
 - [ ] [API] 停權帳號 （狀態） 
 
- 
+
+- [ ] [API] 強制結束聚餐的通知未發送，
+22:00:03
+餐廳選擇時段開始: 2025-12-27 06:00
+22:00:03
+餐廳選擇時段結束: 2025-12-28 06:00
+22:00:03
+取消預約截止時間: 2025-12-27 06:00
+22:00:03
+聚餐后問卷推播時間: 2025-12-29 22:00
+22:00:03
+INFO:routers.restaurant:群組 8b1aab58-c4ea-4405-8b28-c0bc9bf9827f 的聚餐事件 e40bedbc-a392-4d05-9cd3-4069463d586d 已成功創建（強制結束），通知將由 reminder_vote_result 排程發送
+22:00:03
+INFO:routers.restaurant:餐廳投票強制結束任務完成
+
+INFO:dependencies:用戶驗證成功: ncchen99@gmail.com
+01:51:14
+INFO:routers.dining:已設置聚餐事件 e40bedbc-a392-4d05-9cd3-4069463d586d 的自動重置任務
+02:00:02
+INFO:services.reminder_service:[reminder_vote_result] 沒有強制結束的聚餐事件需要發送通知
+02:00:02
+INFO:routers.schedule:[背景任務] reminder_vote_result 執行完成: {'success': True, 'reminder_type': 'reminder_vote_resu
