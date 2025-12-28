@@ -615,7 +615,7 @@ class ReminderService:
                 self.supabase.table("dining_events")
                 .select("id, matching_group_id, restaurant_id, date, description, restaurants(name)")
                 .in_("status", ["pending_confirmation", "confirmed"])
-                .like("description", "%投票時間已到自動選出%")
+                .like("description", "*投票時間已到自動選出*")
                 .execute()
             )
             return result.data or []
