@@ -93,7 +93,7 @@ Tuckin 鼓勵真實且安全的聚餐環境。透過學校 Gmail 認證，我們
 
 #### 🚀 我可以怎麼參與 Tuckin 的開發或貢獻這個專案？
 
-[Tuckin (Deepwiki 頁面)](https://deepwiki.com/ncchen99/Tuckin) 是一個開源專案，歡迎所有對專案有熱情的人加入我們！你可以自由 fork 專案、進行修改，然後提交 Pull Request。我們會認真審核，並考慮在未來的版本中加入你的貢獻。 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ncchen99/Tuckin) 是一個開源專案，歡迎所有對專案有熱情的人加入我們！你可以自由 fork 專案、進行修改，然後提交 Pull Request。我們會認真審核，並考慮在未來的版本中加入你的貢獻。 
 
 ## 🌟 App 的故事
 
