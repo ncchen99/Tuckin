@@ -5,7 +5,7 @@ python-dotenv==1.2.2
 supabase==1.0.3
 firebase-admin==6.2.0
 requests==2.33.0
-python-multipart==0.0.22
+python-multipart==0.0.26
 boto3==1.28.45
 gunicorn>=23.0.0
 pillow>=11.3.0
