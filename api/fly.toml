@@ -1,7 +1,7 @@
 # Fly.io 配置文件
 # 參考文檔: https://fly.io/docs/reference/configuration/
 
-app = 'tuckin-api'
+app = 'tuckin'
 primary_region = 'nrt'  # 東京區域，對台灣用戶延遲較低
 
 [build]

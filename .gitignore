@@ -88,3 +88,4 @@ ios/Runner/GoogleService-Info.plist
 
 
 GOOGLE_CREDENTIALS.json
+.wrangler/

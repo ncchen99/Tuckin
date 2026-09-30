@@ -7,12 +7,25 @@ import logging
 import asyncio
 from functools import lru_cache
 
-from config import R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PRIVATE_BUCKET_NAME
+from config import (
+    R2_ACCOUNT_ID,
+    R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY,
+    R2_BUCKET_NAME,
+    R2_PRIVATE_BUCKET_NAME,
+    R2_ENDPOINT_URL,
+    R2_PUBLIC_URL
+)
 
 logger = logging.getLogger(__name__)
 
 # 設置 Cloudflare R2 端點
-R2_ENDPOINT = f'https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com'
+if R2_ENDPOINT_URL:
+    R2_ENDPOINT = R2_ENDPOINT_URL
+elif R2_ACCOUNT_ID:
+    R2_ENDPOINT = f'https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com'
+else:
+    R2_ENDPOINT = None
 
 # 單例 R2 客戶端（避免重複創建）
 _r2_client = None
@@ -21,6 +34,9 @@ def get_r2_client():
     """獲取 R2 客戶端單例"""
     global _r2_client
     if _r2_client is None:
+        if not R2_ENDPOINT:
+            logger.error("未設置 R2_ENDPOINT_URL 或 R2_ACCOUNT_ID 環境變數")
+            raise ValueError("未設置 R2_ENDPOINT_URL 或 R2_ACCOUNT_ID 環境變數")
         _r2_client = boto3.client(
             's3',
             endpoint_url=R2_ENDPOINT,
@@ -64,7 +80,8 @@ async def upload_file_to_r2(
         )
         
         # 返回檔案 URL
-        return f"https://{R2_BUCKET_NAME}.r2.dev/{filename}"
+        base_url = (R2_PUBLIC_URL or f"https://{R2_BUCKET_NAME}.r2.dev").rstrip('/')
+        return f"{base_url}/{filename}"
     except Exception as e:
         print(f"上傳檔案到 R2 時發生錯誤: {e}")
         return None
@@ -106,9 +123,15 @@ def extract_r2_path_from_url(url: str) -> Optional[str]:
         R2 儲存桶中的相對路徑
     """
     try:
-        base_url = f"https://{R2_BUCKET_NAME}.r2.dev/"
-        if url.startswith(base_url):
-            return url[len(base_url):]
+        candidates = [
+            f"https://{R2_BUCKET_NAME}.r2.dev/"
+        ]
+        if R2_PUBLIC_URL:
+            candidates.insert(0, f"{R2_PUBLIC_URL.rstrip('/')}/")
+            
+        for base in candidates:
+            if url.startswith(base):
+                return url[len(base):]
         return None
     except Exception:
         return None
@@ -137,7 +160,7 @@ def generate_presigned_put_url(
             bucket_name = R2_PRIVATE_BUCKET_NAME
             
         if not bucket_name:
-            logger.error("未設置 Bucket 名稱")
+            logger.error("未設置 Bucket 名稱（請確認 R2_PRIVATE_BUCKET_NAME 環境變數）")
             return None
             
         client = get_r2_client()
@@ -199,7 +222,7 @@ def generate_presigned_get_url(
             bucket_name = R2_PRIVATE_BUCKET_NAME
             
         if not bucket_name:
-            logger.error("未設置 Bucket 名稱")
+            logger.error("未設置 Bucket 名稱（請確認 R2_PRIVATE_BUCKET_NAME 環境變數）")
             return None
             
         client = get_r2_client()
@@ -284,7 +307,7 @@ async def delete_file_from_private_r2(file_key: str) -> bool:
     """
     try:
         if not R2_PRIVATE_BUCKET_NAME:
-            logger.error("未設置私有 Bucket 名稱")
+            logger.error("未設置 R2_PRIVATE_BUCKET_NAME 環境變數")
             return False
             
         client = get_r2_client()
@@ -317,8 +340,8 @@ def delete_folder_from_private_r2_sync(folder_prefix: str) -> dict:
     
     try:
         if not R2_PRIVATE_BUCKET_NAME:
-            logger.error("未設置私有 Bucket 名稱")
-            result["errors"].append("未設置私有 Bucket 名稱")
+            logger.error("未設置 R2_PRIVATE_BUCKET_NAME 環境變數")
+            result["errors"].append("未設置 R2_PRIVATE_BUCKET_NAME 環境變數")
             return result
             
         client = get_r2_client()
