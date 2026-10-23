@@ -74,9 +74,13 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
-            // 簡化發佈配置
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // 啟用 R8 程式碼最佳化、模糊化與資源縮減
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
@@ -88,7 +92,6 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:32.7.1"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.android.gms:play-services-auth:20.7.0")
-    implementation("com.google.gms:google-services:4.3.15")
 }
 
 flutter {
